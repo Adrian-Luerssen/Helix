@@ -1386,24 +1386,28 @@
       
       const connectId = String(++state.rpcIdCounter);
       
+      const connectParams = {
+        minProtocol: WS_PROTOCOL_VERSION,
+        maxProtocol: WS_PROTOCOL_VERSION,
+        client: {
+          id: 'clawdbot-control-ui',
+          displayName: 'Sharp Dashboard',
+          mode: 'ui',
+          version: '2.0.0',
+          platform: 'browser'
+        }
+      };
+      
+      // Only include auth if we have a token (Caddy proxy handles auth otherwise)
+      if (state.token) {
+        connectParams.auth = { password: state.token };
+      }
+      
       const connectFrame = {
         type: 'req',
         id: connectId,
         method: 'connect',
-        params: {
-          minProtocol: WS_PROTOCOL_VERSION,
-          maxProtocol: WS_PROTOCOL_VERSION,
-          client: {
-            id: 'clawdbot-control-ui',
-            displayName: 'Sharp Dashboard',
-            mode: 'ui',
-            version: '2.0.0',
-            platform: 'browser'
-          },
-          auth: {
-            password: state.token
-          }
-        }
+        params: connectParams
       };
       
       console.log('[WS] Sending connect request');
