@@ -1752,6 +1752,9 @@
       archivedSessions: JSON.parse(localStorage.getItem('sharp_archived_sessions') || '[]'),
       showArchived: false,
       
+      // Custom session names
+      sessionNames: JSON.parse(localStorage.getItem('sharp_session_names') || '{}'),
+      
       // Auto-archive: 'never' or number of days
       autoArchiveDays: localStorage.getItem('sharp_auto_archive_days') || '7'
     };
@@ -1800,6 +1803,34 @@
     function toggleShowArchived() {
       state.showArchived = !state.showArchived;
       renderSessions();
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // SESSION RENAME
+    // ═══════════════════════════════════════════════════════════════
+    function getCustomSessionName(key) {
+      return state.sessionNames[key] || null;
+    }
+    
+    function setCustomSessionName(key, name) {
+      if (name && name.trim()) {
+        state.sessionNames[key] = name.trim();
+      } else {
+        delete state.sessionNames[key];
+      }
+      localStorage.setItem('sharp_session_names', JSON.stringify(state.sessionNames));
+      renderSessions();
+      renderSessionsGrid();
+    }
+    
+    function promptRenameSession(key, event) {
+      if (event) event.stopPropagation();
+      const session = state.sessions.find(s => s.key === key);
+      const current = getCustomSessionName(key) || getDefaultSessionName(session);
+      const newName = prompt('Rename session:', current);
+      if (newName !== null) {
+        setCustomSessionName(key, newName);
+      }
     }
     
     // ═══════════════════════════════════════════════════════════════
@@ -2485,6 +2516,11 @@
                       title="${isPinned ? 'Unpin' : 'Pin'}">
                 ${isPinned ? '★' : '☆'}
               </button>
+              <button class="session-action-btn" 
+                      onclick="promptRenameSession('${escapeHtml(s.key)}', event)" 
+                      title="Rename">
+                ✏️
+              </button>
               <button class="session-action-btn ${isArchived ? 'archived' : ''}" 
                       onclick="event.stopPropagation(); toggleArchiveSession('${escapeHtml(s.key)}')" 
                       title="${isArchived ? 'Unarchive' : 'Archive'}">
@@ -2511,6 +2547,14 @@
     }
     
     function getSessionName(s) {
+      // Check for custom name first
+      const customName = getCustomSessionName(s.key);
+      if (customName) return customName;
+      return getDefaultSessionName(s);
+    }
+    
+    function getDefaultSessionName(s) {
+      if (!s) return 'Unknown';
       if (s.key === 'agent:main:main') return 'Main';
       if (s.key.includes(':subagent:')) return s.label || 'Sub-agent';
       if (s.key.includes(':app:')) return `App: ${s.key.split(':app:')[1]}`;
