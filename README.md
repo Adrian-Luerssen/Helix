@@ -73,9 +73,8 @@ See [Backend API Documentation](docs/BACKEND-API.md) for the full protocol speci
 
 ```
 sharp/
-├── index.html           # Main dashboard
-├── app.html             # App view with assistant panel
-├── shell.html           # Shell/terminal view
+├── index.html           # Main dashboard (sessions, chat, agents)
+├── app.html             # App view with embedded assistant panel
 ├── lib/
 │   ├── config.js        # Configuration loader
 │   └── gateway-ws.js    # WebSocket client library
