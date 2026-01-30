@@ -1065,6 +1065,128 @@
       font-size: 0.8rem;
       color: var(--text-dim);
     }
+    
+    /* Compact Tool Activity Indicator */
+    .tool-activity {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 8px 0;
+      overflow: hidden;
+    }
+    .tool-activity-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .tool-activity-header:hover { background: var(--bg-hover); }
+    .tool-activity-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: tool-spin 0.8s linear infinite;
+    }
+    @keyframes tool-spin {
+      to { transform: rotate(360deg); }
+    }
+    .tool-activity-label {
+      flex: 1;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+    .tool-activity-tools {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .tool-activity-pill {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 3px 8px;
+      font-size: 0.75rem;
+      color: var(--text);
+      animation: tool-pill-pulse 1.5s ease-in-out infinite;
+    }
+    .tool-activity-pill.done {
+      animation: none;
+      opacity: 0.5;
+    }
+    .tool-activity-pill .pill-icon {
+      font-size: 0.8rem;
+    }
+    @keyframes tool-pill-pulse {
+      0%, 100% { opacity: 1; border-color: var(--border); }
+      50% { opacity: 0.7; border-color: var(--accent); }
+    }
+    .tool-activity-expand {
+      color: var(--text-dim);
+      font-size: 0.8rem;
+      transition: transform 0.2s;
+    }
+    .tool-activity.expanded .tool-activity-expand { transform: rotate(180deg); }
+    .tool-activity-details {
+      display: none;
+      border-top: 1px solid var(--border);
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .tool-activity.expanded .tool-activity-details { display: block; }
+    .tool-activity-item {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tool-activity-item:last-child { border-bottom: none; }
+    .tool-activity-item-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .tool-activity-item-icon { font-size: 1rem; }
+    .tool-activity-item-name { font-weight: 500; color: var(--accent); font-size: 0.85rem; }
+    .tool-activity-item-status {
+      margin-left: auto;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+    .tool-activity-item-status.running { color: var(--yellow); }
+    .tool-activity-item-status.done { color: var(--green); }
+    .tool-activity-item-content {
+      background: var(--bg);
+      border-radius: 4px;
+      padding: 8px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    .tool-activity-item-content.collapsed {
+      max-height: 60px;
+      overflow: hidden;
+      position: relative;
+    }
+    .tool-activity-item-content.collapsed::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 30px;
+      background: linear-gradient(transparent, var(--bg));
+    }
     .send-btn svg { width: 22px; height: 22px; fill: white; }
     
     .thinking { color: var(--text-dim); font-style: italic; }
@@ -2105,7 +2227,11 @@
       
       // Session status (brief current state)
       sessionStatus: JSON.parse(localStorage.getItem('sharp_session_status') || '{}'),
-      generatingStatus: new Set()
+      generatingStatus: new Set(),
+      
+      // Tool activity tracking (for compact indicator)
+      activeTools: new Map(),  // Map<toolCallId, { name, args, output, startedAt, status }>
+      toolActivityExpanded: false
     };
     
     // ═══════════════════════════════════════════════════════════════
@@ -2886,46 +3012,212 @@
         hideTypingIndicator(runId);
       }
       
-      // Show tool calls
+      // Show tool calls via compact activity indicator
       if (stream === 'tool' && state.currentSession?.key === sessionKey) {
+        const toolCallId = eventData?.toolCallId || `${runId}-${eventData?.name}-${Date.now()}`;
         const toolName = eventData?.name || eventData?.tool || 'tool';
         const toolInput = eventData?.input || eventData?.args || '';
         const toolOutput = eventData?.output || eventData?.result || '';
         
         if (eventData?.phase === 'start' || eventData?.type === 'call') {
-          addToolCall(runId, toolName, toolInput);
-        } else if (eventData?.phase === 'end' || eventData?.type === 'result') {
-          updateToolCallResult(runId, toolName, toolOutput);
+          trackToolStart(runId, toolCallId, toolName, toolInput);
+        } else if (eventData?.phase === 'end' || eventData?.phase === 'result' || eventData?.type === 'result') {
+          trackToolEnd(runId, toolCallId, toolName, toolOutput);
         }
       }
     }
     
-    function addToolCall(runId, toolName, input) {
+    // ═══════════════════════════════════════════════════════════════
+    // COMPACT TOOL ACTIVITY INDICATOR
+    // ═══════════════════════════════════════════════════════════════
+    
+    function getToolIcon(toolName) {
+      const name = (toolName || '').toLowerCase();
+      if (name.includes('read') || name.includes('file')) return '📄';
+      if (name.includes('write') || name.includes('edit')) return '✏️';
+      if (name.includes('exec') || name.includes('bash') || name.includes('shell')) return '⚡';
+      if (name.includes('browser') || name.includes('web')) return '🌐';
+      if (name.includes('search')) return '🔍';
+      if (name.includes('image')) return '🖼️';
+      if (name.includes('message') || name.includes('send')) return '💬';
+      if (name.includes('cron') || name.includes('schedule')) return '⏰';
+      if (name.includes('memory')) return '🧠';
+      return '🔧';
+    }
+    
+    function trackToolStart(runId, toolCallId, toolName, input) {
       hideTypingIndicator(runId);
       
-      const container = document.getElementById('chatMessages');
-      if (!container) return;
+      state.activeTools.set(toolCallId, {
+        runId,
+        name: toolName,
+        args: input,
+        output: null,
+        startedAt: Date.now(),
+        status: 'running'
+      });
       
-      const toolId = `tool-${runId}-${toolName}-${Date.now()}`;
-      const el = document.createElement('div');
-      el.id = toolId;
-      el.className = 'tool-call';
-      el.innerHTML = `
-        <div class="tool-call-header" onclick="this.parentElement.classList.toggle('expanded')">
-          <span class="tool-call-icon">🔧</span>
-          <span class="tool-call-name">${escapeHtml(toolName)}</span>
-          <span class="tool-call-toggle">▼</span>
-        </div>
-        <div class="tool-call-content">
-          <pre>${escapeHtml(typeof input === 'string' ? input : JSON.stringify(input, null, 2))}</pre>
-        </div>
-      `;
-      container.appendChild(el);
+      renderToolActivity();
       scrollChatToBottom();
     }
     
+    function trackToolEnd(runId, toolCallId, toolName, output) {
+      // Find by toolCallId or by name (fallback)
+      let tool = state.activeTools.get(toolCallId);
+      if (!tool) {
+        // Fallback: find most recent tool with same name
+        for (const [id, t] of state.activeTools) {
+          if (t.name === toolName && t.status === 'running') {
+            toolCallId = id;
+            tool = t;
+            break;
+          }
+        }
+      }
+      
+      if (tool) {
+        tool.output = output;
+        tool.status = 'done';
+        tool.endedAt = Date.now();
+        state.activeTools.set(toolCallId, tool);
+      }
+      
+      renderToolActivity();
+      
+      // Clear completed tools after a delay (keep them visible briefly)
+      setTimeout(() => {
+        cleanupCompletedTools(runId);
+      }, 3000);
+    }
+    
+    function cleanupCompletedTools(runId) {
+      // Only clean up if all tools for this run are done
+      let allDone = true;
+      for (const [id, tool] of state.activeTools) {
+        if (tool.runId === runId && tool.status === 'running') {
+          allDone = false;
+          break;
+        }
+      }
+      
+      if (allDone) {
+        // Remove all tools for this run
+        for (const [id, tool] of state.activeTools) {
+          if (tool.runId === runId) {
+            state.activeTools.delete(id);
+          }
+        }
+        renderToolActivity();
+      }
+    }
+    
+    function clearAllTools() {
+      state.activeTools.clear();
+      state.toolActivityExpanded = false;
+      const el = document.getElementById('toolActivityIndicator');
+      if (el) el.remove();
+    }
+    
+    function toggleToolActivityExpanded() {
+      state.toolActivityExpanded = !state.toolActivityExpanded;
+      const el = document.getElementById('toolActivityIndicator');
+      if (el) {
+        el.classList.toggle('expanded', state.toolActivityExpanded);
+      }
+    }
+    
+    function renderToolActivity() {
+      const container = document.getElementById('chatMessages');
+      if (!container) return;
+      
+      let el = document.getElementById('toolActivityIndicator');
+      
+      // If no active tools, remove the indicator
+      if (state.activeTools.size === 0) {
+        if (el) el.remove();
+        return;
+      }
+      
+      // Count running vs done
+      let runningCount = 0;
+      let doneCount = 0;
+      const tools = Array.from(state.activeTools.values());
+      tools.forEach(t => t.status === 'running' ? runningCount++ : doneCount++);
+      
+      // Build pills HTML
+      const pillsHtml = tools.slice(-5).map(t => {
+        const icon = getToolIcon(t.name);
+        const statusClass = t.status === 'done' ? 'done' : '';
+        return `<span class="tool-activity-pill ${statusClass}">
+          <span class="pill-icon">${icon}</span>
+          <span>${escapeHtml(t.name)}</span>
+        </span>`;
+      }).join('');
+      
+      // Build details HTML
+      const detailsHtml = tools.map(t => {
+        const icon = getToolIcon(t.name);
+        const statusClass = t.status === 'running' ? 'running' : 'done';
+        const statusText = t.status === 'running' ? '⏳ running' : '✓ done';
+        const argsStr = t.args ? (typeof t.args === 'string' ? t.args : JSON.stringify(t.args, null, 2)) : '';
+        const outputStr = t.output ? (typeof t.output === 'string' ? t.output : JSON.stringify(t.output, null, 2)) : '';
+        const contentStr = outputStr ? `${argsStr}\n\n--- Result ---\n${outputStr}` : argsStr;
+        
+        return `<div class="tool-activity-item">
+          <div class="tool-activity-item-header">
+            <span class="tool-activity-item-icon">${icon}</span>
+            <span class="tool-activity-item-name">${escapeHtml(t.name)}</span>
+            <span class="tool-activity-item-status ${statusClass}">${statusText}</span>
+          </div>
+          ${contentStr ? `<div class="tool-activity-item-content collapsed">${escapeHtml(contentStr)}</div>` : ''}
+        </div>`;
+      }).join('');
+      
+      const labelText = runningCount > 0 
+        ? `Working... (${runningCount} active${doneCount > 0 ? `, ${doneCount} done` : ''})`
+        : `${doneCount} tool${doneCount !== 1 ? 's' : ''} completed`;
+      
+      const showSpinner = runningCount > 0;
+      
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'toolActivityIndicator';
+        el.className = 'tool-activity';
+        container.appendChild(el);
+      }
+      
+      if (state.toolActivityExpanded) {
+        el.classList.add('expanded');
+      }
+      
+      el.innerHTML = `
+        <div class="tool-activity-header" onclick="toggleToolActivityExpanded()">
+          ${showSpinner ? '<div class="tool-activity-spinner"></div>' : '<span style="color: var(--green);">✓</span>'}
+          <span class="tool-activity-label">${labelText}</span>
+          <div class="tool-activity-tools">${pillsHtml}</div>
+          <span class="tool-activity-expand">▼</span>
+        </div>
+        <div class="tool-activity-details">${detailsHtml}</div>
+      `;
+      
+      scrollChatToBottom();
+    }
+    
+    // Legacy function for compatibility - now uses compact indicator
+    function addToolCall(runId, toolName, input) {
+      const toolCallId = `${runId}-${toolName}-${Date.now()}`;
+      trackToolStart(runId, toolCallId, toolName, input);
+    }
+    
     function updateToolCallResult(runId, toolName, output) {
-      // Find the most recent tool call with this name and add result
+      // Find most recent tool with this name
+      for (const [id, tool] of state.activeTools) {
+        if (tool.name === toolName && tool.status === 'running') {
+          trackToolEnd(runId, id, toolName, output);
+          return;
+        }
+      }
+      // Fallback: legacy behavior
       const toolCalls = document.querySelectorAll('.tool-call');
       for (let i = toolCalls.length - 1; i >= 0; i--) {
         const nameEl = toolCalls[i].querySelector('.tool-call-name');
@@ -2972,6 +3264,9 @@
           state.isThinking = false;
           updateSendButton();
           
+          // Clear tool activity indicator after brief delay
+          setTimeout(() => clearAllTools(), 2000);
+          
           // Finalize streaming message or add new one
           if (message?.content) {
             const text = extractText(message.content);
@@ -2992,6 +3287,7 @@
           state.isThinking = false;
           updateSendButton();
           removeStreamingMessage(runId);
+          clearAllTools();  // Clear tool activity on error/abort
           if (data.errorMessage) {
             addChatMessage('system', `Error: ${data.errorMessage}`);
           }
@@ -3925,6 +4221,9 @@
       
       // Mark session as read
       markSessionRead(key);
+      
+      // Clear tool activity from previous session
+      clearAllTools();
       
       state.currentView = 'chat';
       state.currentSession = session;
