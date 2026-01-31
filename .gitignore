@@ -25,3 +25,7 @@ Caddyfile
 node_modules/
 start-gateway.sh
 package-lock.json
+
+# pycache
+**/__pycache__/
+*.pyc

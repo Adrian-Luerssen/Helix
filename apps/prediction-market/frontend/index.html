@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediction Market Agent</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <span class="logo">🎰</span>
+                <h1>Prediction Market Agent</h1>
+            </div>
+            <div class="header-right">
+                <span class="status-badge" id="status-badge">Paper Trading</span>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab active" data-tab="trades">📋 Trades</button>
+            <button class="tab" data-tab="strategies">🎯 Strategies</button>
+            <button class="tab" data-tab="performance">📈 Performance</button>
+            <button class="tab" data-tab="analysis">🔍 Analysis</button>
+        </nav>
+
+        <!-- Tab Content -->
+        <main class="content">
+            <!-- Trades Tab -->
+            <section id="trades-tab" class="tab-content active">
+                <div class="toolbar">
+                    <div class="filters">
+                        <select id="filter-status">
+                            <option value="">All Status</option>
+                            <option value="open">Open</option>
+                            <option value="resolved_win">Won</option>
+                            <option value="resolved_loss">Lost</option>
+                        </select>
+                        <select id="filter-strategy">
+                            <option value="">All Strategies</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" id="refresh-trades">↻ Refresh</button>
+                </div>
+                
+                <div class="stats-row" id="trade-stats">
+                    <div class="stat">
+                        <span class="stat-value" id="total-trades">-</span>
+                        <span class="stat-label">Total Trades</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="open-trades">-</span>
+                        <span class="stat-label">Open</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="total-pnl">-</span>
+                        <span class="stat-label">Total P&L</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="win-rate">-</span>
+                        <span class="stat-label">Win Rate</span>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="trades-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Market</th>
+                                <th>Side</th>
+                                <th>Price</th>
+                                <th>Amount</th>
+                                <th>Strategy</th>
+                                <th>Status</th>
+                                <th>P&L</th>
+                                <th>CLV</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trades-body">
+                            <tr><td colspan="9" class="loading">Loading trades...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Strategies Tab -->
+            <section id="strategies-tab" class="tab-content">
+                <div class="strategies-grid" id="strategies-grid">
+                    <div class="loading">Loading strategies...</div>
+                </div>
+            </section>
+
+            <!-- Performance Tab -->
+            <section id="performance-tab" class="tab-content">
+                <div class="performance-summary" id="performance-summary">
+                    <div class="loading">Loading performance data...</div>
+                </div>
+                <div class="charts-container">
+                    <div class="chart-placeholder">
+                        <h3>Cumulative P&L</h3>
+                        <div class="chart" id="pnl-chart">[Chart placeholder]</div>
+                    </div>
+                    <div class="chart-placeholder">
+                        <h3>Win Rate by Category</h3>
+                        <div class="chart" id="category-chart">[Chart placeholder]</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analysis Tab -->
+            <section id="analysis-tab" class="tab-content">
+                <h2>Trade Analysis</h2>
+                <p class="subtitle">Review resolved trades and their lessons</p>
+                
+                <div class="analysis-list" id="analysis-list">
+                    <div class="loading">Loading resolved trades...</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
