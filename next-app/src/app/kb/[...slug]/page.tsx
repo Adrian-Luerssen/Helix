@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getDocument, getFolderTree, getAllDocuments } from '@/lib/kb';
-import { Sidebar, DocViewer } from '@/components/kb';
+import { KbDocPageClient } from '@/components/kb/KbDocPageClient';
 
 type PageProps = {
   params: Promise<{ slug: string[] }>;
@@ -58,37 +58,18 @@ export default async function DocPage({ params }: PageProps) {
   };
 
   return (
-    <div className="flex h-screen">
-      <Sidebar tree={tree} currentSlug={slugPath} />
-
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="h-[60px] bg-[var(--bg-panel)] border-b border-[var(--border-subtle)] flex items-center px-6 gap-4 shrink-0">
-          <nav className="flex items-center gap-2 text-sm text-[var(--text-dim)]">
-            <a href="/kb" className="hover:text-[var(--accent)] transition-colors">
-              Knowledge Base
-            </a>
-            {slug.slice(0, -1).map((part, i) => (
-              <span key={i} className="flex items-center gap-2">
-                <span>/</span>
-                <span className="capitalize">{part}</span>
-              </span>
-            ))}
-          </nav>
-        </header>
-
-        {/* Document content */}
-        <DocViewer
-          title={doc.meta.title}
-          tags={doc.meta.tags}
-          html={doc.html}
-          created={typeof serializedMeta.created === 'string' ? serializedMeta.created : undefined}
-          updated={typeof serializedMeta.updated === 'string' ? serializedMeta.updated : undefined}
-          backlinks={backlinks}
-          meta={docMeta}
-        />
-      </main>
-    </div>
+    <KbDocPageClient
+      tree={tree}
+      slugParts={slug}
+      slugPath={slugPath}
+      title={doc.meta.title}
+      tags={doc.meta.tags}
+      html={doc.html}
+      created={typeof serializedMeta.created === 'string' ? serializedMeta.created : undefined}
+      updated={typeof serializedMeta.updated === 'string' ? serializedMeta.updated : undefined}
+      backlinks={backlinks}
+      meta={docMeta}
+    />
   );
 }
 
