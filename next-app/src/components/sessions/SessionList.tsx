@@ -5,9 +5,14 @@
  * Displays a list of agent sessions with real-time updates
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { SessionCard } from './SessionCard';
 import { useGateway } from '@/hooks/use-gateway';
+import { 
+  getSessionStatus, 
+  getFilterPreset,
+  type SmartSessionStatus,
+} from '@/lib/session-status';
 import type { Session, SessionKey, ChatEvent, AgentEvent } from '@/lib/types';
 
 const SUBAGENT_PARENT_KEY = 'sharp_subagent_parents';
@@ -41,6 +46,10 @@ type SessionListProps = {
   selectedSession?: SessionKey | null;
   searchQuery?: string;
   channelFilter?: string;
+  agentFilter?: string;
+  statusFilter?: string;
+  typeFilter?: string;
+  activePreset?: string | null;
 };
 
 export function SessionList({ 
@@ -48,6 +57,10 @@ export function SessionList({
   selectedSession: _selectedSession,
   searchQuery = '',
   channelFilter = 'all',
+  agentFilter = '',
+  statusFilter = 'all',
+  typeFilter = 'all',
+  activePreset = null,
 }: SessionListProps): React.ReactElement {
   const { isConnected, listSessions, subscribe, gateway, abort } = useGateway();
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -179,20 +192,25 @@ export function SessionList({
     return parts[2] || 'unknown';
   };
 
+  const getSessionAgent = (key: SessionKey): string => {
+    const parts = key.split(':');
+    return parts[1] || 'unknown';
+  };
+
   // Check if session is a subagent
   const isSubagent = (key: SessionKey): boolean => {
     return getSessionChannel(key) === 'subagent';
   };
 
   const findParentByTiming = (subagent: Session, candidates: Session[]): Session | null => {
-    const subagentTime = subagent.createdAt ? new Date(subagent.createdAt).getTime() : 0;
+    const subagentTime = subagent.createdAt ? new Date(subagent.createdAt || 0).getTime() : 0;
     let bestParent: Session | null = null;
     let bestTimeDiff = Infinity;
 
     for (const parent of candidates) {
       const parentTime = parent.lastMessageAt
         ? new Date(parent.lastMessageAt).getTime()
-        : new Date(parent.createdAt).getTime();
+        : new Date(parent.createdAt || 0).getTime();
       const timeDiff = subagentTime - parentTime;
       if (timeDiff >= -60000 && timeDiff < bestTimeDiff) {
         bestTimeDiff = timeDiff;
@@ -207,18 +225,67 @@ export function SessionList({
   // But keep subagents grouped after their potential parents
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const normalizedChannel = channelFilter.trim().toLowerCase();
+  const normalizedAgent = agentFilter.trim().toLowerCase();
+  const normalizedStatus = statusFilter.trim().toLowerCase();
+  const normalizedType = typeFilter.trim().toLowerCase();
+
+  // Get the active preset filter function if one is selected
+  const presetFilter = activePreset ? getFilterPreset(activePreset)?.filter : null;
+
+  // Helper to get session type from key
+  const getSessionType = (key: SessionKey): string => {
+    if (key.includes(':topic:')) return 'topics';
+    if (key.includes(':cron:')) return 'crons';
+    if (key.includes(':webchat:')) return 'webchat';
+    if (key.includes(':app:') || key.includes(':sharp:')) return 'apps';
+    if (key.endsWith(':main') || key.includes(':telegram:') || key.includes(':whatsapp:') || key.includes(':discord:')) return 'conversations';
+    return 'other';
+  };
 
   const filteredSessions = sessions.filter((session) => {
+    // Apply preset filter if active
+    if (presetFilter && !presetFilter(session, activeRuns)) {
+      return false;
+    }
+
+    // Channel filter
     const sessionChannel = (session.channel || getSessionChannel(session.key)).toLowerCase();
     if (normalizedChannel && normalizedChannel !== 'all' && sessionChannel !== normalizedChannel) {
       return false;
     }
 
+    // Agent filter
+    if (normalizedAgent) {
+      const sessionAgent = getSessionAgent(session.key).toLowerCase();
+      if (sessionAgent !== normalizedAgent) {
+        return false;
+      }
+    }
+
+    // Status filter (smart status)
+    if (normalizedStatus && normalizedStatus !== 'all') {
+      const sessionStatus = getSessionStatus(session, activeRuns);
+      if (sessionStatus !== normalizedStatus) {
+        return false;
+      }
+    }
+
+    // Type filter
+    if (normalizedType && normalizedType !== 'all') {
+      const sessionType = getSessionType(session.key);
+      if (sessionType !== normalizedType) {
+        return false;
+      }
+    }
+
+    // Search filter
     if (!normalizedSearch) return true;
 
     const lastMessageContent = session.messages?.[0]?.content ?? '';
     const haystackKey = session.key.toLowerCase();
-    const haystackMessage = lastMessageContent.toLowerCase();
+    const haystackMessage = typeof lastMessageContent === 'string' 
+      ? lastMessageContent.toLowerCase() 
+      : '';
     return haystackKey.includes(normalizedSearch) || haystackMessage.includes(normalizedSearch);
   });
 
@@ -433,6 +500,7 @@ export function SessionList({
             <SessionCard
               session={node.session}
               isActive={activeRuns.has(node.session.key)}
+              activeRuns={activeRuns}
               onClick={onSessionSelect}
               onAbort={abort}
               isSelectable={!node.isVirtual}
@@ -476,6 +544,7 @@ export function SessionList({
                       <SessionCard
                         session={child}
                         isActive={activeRuns.has(child.key)}
+                        activeRuns={activeRuns}
                         onClick={onSessionSelect}
                         onAbort={abort}
                         isChild

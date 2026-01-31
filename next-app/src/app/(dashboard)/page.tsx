@@ -100,7 +100,7 @@ export default function DashboardPage(): React.ReactElement {
   }, [isConnected, listSessions, gateway]);
 
   // Calculate stats
-  const totalMessages = sessions.reduce((sum, s) => sum + s.messageCount, 0);
+  const totalMessages = sessions.reduce((sum, s) => sum + (s.messageCount || 0), 0);
   const channelCounts = sessions.reduce((acc, s) => {
     const channel = s.key.split(':')[2] || 'unknown';
     acc[channel] = (acc[channel] || 0) + 1;

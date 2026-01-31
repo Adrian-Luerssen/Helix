@@ -18,6 +18,7 @@ import type {
   Session,
   Message,
   HistoryResponse,
+  Agent,
 } from './types';
 
 // ═══════════════════════════════════════════════════════════════
@@ -281,6 +282,10 @@ export class GatewayClient {
     return this.request('sessions.list', { limit, messageLimit });
   }
   
+  async listAgents(): Promise<{ agents: Agent[] }> {
+    return this.request('agents.list', {});
+  }
+
   async getActiveRuns(): Promise<{ runs: Array<{ sessionKey: SessionKey; runId: string }> }> {
     return this.request('chat.activeRuns', {});
   }

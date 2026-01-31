@@ -14,6 +14,7 @@ import type {
   Message,
   HistoryResponse,
   Session,
+  Agent,
   ChatEvent,
   AgentEvent,
   GatewayEvents,
@@ -46,6 +47,9 @@ export type UseGatewayReturn = {
   
   // Session methods
   listSessions: (limit?: number) => Promise<{ sessions: Session[] }>;
+  
+  // Agent methods
+  listAgents: () => Promise<{ agents: Agent[] }>;
   
   // Event subscription
   subscribe: <K extends keyof GatewayEvents>(
@@ -170,6 +174,15 @@ export function useGateway(options: UseGatewayOptions = {}): UseGatewayReturn {
     return gateway.listSessions(limit);
   }, []);
   
+  // List agents
+  const listAgents = useCallback(async (): Promise<{ agents: Agent[] }> => {
+    const gateway = gatewayRef.current;
+    if (!gateway) {
+      throw new Error('Gateway not initialized');
+    }
+    return gateway.listAgents();
+  }, []);
+  
   // Subscribe to events
   const subscribe = useCallback(<K extends keyof GatewayEvents>(
     event: K,
@@ -201,6 +214,7 @@ export function useGateway(options: UseGatewayOptions = {}): UseGatewayReturn {
     getHistory,
     abort,
     listSessions,
+    listAgents,
     subscribe,
     gateway: gatewayRef.current,
   };

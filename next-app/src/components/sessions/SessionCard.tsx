@@ -6,10 +6,16 @@
  */
 
 import type { Session, SessionKey } from '@/lib/types';
+import { 
+  getSessionStatus, 
+  getStatusConfig,
+  type SmartSessionStatus,
+} from '@/lib/session-status';
 
 type SessionCardProps = {
   session: Session;
   isActive?: boolean;
+  activeRuns?: Set<SessionKey>;
   isChild?: boolean;
   isSelectable?: boolean;
   onClick?: (sessionKey: SessionKey) => void;
@@ -74,6 +80,7 @@ function truncate(text: string, maxLength: number): string {
 export function SessionCard({
   session,
   isActive = false,
+  activeRuns,
   isChild = false,
   isSelectable = true,
   onClick,
@@ -83,6 +90,12 @@ export function SessionCard({
   const displayAgent = session.label ?? agent;
   const lastMessage = session.messages?.[0];
   const isInteractive = Boolean(onClick) && isSelectable;
+  
+  // Compute smart status
+  const smartStatus: SmartSessionStatus = activeRuns 
+    ? getSessionStatus(session, activeRuns)
+    : (isActive ? 'running' : 'idle');
+  const statusConfig = getStatusConfig(smartStatus);
   
   const handleClick = (): void => {
     if (!isInteractive) return;
@@ -112,14 +125,23 @@ export function SessionCard({
     >
       {/* Header: Agent + Channel + Time */}
       <div className="flex items-center gap-2 mb-2">
-        {/* Status indicator */}
+        {/* Smart Status indicator */}
         <div 
           className={`
-            w-2 h-2 rounded-full shrink-0
-            ${isActive ? 'bg-[var(--green)] animate-pulse' : 'bg-[var(--text-muted)]'}
-          `} 
-          title={isActive ? 'Active' : 'Idle'}
-        />
+            shrink-0 flex items-center gap-1 text-xs px-1.5 py-0.5 rounded
+            ${smartStatus === 'running' ? 'animate-pulse' : ''}
+          `}
+          style={{ 
+            backgroundColor: statusConfig.bgColor,
+            color: statusConfig.color,
+          }}
+          title={statusConfig.description}
+        >
+          <span>{statusConfig.emoji}</span>
+          {(smartStatus === 'running' || smartStatus === 'needs-you' || smartStatus === 'error') && (
+            <span className="font-medium">{statusConfig.label}</span>
+          )}
+        </div>
         
         {/* Agent name */}
         <span className="font-medium text-[var(--text)]">{displayAgent}</span>

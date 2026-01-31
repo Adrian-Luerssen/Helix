@@ -77,16 +77,41 @@ export type Session = {
   key: SessionKey;
   channel: string;
   label?: string;
-  createdAt: string;
+  createdAt?: string;
   lastMessageAt?: string;
-  messageCount: number;
+  updatedAt?: number;  // Timestamp in ms from gateway
+  messageCount?: number;
   messages?: Message[];
+  abortedLastRun?: boolean;
+  // Additional fields from gateway
+  displayName?: string;
+  model?: string;
+  totalTokens?: number;
+  contextTokens?: number;
 };
 
 export type SessionStatus = 'idle' | 'running' | 'offline';
 
 export type SessionListResponse = {
   sessions: Session[];
+};
+
+// ═══════════════════════════════════════════════════════════════
+// AGENT TYPES
+// ═══════════════════════════════════════════════════════════════
+
+export type Agent = {
+  id: string;
+  name?: string;
+  identityName: string;
+  identityEmoji: string;
+  identitySource: string;
+  workspace: string;
+  agentDir: string;
+  model: string;
+  bindings: number;
+  isDefault: boolean;
+  routes?: string[];
 };
 
 // ═══════════════════════════════════════════════════════════════

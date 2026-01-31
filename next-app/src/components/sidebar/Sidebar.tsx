@@ -110,6 +110,12 @@ export function Sidebar(): React.ReactElement {
         </NavSection>
         <NavSection title="Agents">
           <NavItem 
+            href="/agents" 
+            icon="🤖" 
+            label="Agents" 
+            isActive={pathname === '/agents'} 
+          />
+          <NavItem 
             href="/sessions" 
             icon="🤖" 
             label="Sessions" 
