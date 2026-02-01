@@ -332,7 +332,7 @@
       
       // Auth - loaded from config or localStorage
       // Token should be set via config.json or login modal, NOT hardcoded
-      token: localStorage.getItem('sharp_token') || (window.location.port === '9000' ? 'REDACTED' : null),
+      token: localStorage.getItem('sharp_token') || null,
       gatewayUrl: (() => {
         // Priority: localStorage > config > auto-detect
         const saved = localStorage.getItem('sharp_gateway');
