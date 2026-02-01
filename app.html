@@ -324,12 +324,18 @@ Be concise. Start by reading the entry file to understand the current state.`;
       await callAgent(contextMsg, true);
     }
 
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML.replace(/'/g, '&#39;');
+    }
+
     function addMessage(role, content) {
       const container = document.getElementById('messages');
       const msg = document.createElement('div');
       msg.className = `message ${role}`;
       if (role === 'assistant') {
-        msg.innerHTML = content
+        msg.innerHTML = escapeHtml(content)
           .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
           .replace(/`([^`]+)`/g, '<code>$1</code>')
           .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')

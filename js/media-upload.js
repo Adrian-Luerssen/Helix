@@ -31,6 +31,12 @@ const MediaUpload = (() => {
   // ═══════════════════════════════════════════════════════════════
   // UTILITIES
   // ═══════════════════════════════════════════════════════════════
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+  }
+
   function generateId() {
     return `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
@@ -229,7 +235,7 @@ const MediaUpload = (() => {
       if (isImage && f.previewUrl) {
         return `
           <div class="media-preview-item ${statusClass}" data-id="${f.id}">
-            <img src="${f.previewUrl}" alt="${f.file.name}">
+            <img src="${f.previewUrl}" alt="${escapeHtml(f.file.name)}">
             <button class="media-remove-btn" onclick="MediaUpload.removeFile('${f.id}')" title="Remove">×</button>
             ${progressBar}
             ${f.status === 'error' ? '<div class="media-error">!</div>' : ''}
@@ -241,7 +247,7 @@ const MediaUpload = (() => {
         return `
           <div class="media-preview-item audio ${statusClass}" data-id="${f.id}">
             <div class="media-audio-icon">${icon}</div>
-            <div class="media-audio-name">${f.file.name}</div>
+            <div class="media-audio-name">${escapeHtml(f.file.name)}</div>
             <button class="media-remove-btn" onclick="MediaUpload.removeFile('${f.id}')" title="Remove">×</button>
             ${progressBar}
             ${f.status === 'error' ? '<div class="media-error">!</div>' : ''}
