@@ -218,6 +218,12 @@ Implement the [Backend API](BACKEND-API.md) protocol:
 ## Security Notes
 
 - **Never commit** `Caddyfile` or `config.json` with real tokens
+- By default, Sharp **does not** apply markdown/media rendering to **user** messages. To enable it, set:
+  - `features.formatUserMessages: true`
+- By default, Sharp **blocks external http(s) media embeds** (images/audio/links) for safety. To allow external embeds, set:
+  - `features.allowExternalMedia: true`
+
+Recommended: keep both flags `false` when viewing chats that may include untrusted user content.
 - Use environment variables for secrets in production
 - Consider using Tailscale or similar for secure internal access
 - The `.gitignore` excludes sensitive files by default

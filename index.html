@@ -2793,7 +2793,9 @@
       
       // Format content
       let contentHtml;
-      const shouldFormat = role.startsWith('assistant') || role.startsWith('user');
+      const features = (config && config.features) ? config.features : {};
+      const formatUserMessages = features.formatUserMessages === true;
+      const shouldFormat = role.startsWith('assistant') || (formatUserMessages && role.startsWith('user'));
       if (shouldFormat && !role.includes('thinking')) {
         contentHtml = formatMessage(content);
       } else {
@@ -2845,15 +2847,22 @@
       if (!rawUrl) return null;
       const trimmed = rawUrl.trim();
 
+      // Always allow local uploads paths
       if (trimmed.startsWith('/apps/uploads/')) {
         return trimmed;
       }
 
+      // Back-compat: /uploads/* served by OpenClaw apps → rewrite
       if (trimmed.startsWith('/uploads/')) {
         return `/apps${trimmed}`;
       }
 
+      // External media is optional (off by default for safer fresh installs)
+      const features = (config && config.features) ? config.features : {};
+      const allowExternalMedia = features.allowExternalMedia === true;
+
       if (/^https?:\/\//i.test(trimmed)) {
+        if (!allowExternalMedia) return null;
         try {
           const parsed = new URL(trimmed);
           if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
