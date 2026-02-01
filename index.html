@@ -400,6 +400,9 @@
       
       // Track which session groups are expanded (for nested view)
       expandedGroups: JSON.parse(localStorage.getItem('sharp_expanded_groups') || '{}'),
+
+      // Track which agent nodes are expanded in sidebar (Agents > Sessions/Subsessions)
+      expandedAgents: JSON.parse(localStorage.getItem('sharp_expanded_agents') || '{}'),
       
       // Session status (brief current state)
       sessionStatus: JSON.parse(localStorage.getItem('sharp_session_status') || '{}'),
@@ -466,6 +469,17 @@
     function isGroupExpanded(groupKey) {
       // Default to expanded
       return state.expandedGroups[groupKey] !== false;
+    }
+
+    function toggleAgentExpanded(agentId) {
+      state.expandedAgents[agentId] = !isAgentExpanded(agentId);
+      localStorage.setItem('sharp_expanded_agents', JSON.stringify(state.expandedAgents));
+      renderAgents();
+    }
+
+    function isAgentExpanded(agentId) {
+      // Default to expanded
+      return state.expandedAgents[agentId] !== false;
     }
     
     function getGroupUnreadCount(groupKey, sessions) {
@@ -1958,6 +1972,8 @@
           checkAutoArchive();
           renderSessions();
           renderSessionsGrid();
+          // Agents tree uses sessions for its nested view
+          if (state.agents?.length) renderAgents();
         }
       } catch (err) {
         console.error('[Sharp] Failed to load sessions:', err);
@@ -1993,24 +2009,78 @@
     
     function renderAgents() {
       const container = document.getElementById('agentsList');
-      
+
       if (state.agents.length === 0) {
         container.innerHTML = `<div style="padding: 16px; color: var(--text-dim); font-size: 0.85rem;">No agents configured</div>`;
         return;
       }
-      
+
+      // Build a lightweight tree: Agent -> Sessions -> Subsessions.
+      // NOTE: The backend session model does not currently expose parent pointers for subagents,
+      // so we group by agentId only.
+      const sessionsByAgent = new Map();
+      for (const a of state.agents) {
+        sessionsByAgent.set(a.id, { sessions: [], subsessions: [] });
+      }
+
+      for (const s of (state.sessions || [])) {
+        const m = s.key.match(/^agent:([^:]+):/);
+        if (!m) continue;
+        const agentId = m[1];
+        if (!sessionsByAgent.has(agentId)) continue;
+        if (s.key.includes(':subagent:')) sessionsByAgent.get(agentId).subsessions.push(s);
+        else sessionsByAgent.get(agentId).sessions.push(s);
+      }
+
+      // Sort newest first
+      for (const group of sessionsByAgent.values()) {
+        group.sessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        group.subsessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      }
+
       container.innerHTML = state.agents.map(agent => {
         const emoji = agent.identity?.emoji || '🤖';
         const name = agent.identity?.name || agent.name || agent.id;
         const isDefault = agent.isDefault ? ' (default)' : '';
+        const expanded = isAgentExpanded(agent.id);
+        const group = sessionsByAgent.get(agent.id) || { sessions: [], subsessions: [] };
+
+        const sessionsHtml = group.sessions.length
+          ? group.sessions.map(s => renderSessionItem(s, true)).join('')
+          : `<div style="padding: 10px 16px 10px 48px; color: var(--text-dim); font-size: 0.8rem;">No sessions</div>`;
+
+        const subsessionsHtml = group.subsessions.length
+          ? group.subsessions.map(s => renderSessionItem(s, true)).join('')
+          : `<div style="padding: 10px 16px 10px 48px; color: var(--text-dim); font-size: 0.8rem;">No subsessions</div>`;
+
         return `
-          <div class="item" onclick="showAgentDetails('${escapeHtml(agent.id)}')">
-            <div class="item-icon">${emoji}</div>
-            <div class="item-content">
-              <div class="item-name">${escapeHtml(name)}${isDefault}</div>
-              <div class="item-meta">${escapeHtml(agent.id)}</div>
+          <div class="session-group ${expanded ? 'expanded' : ''}">
+            <div class="session-group-header" onclick="toggleAgentExpanded('${escapeHtml(agent.id)}')">
+              <span class="group-expand-icon">${expanded ? '▼' : '▶'}</span>
+              <span class="group-icon">${emoji}</span>
+              <span class="group-name">${escapeHtml(name)}${isDefault}</span>
+              <span class="group-count">${group.sessions.length + group.subsessions.length}</span>
+              <button class="session-action-btn" onclick="event.stopPropagation(); startNewSession('${escapeHtml(agent.id)}')" title="New session">＋</button>
+              <button class="session-action-btn" onclick="event.stopPropagation(); showAgentDetails('${escapeHtml(agent.id)}')" title="Details">ℹ</button>
             </div>
-            <button class="item-action" onclick="event.stopPropagation(); startNewSession('${escapeHtml(agent.id)}')" title="New session">+</button>
+            ${expanded ? `
+              <div class="session-group-items">
+                <div class="session-group-header" style="padding-left: 36px; font-size: 0.78rem; color: var(--text-dim); cursor: default;">
+                  <span class="group-expand-icon" style="visibility: hidden;">▶</span>
+                  <span class="group-icon">💬</span>
+                  <span class="group-name">Sessions</span>
+                  <span class="group-count">${group.sessions.length}</span>
+                </div>
+                ${sessionsHtml}
+                <div class="session-group-header" style="padding-left: 36px; font-size: 0.78rem; color: var(--text-dim); cursor: default; border-top: 1px solid var(--border-subtle);">
+                  <span class="group-expand-icon" style="visibility: hidden;">▶</span>
+                  <span class="group-icon">⚡</span>
+                  <span class="group-name">Subsessions</span>
+                  <span class="group-count">${group.subsessions.length}</span>
+                </div>
+                ${subsessionsHtml}
+              </div>
+            ` : ''}
           </div>
         `;
       }).join('');
@@ -2152,6 +2222,69 @@
       `;
     }
     
+    function buildSubagentParentMap(mainSessions, subagentSessions) {
+      // Heuristic parenting: we don't have explicit parent pointers.
+      // We attach each subagent to the closest-in-time main session for the same agent.
+      const byAgent = new Map();
+      for (const s of mainSessions) {
+        const m = s.key.match(/^agent:([^:]+):/);
+        const agentId = m ? m[1] : null;
+        if (!agentId) continue;
+        if (!byAgent.has(agentId)) byAgent.set(agentId, []);
+        byAgent.get(agentId).push(s);
+      }
+      for (const arr of byAgent.values()) {
+        arr.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      }
+
+      const parentMap = new Map(); // parentSessionKey -> subagent[]
+      const unparented = [];
+
+      const MAX_ATTACH_AGE_MS = 2 * 60 * 60 * 1000; // 2h window
+      const ALLOW_FUTURE_PARENT_MS = 5 * 60 * 1000; // tolerate slight clock/order skew
+
+      for (const sub of subagentSessions) {
+        const m = sub.key.match(/^agent:([^:]+):/);
+        const agentId = m ? m[1] : null;
+        const candidates = agentId ? (byAgent.get(agentId) || []) : [];
+
+        let best = null;
+        let bestScore = Infinity;
+        const subTime = sub.updatedAt || 0;
+
+        for (const cand of candidates) {
+          const candTime = cand.updatedAt || 0;
+          const dt = Math.abs(subTime - candTime);
+
+          // Avoid attaching to something wildly unrelated
+          if (dt > MAX_ATTACH_AGE_MS) continue;
+
+          // Prefer candidates not too far "after" the subagent (but allow a bit)
+          if (candTime - subTime > ALLOW_FUTURE_PARENT_MS) continue;
+
+          if (dt < bestScore) {
+            best = cand;
+            bestScore = dt;
+          }
+        }
+
+        if (best) {
+          if (!parentMap.has(best.key)) parentMap.set(best.key, []);
+          parentMap.get(best.key).push(sub);
+        } else {
+          unparented.push(sub);
+        }
+      }
+
+      // Sort each child list newest-first
+      for (const arr of parentMap.values()) {
+        arr.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      }
+      unparented.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+      return { parentMap, unparented };
+    }
+
     function renderSessions() {
       const container = document.getElementById('sessionsList');
       const archivedToggle = document.getElementById('showArchivedToggle');
@@ -2179,9 +2312,18 @@
         if (!matchesSearch(s)) return false;
         return true;
       });
-      
+
+      // Split out subagents so we can nest them under a parent session (heuristic)
+      const subagentSessions = displaySessions.filter(s => s.key.includes(':subagent:'));
+      const mainDisplaySessions = displaySessions.filter(s => !s.key.includes(':subagent:'));
+
+      const { parentMap: subagentsByParent, unparented: unparentedSubagents } = buildSubagentParentMap(
+        mainDisplaySessions,
+        subagentSessions
+      );
+
       // Sort: pinned first, then by updatedAt
-      displaySessions.sort((a, b) => {
+      mainDisplaySessions.sort((a, b) => {
         const aPinned = isSessionPinned(a.key);
         const bPinned = isSessionPinned(b.key);
         if (aPinned && !bPinned) return -1;
@@ -2198,7 +2340,7 @@
       const groups = new Map(); // groupKey -> { sessions: [], latestUpdate: number }
       const standalone = []; // sessions that don't belong to a group
       
-      for (const s of displaySessions) {
+      for (const s of mainDisplaySessions) {
         const parsed = parseSessionGroup(s.key);
         if (parsed.type === 'topic' && parsed.isGrouped) {
           if (!groups.has(parsed.groupKey)) {
@@ -2260,14 +2402,40 @@
                 <button class="session-action-btn" onclick="event.stopPropagation(); generateGroupTitles('${escapeHtml(item.groupKey)}', event)" title="Auto-generate all topic titles">✨</button>
                 <button class="session-action-btn" onclick="event.stopPropagation(); promptRenameSession('${escapeHtml(item.groupKey)}', event)" title="Rename group">✏️</button>
               </div>
-              ${expanded ? `<div class="session-group-items">${item.sessions.map(s => renderSessionItem(s, true)).join('')}</div>` : ''}
+              ${expanded ? `<div class="session-group-items">${item.sessions.map(s => {
+                const kids = subagentsByParent.get(s.key) || [];
+                const childrenHtml = kids.length ? kids.map(k => renderSessionItem(k, true)).join('') : '';
+                return renderSessionItem(s, true) + childrenHtml;
+              }).join('')}</div>` : ''}
             </div>
           `;
         } else {
-          html += renderSessionItem(item.session, false);
+          const s = item.session;
+          const kids = subagentsByParent.get(s.key) || [];
+          html += renderSessionItem(s, false);
+          if (kids.length) {
+            html += kids.map(k => renderSessionItem(k, true)).join('');
+          }
         }
       }
       
+      // If any subagents couldn't be attached, show them at the bottom in a collapsible group
+      if (unparentedSubagents.length) {
+        const key = '__subagents__unparented';
+        const expanded = isGroupExpanded(key);
+        html += `
+          <div class="session-group">
+            <div class="session-group-header" onclick="toggleGroupExpanded('${escapeHtml(key)}')">
+              <span class="group-expand-icon">${expanded ? '▼' : '▶'}</span>
+              <span class="group-icon">⚡</span>
+              <span class="group-name">Subagents</span>
+              <span class="group-count">${unparentedSubagents.length}</span>
+            </div>
+            ${expanded ? `<div class="session-group-items">${unparentedSubagents.map(s => renderSessionItem(s, true)).join('')}</div>` : ''}
+          </div>
+        `;
+      }
+
       container.innerHTML = html;
       
       // Update select all checkbox state
