@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Loading...</title>
+  <title>ClawCondos App</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -269,7 +269,7 @@
         app = data.apps.find(a => a.id === appId);
         if (!app) { alert(`App "${appId}" not found`); window.location.href = '/'; return; }
         
-        document.title = `${app.name} | Sharp`;
+        document.title = `${app.name} | ClawCondos`;
         document.getElementById('appIcon').textContent = app.icon || '📦';
         document.getElementById('appName').textContent = app.name;
         // Support custom URL/route: app.url for external, app.route for path, default to /{id}/
@@ -397,7 +397,7 @@
         return;
       }
       
-      const errorText = `=== Sharp App Error Report ===
+      const errorText = `=== ClawCondos App Error Report ===
 Timestamp: ${lastErrorDetails.timestamp}
 App: ${lastErrorDetails.app?.name || 'Unknown'} (${lastErrorDetails.app?.id || 'Unknown'})
 Port: ${lastErrorDetails.app?.port || 'N/A'}

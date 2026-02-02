@@ -48,7 +48,7 @@
       <p class="modal-desc">Create a new condo (goal). You can attach sessions and spawn agents inside it.</p>
       <div class="form-group">
         <label class="form-label">Title</label>
-        <input type="text" class="form-input" id="createGoalTitle" placeholder="e.g., Rebrand Sharp → ClawCondos" 
+        <input type="text" class="form-input" id="createGoalTitle" placeholder="e.g., Rebrand Dashboard" 
                onkeypress="if(event.key==='Enter')createGoal()">
       </div>
       <div class="form-group">
@@ -148,7 +148,7 @@
           
           <div class="wiz-section-label" style="margin-top: 20px;">CONTENT PREVIEW</div>
           <div class="wiz-content-box" id="wizardSummary">
-            Loading messages...
+            Loading session data...
           </div>
         </div>
         
@@ -530,7 +530,7 @@
     // ═══════════════════════════════════════════════════════════════
     
     // Get configuration (from config.js)
-    const config = window.SharpConfig ? window.SharpConfig.getConfig() : {};
+    const config = window.ClawCondosConfig ? window.ClawCondosConfig.getConfig() : {};
     
     const state = {
       // Data
@@ -773,7 +773,7 @@
           body: JSON.stringify({
             model: 'gpt-4o-mini',
             messages: [
-              { role: 'system', content: 'Write a 5-8 word status of what is currently happening. Be specific. No punctuation. Examples: "Adding unread indicators to Sharp sidebar", "Debugging Catastro API rate limits", "Waiting for user feedback on design"' },
+              { role: 'system', content: 'Write a 5-8 word status of what is currently happening. Be specific. No punctuation. Examples: "Adding unread indicators to ClawCondos sidebar", "Debugging Catastro API rate limits", "Waiting for user feedback on design"' },
               { role: 'user', content: context.slice(0, 1500) }
             ],
             max_tokens: 30,
@@ -1223,7 +1223,7 @@
     function setAutoArchiveDays(value) {
       state.autoArchiveDays = value;
       localStorage.setItem('sharp_auto_archive_days', value);
-      console.log('[Sharp] Auto-archive set to:', value);
+      console.log('[ClawCondos] Auto-archive set to:', value);
     }
     
     function initAutoArchiveUI() {
@@ -1236,7 +1236,7 @@
     function checkAutoArchive() {
       // Skip if auto-archive is disabled
       if (state.autoArchiveDays === 'never') {
-        console.log('[Sharp] Auto-archive disabled');
+        console.log('[ClawCondos] Auto-archive disabled');
         return;
       }
       
@@ -1259,7 +1259,7 @@
           // Auto-archive this session
           state.archivedSessions.push(session.key);
           autoArchivedCount++;
-          console.log('[Sharp] Auto-archived:', session.key, 'last updated:', new Date(updatedAt).toISOString());
+          console.log('[ClawCondos] Auto-archived:', session.key, 'last updated:', new Date(updatedAt).toISOString());
         }
       }
       
@@ -1367,7 +1367,7 @@
     function handleWsMessage(msg) {
       // Debug: log all incoming messages
       if (msg.type === 'event') {
-        console.log('[Sharp] WS Event:', msg.event, msg.payload ? JSON.stringify(msg.payload).slice(0, 200) : '');
+        console.log('[ClawCondos] WS Event:', msg.event, msg.payload ? JSON.stringify(msg.payload).slice(0, 200) : '');
       }
       
       // Challenge for auth (comes as event type)
@@ -1418,7 +1418,7 @@
         maxProtocol: WS_PROTOCOL_VERSION,
         client: {
           id: 'openclaw-control-ui',
-          displayName: 'Sharp Dashboard',
+          displayName: 'ClawCondos Dashboard',
           mode: 'ui',
           version: '2.0.0',
           platform: 'browser'
@@ -1719,7 +1719,7 @@
     function handleChatEvent(data) {
       const { sessionKey, runId, state: runState, message } = data;
       
-      console.log('[Sharp] Chat event:', runState, 'for', sessionKey, 'runId:', runId);
+      console.log('[ClawCondos] Chat event:', runState, 'for', sessionKey, 'runId:', runId);
       
       // Server sends: 'delta' (streaming), 'final' (done), 'error'
       // Track active runs and update agent status (with persistence)
@@ -2018,12 +2018,12 @@
           // Stale run - remove it
           delete store[key];
           changed = true;
-          console.log(`[Sharp] Cleaned stale run for ${key} (${Math.round(age/1000)}s old)`);
+          console.log(`[ClawCondos] Cleaned stale run for ${key} (${Math.round(age/1000)}s old)`);
         } else {
           // Valid run - restore to activeRuns Map
           state.activeRuns.set(key, data.runId);
           state.sessionAgentStatus[key] = 'thinking';
-          console.log(`[Sharp] Restored active run for ${key}`);
+          console.log(`[ClawCondos] Restored active run for ${key}`);
         }
       }
       
@@ -2109,12 +2109,12 @@
     // DATA LOADING
     // ═══════════════════════════════════════════════════════════════
     async function loadInitialData() {
-      console.log('[Sharp] loadInitialData starting - v2');
+      console.log('[ClawCondos] loadInitialData starting - v2');
       try {
         // Fetch active runs from server first (authoritative source)
-        console.log('[Sharp] About to call syncActiveRunsFromServer...');
+        console.log('[ClawCondos] About to call syncActiveRunsFromServer...');
         await syncActiveRunsFromServer();
-        console.log('[Sharp] syncActiveRunsFromServer completed');
+        console.log('[ClawCondos] syncActiveRunsFromServer completed');
         await Promise.all([loadGoals(), loadSessions(), loadApps(), loadAgents()]);
         updateOverview();
         
@@ -2123,7 +2123,7 @@
         if (savedSessionKey) {
           const session = state.sessions.find(s => s.key === savedSessionKey);
           if (session) {
-            console.log('[Sharp] Restoring session:', savedSessionKey);
+            console.log('[ClawCondos] Restoring session:', savedSessionKey);
             openSession(savedSessionKey);
           }
         }
@@ -2134,18 +2134,18 @@
     
     async function syncActiveRunsFromServer() {
       try {
-        console.log('[Sharp] Calling chat.activeRuns...');
+        console.log('[ClawCondos] Calling chat.activeRuns...');
         const result = await rpcCall('chat.activeRuns', {});
-        console.log('[Sharp] chat.activeRuns response:', JSON.stringify(result));
+        console.log('[ClawCondos] chat.activeRuns response:', JSON.stringify(result));
         if (result?.activeRuns) {
-          console.log('[Sharp] Synced active runs from server:', result.activeRuns.length);
+          console.log('[ClawCondos] Synced active runs from server:', result.activeRuns.length);
           
           // Clear old state and sync with server
           state.activeRuns.clear();
           state.activeRunsStore = {};
           
           for (const run of result.activeRuns) {
-            console.log('[Sharp] Setting thinking for:', run.sessionKey);
+            console.log('[ClawCondos] Setting thinking for:', run.sessionKey);
             state.activeRuns.set(run.sessionKey, run.runId);
             state.activeRunsStore[run.sessionKey] = {
               runId: run.runId,
@@ -2158,10 +2158,10 @@
           renderSessions();
           renderSessionsGrid();
         } else {
-          console.log('[Sharp] No activeRuns in response, result:', result);
+          console.log('[ClawCondos] No activeRuns in response, result:', result);
         }
       } catch (err) {
-        console.error('[Sharp] chat.activeRuns error:', err);
+        console.error('[ClawCondos] chat.activeRuns error:', err);
         // Fallback to localStorage restore (for older Clawdbot versions)
         restoreActiveRuns();
       }
@@ -3340,7 +3340,7 @@ Response format:
       for (const [key, data] of Object.entries(state.activeRunsStore)) {
         const age = now - (data.startedAt || 0);
         if (age > ACTIVE_RUN_STALE_MS) {
-          console.log(`[Sharp] Cleaning stale run for ${key} (${Math.round(age/1000)}s old)`);
+          console.log(`[ClawCondos] Cleaning stale run for ${key} (${Math.round(age/1000)}s old)`);
           state.activeRuns.delete(key);
           delete state.activeRunsStore[key];
           // Reset status to idle if it was thinking
@@ -3360,9 +3360,9 @@ Response format:
     
     async function loadSessions() {
       try {
-        console.log('[Sharp] Loading sessions...');
+        console.log('[ClawCondos] Loading sessions...');
         const result = await rpcCall('sessions.list', { limit: 50 });
-        console.log('[Sharp] Sessions result:', result);
+        console.log('[ClawCondos] Sessions result:', result);
         if (result?.sessions) {
           state.sessions = result.sessions;
           // Goals chips depend on total session count
@@ -3386,7 +3386,7 @@ Response format:
           if (state.agents?.length) renderAgents();
         }
       } catch (err) {
-        console.error('[Sharp] Failed to load sessions:', err);
+        console.error('[ClawCondos] Failed to load sessions:', err);
       }
     }
     
@@ -4022,7 +4022,7 @@ Response format:
       } else {
         menuBtn.style.display = 'flex';
         backBtn.style.display = 'none';
-        mobileTitle.textContent = 'Sharp';
+        mobileTitle.textContent = 'ClawCondos';
       }
     }
     
@@ -4798,7 +4798,7 @@ Response format:
       exitMultiSelect();
       await refresh();
       
-      console.log(`[Sharp] Archived ${archived}/${count} sessions`);
+      console.log(`[ClawCondos] Archived ${archived}/${count} sessions`);
     }
     
     async function bulkPin() {
@@ -4819,7 +4819,7 @@ Response format:
       exitMultiSelect();
       await refresh();
       
-      console.log(`[Sharp] Pinned ${pinned}/${keys.length} sessions`);
+      console.log(`[ClawCondos] Pinned ${pinned}/${keys.length} sessions`);
     }
     
     // ═══════════════════════════════════════════════════════════════

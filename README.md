@@ -1,36 +1,34 @@
-# Sharp 🎯
+# ClawCondos 🏙️
 
-**A unified multi-agent dashboard for AI assistants**
+**A goals-first multi-agent dashboard**
 
-Sharp is a sleek, mobile-responsive web dashboard for managing multiple AI agent sessions. Built as part of the [Clawdbot](https://github.com/clawdbot) ecosystem, it provides a unified interface for chatting with agents, embedding apps, and monitoring background tasks.
+ClawCondos is a sleek, mobile-responsive web dashboard for managing multiple AI agent sessions organized into "Condos" (Goals). Built as part of the [Clawdbot](https://github.com/clawdbot) ecosystem, it provides a unified interface for chatting with agents, embedding apps, and monitoring background tasks.
 
 ## Features
 
+- **🏙️ Goals-First (Condos)** — Organize sessions into high-level goals/projects
 - **📱 Sessions Sidebar** — View and switch between sessions with search and filters
 - **🔍 Smart Filters** — Filter by channel (Telegram, Discord, etc.) and status (Running, Unread, Error)
 - **💬 Chat Interface** — Streaming responses, tool activity, message queue
 - **📲 Mobile-Responsive** — Works on phones, tablets, and desktops
-- **🌙 Dark Theme** — GitHub-inspired dark color scheme
+- **🌙 Dark Theme** — Premium dark color scheme
 - **⚡ Real-time Updates** — WebSocket-based with live status
-- **🤖 Auto Titles** — AI-generated session titles via OpenAI
+- **🤖 Organize Wizard** — AI-assisted backlog triage
 - **📦 Session Management** — Pin, archive, rename, auto-archive
 
 ## Quick Start
 
-Sharp is a static HTML/JS application. Serve it with any web server:
+ClawCondos is a static HTML/JS application. Serve it with any web server:
 
 ```bash
+# Node.js (with proxy)
+node serve.js 9011
+
 # Python
-python3 -m http.server 9000
-
-# Node.js
-npx serve -p 9000
-
-# Caddy (recommended for production)
-caddy file-server --listen :9000
+python3 -m http.server 9011
 ```
 
-Then open `http://localhost:9000`
+Then open `http://localhost:9011`
 
 ## Configuration
 
@@ -46,7 +44,7 @@ Copy `config.example.json` to `config.json`:
 ## Project Structure
 
 ```
-sharp/
+clawcondos/
 ├── index.html           # Main dashboard (all-in-one)
 ├── app.html             # App viewer with assistant panel
 ├── styles/main.css      # Extracted CSS
@@ -59,7 +57,7 @@ sharp/
 
 ## Backend API
 
-Sharp connects via WebSocket to a Clawdbot gateway. Required methods:
+ClawCondos connects via WebSocket to a Clawdbot gateway. Required methods:
 
 | Method | Description |
 |--------|-------------|
@@ -85,4 +83,4 @@ No build step. Edit `index.html` and refresh.
 
 ## License
 
-[MIT](LICENSE) © 2024-2025 Albert Castellana
+[MIT](LICENSE) © 2024-2026 Albert Castellana
