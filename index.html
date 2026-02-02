@@ -2242,11 +2242,16 @@
       
       // Update DOM
       const elActive = document.getElementById('statActiveSessions');
+      const elTrend = document.getElementById('statSessionsTrend');
       const elPending = document.getElementById('statPendingGoals');
       const elCompleted = document.getElementById('statCompletedGoals');
       const elErrors = document.getElementById('statErrors');
       
       if (elActive) elActive.textContent = activeSessions;
+      if (elTrend) {
+        const totalSessions = sessions.filter(s => !s.key.includes(':subagent:')).length;
+        elTrend.textContent = totalSessions > 0 ? `${totalSessions} total` : '';
+      }
       if (elPending) elPending.textContent = pendingGoals;
       if (elCompleted) elCompleted.textContent = completedGoals;
       if (elErrors) {

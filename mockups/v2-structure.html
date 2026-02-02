@@ -39,11 +39,12 @@
     .layout {
       display: flex;
       height: 100vh;
+      min-width: 1200px;
     }
     
     /* === SIDEBAR === */
     .sidebar {
-      width: 260px;
+      width: 280px;
       background: var(--bg-sidebar);
       border-right: 1px solid var(--border);
       display: flex;
@@ -287,6 +288,79 @@
     
     .session-dot.active { background: var(--accent-green); }
     .session-dot.error { background: var(--accent-red); }
+    .session-dot.unread {
+      background: var(--accent-blue);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7); }
+      50% { opacity: 0.7; box-shadow: 0 0 8px 2px rgba(96, 165, 250, 0.5); }
+    }
+    
+    /* Global Search */
+    .global-search {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, rgba(30, 34, 40, 0.9), rgba(26, 30, 36, 0.95));
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 14px;
+      min-width: 240px;
+      transition: all 0.2s ease;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+    }
+    
+    .global-search:hover {
+      border-color: var(--text-muted);
+      background: linear-gradient(135deg, rgba(37, 42, 51, 0.95), rgba(30, 34, 40, 0.98));
+    }
+    
+    .global-search:focus-within {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15), inset 0 1px 2px rgba(0,0,0,0.2);
+    }
+    
+    .global-search input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 400;
+      outline: none;
+      letter-spacing: 0.01em;
+    }
+    
+    .global-search input::placeholder {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+    
+    .global-search-icon {
+      color: var(--text-muted);
+      font-size: 14px;
+      opacity: 0.7;
+    }
+    
+    .global-search:focus-within .global-search-icon {
+      color: var(--accent-blue);
+      opacity: 1;
+    }
+    
+    .global-search-shortcut {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px 6px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
     
     /* Bottom Navigation */
     .sidebar-nav {
@@ -346,6 +420,33 @@
       font-size: 15px;
       font-weight: 600;
       letter-spacing: -0.01em;
+    }
+    
+    /* Back Button */
+    .back-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    
+    .back-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border-color: var(--text-muted);
+    }
+    
+    .back-btn svg {
+      width: 16px;
+      height: 16px;
     }
     
     .main-content {
@@ -498,7 +599,7 @@
     
     /* === DETAIL PANEL (Third Panel) === */
     .detail-panel {
-      width: 340px;
+      width: 360px;
       background: var(--bg-sidebar);
       border-left: 1px solid var(--border);
       display: flex;
@@ -522,8 +623,16 @@
     }
     
     /* Remove detail header when using shared header */
-    .content-body .detail-panel .detail-header {
+    .content-body .detail-panel > .detail-header {
       display: none;
+    }
+    
+    .content-body .detail-panel {
+      border-top: none;
+    }
+    
+    .content-body .detail-panel .detail-content {
+      padding-top: 20px;
     }
     
     .detail-title {
@@ -848,7 +957,7 @@
 <div style="margin-bottom: 50px; border: 2px solid var(--accent-purple); position: relative;">
   <div class="view-label">VIEW: Dashboard</div>
   
-  <div class="layout" style="height: 620px;">
+  <div class="layout" style="height: 700px;">
     <!-- Sidebar -->
     <div class="sidebar">
       <div class="sidebar-header">
@@ -880,8 +989,9 @@
                 <span>webchat:1769965...</span>
               </div>
               <div class="session-item">
-                <div class="session-dot"></div>
+                <div class="session-dot unread"></div>
                 <span>subagent:e006b1ff...</span>
+                <span style="font-size: 9px; color: var(--accent-blue);">●</span>
               </div>
             </div>
             <div class="goal-item">
@@ -957,6 +1067,16 @@
     <div class="main">
       <div class="main-header">
         <span class="main-title">Dashboard</span>
+        <span style="flex: 1;"></span>
+        <div class="global-search">
+          <svg class="global-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input type="text" placeholder="Search sessions, goals, apps...">
+          <span class="global-search-shortcut">⌘K</span>
+        </div>
+        <span style="flex: 1;"></span>
       </div>
       <div class="main-content">
         <!-- Stats -->
@@ -1062,7 +1182,7 @@
 <div style="margin-bottom: 50px; border: 2px solid var(--accent-blue); position: relative;">
   <div class="view-label" style="background: var(--accent-blue);">VIEW: Apps (with status + info)</div>
   
-  <div class="layout" style="height: 500px;">
+  <div class="layout" style="height: 600px;">
     <div class="sidebar">
       <div class="sidebar-header">
         <span style="font-size: 22px;">🦀</span>
@@ -1112,9 +1232,24 @@
     <!-- Content Area (header spans main + detail) -->
     <div class="content-area">
       <div class="content-header">
+        <button class="back-btn" title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
         <span class="main-title">Apps</span>
         <span style="flex: 1;"></span>
-        <span style="font-size: 12px; color: var(--text-muted);">🎯 Goals War Room</span>
+        <div class="global-search">
+          <svg class="global-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input type="text" placeholder="Search...">
+          <span class="global-search-shortcut">⌘K</span>
+        </div>
+        <span style="flex: 1; display: flex; justify-content: flex-end; gap: 12px;">
+          <span style="font-size: 12px; color: var(--text-muted);">🎯 Goals War Room</span>
+        </span>
       </div>
       <div class="content-body">
         <div class="content-main">
@@ -1307,7 +1442,7 @@
 <div style="margin-bottom: 50px; border: 2px solid var(--accent-yellow); position: relative;">
   <div class="view-label" style="background: var(--accent-yellow); color: #000;">VIEW: Recurring Tasks</div>
   
-  <div class="layout" style="height: 480px;">
+  <div class="layout" style="height: 600px;">
     <div class="sidebar">
       <div class="sidebar-header">
         <span style="font-size: 22px;">🦀</span>
@@ -1357,9 +1492,24 @@
     <!-- Content Area (header spans main + detail) -->
     <div class="content-area">
       <div class="content-header">
+        <button class="back-btn" title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
         <span class="main-title">Recurring Tasks</span>
         <span style="flex: 1;"></span>
-        <span style="font-size: 12px; color: var(--text-muted);">☕ Caffeine Scanner</span>
+        <div class="global-search">
+          <svg class="global-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input type="text" placeholder="Search...">
+          <span class="global-search-shortcut">⌘K</span>
+        </div>
+        <span style="flex: 1; display: flex; justify-content: flex-end; gap: 12px;">
+          <span style="font-size: 12px; color: var(--text-muted);">☕ Caffeine Scanner</span>
+        </span>
       </div>
       <div class="content-body">
         <div class="content-main">
@@ -1509,7 +1659,7 @@
 <div style="margin-bottom: 50px; border: 2px solid #ff79c6; position: relative;">
   <div class="view-label" style="background: #ff79c6; color: #000;">VIEW: Session Chat</div>
   
-  <div class="layout" style="height: 520px;">
+  <div class="layout" style="height: 620px;">
     <div class="sidebar">
       <div class="sidebar-header">
         <span style="font-size: 22px;">🦀</span>
@@ -1560,11 +1710,26 @@
     <!-- Content Area (header spans main + detail) -->
     <div class="content-area">
       <div class="content-header" style="gap: 10px;">
+        <button class="back-btn" title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
         <span style="font-size: 10px; padding: 3px 8px; background: var(--accent-blue); border-radius: 4px; color: #000; font-weight: 600;">main</span>
         <span class="main-title">webchat:1769965525626</span>
         <span style="flex: 1;"></span>
-        <span style="font-size: 11px; color: var(--text-muted);">Goal: Goals-first UI</span>
-        <button class="icon-btn">ℹ️</button>
+        <div class="global-search" style="min-width: 180px;">
+          <svg class="global-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input type="text" placeholder="Search...">
+          <span class="global-search-shortcut">⌘K</span>
+        </div>
+        <span style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
+          <span style="font-size: 11px; color: var(--text-muted);">Goal: Goals-first UI</span>
+          <button class="icon-btn">ℹ️</button>
+        </span>
       </div>
       <div class="content-body">
         <div class="content-main" style="padding: 0; display: flex; flex-direction: column;">
@@ -1670,7 +1835,7 @@
 <div style="margin-bottom: 50px; border: 2px solid var(--accent-green); position: relative;">
   <div class="view-label" style="background: var(--accent-green); color: #000;">VIEW: New Session (click + on condo)</div>
   
-  <div class="layout" style="height: 450px;">
+  <div class="layout" style="height: 550px;">
     <div class="sidebar">
       <div class="sidebar-header">
         <span style="font-size: 22px;">🦀</span>
@@ -1711,6 +1876,11 @@
     
     <div class="main">
       <div class="main-header">
+        <button class="back-btn" title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
         <span class="main-title">New Session in 🏢 SHARP</span>
       </div>
       <div class="main-content">
@@ -1755,7 +1925,7 @@
 <div style="margin-bottom: 50px; border: 2px solid var(--accent-cyan); position: relative;">
   <div class="view-label" style="background: var(--accent-cyan); color: #000;">VIEW: New Goal (click + New goal)</div>
   
-  <div class="layout" style="height: 400px;">
+  <div class="layout" style="height: 500px;">
     <div class="sidebar">
       <div class="sidebar-header">
         <span style="font-size: 22px;">🦀</span>
@@ -1808,6 +1978,11 @@
     
     <div class="main">
       <div class="main-header">
+        <button class="back-btn" title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
         <span class="main-title">New Goal in 🏢 SHARP</span>
       </div>
       <div class="main-content">
