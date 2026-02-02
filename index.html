@@ -87,6 +87,38 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════
+       SUGGEST GOAL MODAL (per-session AI categorization)
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="suggestGoalModal">
+    <div class="modal" style="max-width: 560px;">
+      <h2 class="modal-title">🏷️ Suggest Goal</h2>
+      <p class="modal-desc" id="suggestGoalDesc">Analyzing session...</p>
+      <div class="form-group">
+        <label class="form-label">Session</label>
+        <div class="session-pill" id="suggestSessionPill">—</div>
+      </div>
+      <div class="form-group" id="suggestGoalLoading" style="text-align: center; padding: 20px;">
+        <div class="loading-spinner"></div>
+        <p style="color: var(--text-dim); margin-top: 10px;">Analyzing conversation...</p>
+      </div>
+      <div class="form-group" id="suggestGoalResults" style="display: none;">
+        <label class="form-label">Suggested Goals</label>
+        <div class="goal-suggestions" id="goalSuggestions"></div>
+      </div>
+      <div class="form-group" id="suggestNewGoalSection" style="display: none;">
+        <label class="form-label">Or create a new goal</label>
+        <input type="text" class="form-input" id="suggestNewGoalTitle" placeholder="New goal title...">
+        <button class="form-btn" style="margin-top: 8px;" onclick="createGoalFromSuggestion()">Create & Assign</button>
+      </div>
+      <div style="display:flex; gap:10px; margin-top: 16px;">
+        <button class="form-btn" style="background: var(--bg-input); border: 1px solid var(--border);" onclick="hideSuggestGoalModal()">Cancel</button>
+        <button class="form-btn" id="skipCategorizationBtn" onclick="hideSuggestGoalModal()">Skip</button>
+      </div>
+      <div class="form-error" id="suggestGoalError"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
        MOBILE HEADER
        ═══════════════════════════════════════════════════════════════ -->
   <header class="mobile-header" id="mobileHeader">
@@ -238,9 +270,7 @@
             <div class="grid-header">
               <h2 class="grid-title">🏙️ Condos (Goals)</h2>
               <span class="grid-count" id="goalCount">0</span>
-              <button class="auto-categorize-btn" onclick="autoCategorize()" title="Use AI to categorize uncategorized sessions into goals">
-                🤖 Auto-categorize
-              </button>
+              <span class="uncategorized-count" id="uncategorizedCount" onclick="autoCategorize()" title="Sessions not assigned to any goal"></span>
             </div>
             <div class="cards-grid goals-grid" id="goalsGrid"></div>
           </div>
@@ -2055,8 +2085,27 @@
         state.goals = data.goals || [];
         renderGoals();
         renderGoalsGrid();
+        updateUncategorizedCount();
       } catch (err) {
         console.error('[ClawCondos] Failed to load goals:', err);
+      }
+    }
+    
+    function updateUncategorizedCount() {
+      const el = document.getElementById('uncategorizedCount');
+      if (!el) return;
+      
+      const sessions = (state.sessions || []).filter(s => !s.key.includes(':subagent:'));
+      const goals = state.goals || [];
+      
+      const assignedSessions = new Set();
+      goals.forEach(g => (g.sessions || []).forEach(s => assignedSessions.add(s)));
+      const uncatCount = sessions.filter(s => !assignedSessions.has(s.key)).length;
+      
+      if (uncatCount > 0) {
+        el.textContent = `${uncatCount} uncategorized`;
+      } else {
+        el.textContent = '';
       }
     }
 
@@ -2374,20 +2423,171 @@
       }
     }
 
-    async function autoCategorize() {
-      const btn = document.querySelector('.auto-categorize-btn');
-      if (!btn || btn.disabled) return;
+    // Per-session goal suggestion state
+    state.suggestingSessionKey = null;
+    state.pendingSuggestions = [];
+
+    function showCategorizeSuggestions(sessionKey, event) {
+      if (event) event.stopPropagation();
       
-      // Get current goals and uncategorized sessions
+      state.suggestingSessionKey = sessionKey;
+      state.pendingSuggestions = [];
+      
+      // Find session info
+      const session = state.sessions.find(s => s.key === sessionKey);
+      const sessionName = session ? (session.displayName || session.label || sessionKey.split(':').pop()) : sessionKey;
+      
+      // Update modal
+      document.getElementById('suggestSessionPill').textContent = sessionName;
+      document.getElementById('suggestGoalDesc').textContent = 'Analyzing session to suggest goals...';
+      document.getElementById('suggestGoalLoading').style.display = 'block';
+      document.getElementById('suggestGoalResults').style.display = 'none';
+      document.getElementById('suggestNewGoalSection').style.display = 'none';
+      document.getElementById('suggestGoalError').style.display = 'none';
+      document.getElementById('suggestGoalModal').classList.remove('hidden');
+      
+      // Trigger AI analysis
+      analyzeSesssionForGoals(sessionKey, sessionName);
+    }
+    
+    function hideSuggestGoalModal() {
+      document.getElementById('suggestGoalModal').classList.add('hidden');
+      state.suggestingSessionKey = null;
+      state.pendingSuggestions = [];
+    }
+    
+    async function analyzeSesssionForGoals(sessionKey, sessionName) {
+      try {
+        // Get existing goals
+        const goals = state.goals || [];
+        const goalsList = goals.map(g => `"${g.title}" (id: ${g.id}, status: ${g.status})`).join(', ');
+        
+        // Build prompt for AI
+        const message = `[SUGGEST-GOAL-REQUEST]
+Session: ${sessionKey}
+Name: ${sessionName}
+
+Existing goals: ${goalsList || '(none yet)'}
+
+Please analyze this session and respond with a JSON object containing goal suggestions. Look at the session key pattern and name to infer what it's about. Return format:
+{
+  "suggestions": [
+    { "goalId": "existing-goal-id", "title": "Goal Title", "reason": "Why this fits", "confidence": "high|medium|low" },
+    { "goalId": null, "title": "Suggested New Goal", "reason": "Why create this", "confidence": "medium" }
+  ]
+}
+
+If no existing goal fits well, suggest creating a new one. Include 1-3 suggestions total. Respond ONLY with the JSON, no other text.`;
+
+        // Send via WebSocket RPC
+        const response = await sendChatMessage(message);
+        
+        // The AI will respond in the chat - we'll parse it there
+        // For now, show manual options after a delay
+        setTimeout(() => {
+          showManualGoalOptions();
+        }, 1500);
+        
+      } catch (e) {
+        console.error('Analyze session error:', e);
+        document.getElementById('suggestGoalError').textContent = 'Failed to analyze: ' + e.message;
+        document.getElementById('suggestGoalError').style.display = 'block';
+        document.getElementById('suggestGoalLoading').style.display = 'none';
+        showManualGoalOptions();
+      }
+    }
+    
+    function showManualGoalOptions() {
       const goals = state.goals || [];
-      const sessions = state.sessions || [];
+      document.getElementById('suggestGoalLoading').style.display = 'none';
+      document.getElementById('suggestGoalResults').style.display = 'block';
+      document.getElementById('suggestNewGoalSection').style.display = 'block';
+      document.getElementById('suggestGoalDesc').textContent = 'Pick a goal or create a new one:';
       
+      // Render existing goals as options
+      const container = document.getElementById('goalSuggestions');
       if (goals.length === 0) {
-        alert('Create at least one goal first before auto-categorizing.');
+        container.innerHTML = '<div class="empty-state">No goals yet. Create one below.</div>';
+      } else {
+        container.innerHTML = goals.map(g => `
+          <div class="goal-suggestion-row" onclick="assignSessionToGoal('${escapeHtml(g.id)}')">
+            <div class="suggestion-icon">🏙️</div>
+            <div class="suggestion-content">
+              <div class="suggestion-title">${escapeHtml(g.title)}</div>
+              <div class="suggestion-reason">${g.sessions?.length || 0} sessions · ${g.status || 'active'}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+    
+    async function assignSessionToGoal(goalId) {
+      const sessionKey = state.suggestingSessionKey;
+      if (!sessionKey) return;
+      
+      try {
+        const res = await fetch(`/api/goals/${goalId}/sessions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionKey }),
+        });
+        if (!res.ok) throw new Error('Failed to assign');
+        
+        hideSuggestGoalModal();
+        await loadGoals();
+        renderSessions();
+        
+      } catch (e) {
+        document.getElementById('suggestGoalError').textContent = 'Failed to assign: ' + e.message;
+        document.getElementById('suggestGoalError').style.display = 'block';
+      }
+    }
+    
+    async function createGoalFromSuggestion() {
+      const title = document.getElementById('suggestNewGoalTitle').value.trim();
+      if (!title) {
+        document.getElementById('suggestGoalError').textContent = 'Enter a goal title';
+        document.getElementById('suggestGoalError').style.display = 'block';
         return;
       }
       
-      // Find sessions not assigned to any goal
+      const sessionKey = state.suggestingSessionKey;
+      
+      try {
+        // Create goal
+        const res = await fetch('/api/goals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title }),
+        });
+        if (!res.ok) throw new Error('Failed to create goal');
+        const data = await res.json();
+        
+        // Assign session to new goal
+        if (sessionKey && data?.goal?.id) {
+          await fetch(`/api/goals/${data.goal.id}/sessions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionKey }),
+          });
+        }
+        
+        hideSuggestGoalModal();
+        await loadGoals();
+        renderSessions();
+        
+      } catch (e) {
+        document.getElementById('suggestGoalError').textContent = 'Failed: ' + e.message;
+        document.getElementById('suggestGoalError').style.display = 'block';
+      }
+    }
+    
+    // Keep autoCategorize for bulk operations (optional)
+    async function autoCategorize() {
+      const sessions = (state.sessions || []).filter(s => !s.key.includes(':subagent:'));
+      const goals = state.goals || [];
+      
+      // Find uncategorized sessions
       const assignedSessions = new Set();
       goals.forEach(g => (g.sessions || []).forEach(s => assignedSessions.add(s)));
       const uncategorized = sessions.filter(s => !assignedSessions.has(s.key));
@@ -2397,47 +2597,7 @@
         return;
       }
       
-      btn.disabled = true;
-      btn.textContent = '🔄 Categorizing...';
-      
-      try {
-        // Send a chat message to the main session asking to categorize
-        const goalsList = goals.map(g => `- "${g.title}" (id: ${g.id})`).join('\n');
-        const sessionsList = uncategorized.slice(0, 50).map(s => {
-          const name = s.displayName || s.label || s.key.split(':').pop();
-          return `- ${s.key} (${name})`;
-        }).join('\n');
-        
-        const message = `[AUTO-CATEGORIZE REQUEST]
-
-Please analyze these uncategorized sessions and assign them to the appropriate goals.
-
-**Existing Goals:**
-${goalsList}
-
-**Uncategorized Sessions (${uncategorized.length} total, showing first 50):**
-${sessionsList}
-
-For each session:
-1. Look at its key/name to infer what it's about
-2. If you need more context, check its recent history
-3. Assign it to the most appropriate goal using POST /api/goals/{goalId}/sessions
-4. If no goal fits, suggest creating a new one
-
-Start categorizing now and report progress.`;
-
-        // Send via WebSocket RPC
-        await sendChatMessage(message);
-        
-        alert(`Categorization request sent! I'll analyze ${uncategorized.length} sessions and assign them to goals. Check the chat for progress.`);
-        
-      } catch (e) {
-        console.error('Auto-categorize error:', e);
-        alert('Failed to send categorization request: ' + e.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = '🤖 Auto-categorize';
-      }
+      alert(`${uncategorized.length} sessions need categorization. Use the 🏷️ button on each session to categorize one by one.`);
     }
     
     async function sendChatMessage(text) {
@@ -2569,6 +2729,7 @@ Start categorizing now and report progress.`;
           checkAutoArchive();
           renderSessions();
           renderSessionsGrid();
+          updateUncategorizedCount();
           // Agents tree uses sessions for its nested view
           if (state.agents?.length) renderAgents();
         }
@@ -2817,6 +2978,11 @@ Start categorizing now and report progress.`;
                     title="Ask for full summary">
               📋
             </button>
+            ${!s.key.includes(':subagent:') ? `<button class="session-action-btn categorize-btn" 
+                    onclick="showCategorizeSuggestions('${escapeHtml(s.key)}', event)" 
+                    title="Suggest goal for this session">
+              🏷️
+            </button>` : ''}
             <button class="session-action-btn ${isArchived ? 'archived' : ''}" 
                     onclick="event.stopPropagation(); toggleArchiveSession('${escapeHtml(s.key)}')" 
                     title="${isArchived ? 'Unarchive' : 'Archive'}">
