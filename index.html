@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   
-  <link rel="stylesheet" href="/styles/main.css?v=5">
+  <link rel="stylesheet" href="/styles/main.css?v=6">
   <link rel="stylesheet" href="/styles/media-upload.css">
   <link rel="stylesheet" href="/styles/voice-recorder.css">
 </head>
@@ -337,6 +337,27 @@
       <!-- Overview View -->
       <div class="view active" id="overviewView">
         <div class="overview-content">
+          <!-- Stats Grid -->
+          <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+              <div class="stat-label">Active Sessions</div>
+              <div class="stat-value" id="statActiveSessions">-</div>
+              <div class="stat-trend" id="statSessionsTrend"></div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Pending Goals</div>
+              <div class="stat-value" id="statPendingGoals">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Completed</div>
+              <div class="stat-value" id="statCompletedGoals">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Errors</div>
+              <div class="stat-value stat-error" id="statErrors">-</div>
+            </div>
+          </div>
+
           <!-- Goals Grid -->
           <div class="grid-section" id="goalsSection">
             <div class="grid-header">
@@ -2117,6 +2138,7 @@
         console.log('[ClawCondos] syncActiveRunsFromServer completed');
         await Promise.all([loadGoals(), loadSessions(), loadApps(), loadAgents()]);
         updateOverview();
+        updateStatsGrid();
         
         // Restore previous session if any
         const savedSessionKey = localStorage.getItem('sharp_current_session');
@@ -2196,6 +2218,40 @@
         el.textContent = `${uncatCount} uncategorized`;
       } else {
         el.textContent = '';
+      }
+    }
+
+    // Update stats grid with current counts
+    function updateStatsGrid() {
+      const sessions = state.sessions || [];
+      const goals = state.goals || [];
+      const runs = state.runs || {};
+      
+      // Active sessions: sessions with recent activity or active runs
+      const activeRuns = Object.keys(runs).filter(k => runs[k] && runs[k] !== 'done');
+      const activeSessions = activeRuns.length;
+      
+      // Pending goals: goals with status !== 'done'
+      const pendingGoals = goals.filter(g => g.status !== 'done').length;
+      
+      // Completed goals
+      const completedGoals = goals.filter(g => g.status === 'done').length;
+      
+      // Errors: sessions with error state
+      const errorCount = sessions.filter(s => s.lastError || (runs[s.key] && runs[s.key] === 'error')).length;
+      
+      // Update DOM
+      const elActive = document.getElementById('statActiveSessions');
+      const elPending = document.getElementById('statPendingGoals');
+      const elCompleted = document.getElementById('statCompletedGoals');
+      const elErrors = document.getElementById('statErrors');
+      
+      if (elActive) elActive.textContent = activeSessions;
+      if (elPending) elPending.textContent = pendingGoals;
+      if (elCompleted) elCompleted.textContent = completedGoals;
+      if (elErrors) {
+        elErrors.textContent = errorCount;
+        elErrors.classList.toggle('stat-error', errorCount > 0);
       }
     }
 
@@ -3733,15 +3789,26 @@ Response format:
       // Filter sessions
       const goal = state.currentGoalId !== 'all' ? state.goals.find(g => g.id === state.currentGoalId) : null;
       const goalSessionSet = goal?.sessions ? new Set(goal.sessions) : null;
+      
+      // Build set of ALL sessions that are in ANY goal (for hiding from main Sessions list)
+      const allSessionsInGoals = new Set();
+      state.goals.forEach(g => (g.sessions || []).forEach(s => allSessionsInGoals.add(s)));
+      
+      // Also build a map of session -> goalId for subagent inheritance
+      const sessionToGoal = new Map();
+      state.goals.forEach(g => (g.sessions || []).forEach(s => sessionToGoal.set(s, g.id)));
 
       let displaySessions = state.sessions.filter(s => {
         if (isSessionArchived(s.key) && !state.showArchived) return false;
+        // When viewing a specific goal, only show sessions in that goal
         if (goalSessionSet && !goalSessionSet.has(s.key)) return false;
+        // When viewing "all" (Sessions section), hide sessions that are in any goal
+        if (state.currentGoalId === 'all' && allSessionsInGoals.has(s.key)) return false;
         if (!matchesSearch(s)) return false;
         return true;
       });
 
-      // Split out subagents so we can nest them under a parent session (heuristic)
+      // Split out subagents - they render inline in parent chat, not in sidebar
       const subagentSessions = displaySessions.filter(s => s.key.includes(':subagent:'));
       const mainDisplaySessions = displaySessions.filter(s => !s.key.includes(':subagent:'));
 
@@ -3830,39 +3897,17 @@ Response format:
                 <button class="session-action-btn" onclick="event.stopPropagation(); generateGroupTitles('${escapeHtml(item.groupKey)}', event)" title="Auto-generate all topic titles">✨</button>
                 <button class="session-action-btn" onclick="event.stopPropagation(); promptRenameSession('${escapeHtml(item.groupKey)}', event)" title="Rename group">✏️</button>
               </div>
-              ${expanded ? `<div class="session-group-items">${item.sessions.map(s => {
-                const kids = subagentsByParent.get(s.key) || [];
-                const childrenHtml = kids.length ? kids.map(k => renderSessionItem(k, true)).join('') : '';
-                return renderSessionItem(s, true) + childrenHtml;
-              }).join('')}</div>` : ''}
+              ${expanded ? `<div class="session-group-items">${item.sessions.map(s => renderSessionItem(s, true)).join('')}</div>` : ''}
             </div>
           `;
         } else {
           const s = item.session;
-          const kids = subagentsByParent.get(s.key) || [];
+          // Subagents render inline in parent chat, not in sidebar
           html += renderSessionItem(s, false);
-          if (kids.length) {
-            html += kids.map(k => renderSessionItem(k, true)).join('');
-          }
         }
       }
       
-      // If any subagents couldn't be attached, show them at the bottom in a collapsible group
-      if (unparentedSubagents.length) {
-        const key = '__subagents__unparented';
-        const expanded = isGroupExpanded(key);
-        html += `
-          <div class="session-group">
-            <div class="session-group-header" onclick="toggleGroupExpanded('${escapeHtml(key)}')">
-              <span class="group-expand-icon">${expanded ? '▼' : '▶'}</span>
-              <span class="group-icon">⚡</span>
-              <span class="group-name">Subagents</span>
-              <span class="group-count">${unparentedSubagents.length}</span>
-            </div>
-            ${expanded ? `<div class="session-group-items">${unparentedSubagents.map(s => renderSessionItem(s, true)).join('')}</div>` : ''}
-          </div>
-        `;
-      }
+      // Subagents are no longer shown in sidebar - they appear inline in parent session chat
 
       container.innerHTML = html;
       
@@ -4132,7 +4177,7 @@ Response format:
         return;
       }
       
-      container.innerHTML = messages.map(m => {
+      container.innerHTML = messages.map((m, idx) => {
         if (m.role === 'user') {
           const text = extractText(m.content);
           if (!text) return '';
@@ -4140,14 +4185,131 @@ Response format:
           return `<div class="message user"><div class="message-content">${formatMessage(text)}</div>${timeHtml}</div>`;
         } else if (m.role === 'assistant') {
           const text = extractText(m.content);
-          if (!text) return '';
+          const spawnCards = extractSpawnCards(m.content, m.timestamp);
           const timeHtml = m.timestamp ? `<div class="message-time">${formatMessageTime(new Date(m.timestamp))}</div>` : '';
-          return `<div class="message assistant"><div class="message-content">${formatMessage(text)}</div>${timeHtml}</div>`;
+          
+          // Render spawn cards inline with the message
+          let html = '';
+          if (spawnCards.length > 0) {
+            html += spawnCards.map(card => renderSpawnCard(card, idx)).join('');
+          }
+          if (text) {
+            html += `<div class="message assistant"><div class="message-content">${formatMessage(text)}</div>${timeHtml}</div>`;
+          }
+          return html;
         }
         return '';
       }).filter(Boolean).join('');
       
       scrollChatToBottom();
+    }
+    
+    // Extract sessions_spawn tool calls from message content
+    function extractSpawnCards(content, timestamp) {
+      if (!Array.isArray(content)) return [];
+      
+      const cards = [];
+      for (const block of content) {
+        if (block.type === 'toolCall' && block.name === 'sessions_spawn') {
+          const args = block.arguments || {};
+          cards.push({
+            id: block.id || `spawn-${Date.now()}`,
+            task: args.task || 'Sub-agent task',
+            label: args.label || null,
+            model: args.model || null,
+            agentId: args.agentId || null,
+            timestamp: timestamp,
+            // Result may come in a later tool_result block
+            sessionKey: null, 
+            status: 'running'
+          });
+        }
+        // Check for tool results that might have spawn outcomes
+        if (block.type === 'toolResult' && block.content) {
+          try {
+            const result = typeof block.content === 'string' ? JSON.parse(block.content) : block.content;
+            if (result.sessionKey && result.sessionKey.includes(':subagent:')) {
+              // Update corresponding card if we can find it
+              const card = cards.find(c => c.id === block.toolCallId);
+              if (card) {
+                card.sessionKey = result.sessionKey;
+                card.status = result.status || 'completed';
+              }
+            }
+          } catch {}
+        }
+      }
+      return cards;
+    }
+    
+    // Render a spawn card HTML
+    function renderSpawnCard(card, msgIdx) {
+      const cardId = `spawn-${msgIdx}-${card.id}`;
+      const statusClass = card.status === 'running' ? 'running' : 'completed';
+      const statusText = card.status === 'running' ? '🔄 Running' : '✓ Done';
+      const labelText = card.label ? ` (${escapeHtml(card.label)})` : '';
+      const timeStr = card.timestamp ? formatMessageTime(new Date(card.timestamp)) : '';
+      
+      return `
+        <div class="spawn-card" id="${cardId}" data-session-key="${escapeHtml(card.sessionKey || '')}">
+          <div class="spawn-card-header" onclick="toggleSpawnCard('${cardId}')">
+            <span class="spawn-card-icon">⚡</span>
+            <span class="spawn-card-title">Sub-agent spawned${labelText}</span>
+            <span class="spawn-card-status ${statusClass}">${statusText}</span>
+            <span class="spawn-card-expand">▼</span>
+          </div>
+          <div class="spawn-card-task">${escapeHtml(truncate(card.task, 150))}</div>
+          <div class="spawn-card-body">
+            <div class="spawn-card-messages" id="${cardId}-messages">
+              <div class="spawn-card-loading">Click to load sub-agent transcript...</div>
+            </div>
+            ${card.sessionKey ? `<div class="spawn-card-link" onclick="openSession('${escapeHtml(card.sessionKey)}')">Open full session →</div>` : ''}
+          </div>
+          <div class="message-time">${timeStr}</div>
+        </div>
+      `;
+    }
+    
+    // Toggle spawn card expansion and load transcript
+    async function toggleSpawnCard(cardId) {
+      const card = document.getElementById(cardId);
+      if (!card) return;
+      
+      const wasExpanded = card.classList.contains('expanded');
+      card.classList.toggle('expanded');
+      
+      // Load transcript on first expand
+      if (!wasExpanded) {
+        const sessionKey = card.dataset.sessionKey;
+        const messagesEl = document.getElementById(`${cardId}-messages`);
+        
+        if (sessionKey && messagesEl && messagesEl.querySelector('.spawn-card-loading')) {
+          messagesEl.innerHTML = '<div class="spawn-card-loading">Loading transcript...</div>';
+          
+          try {
+            const resp = await rpc('chat.history', { sessionKey, limit: 50 });
+            const messages = resp.messages || [];
+            
+            if (messages.length === 0) {
+              messagesEl.innerHTML = '<div class="spawn-card-loading">No messages yet</div>';
+            } else {
+              messagesEl.innerHTML = messages.map(m => {
+                const text = extractText(m.content);
+                if (!text) return '';
+                const roleClass = m.role === 'user' ? 'user' : 'assistant';
+                return `<div class="message ${roleClass}"><div class="message-content">${formatMessage(text)}</div></div>`;
+              }).filter(Boolean).join('');
+            }
+          } catch (err) {
+            messagesEl.innerHTML = `<div class="spawn-card-loading">Failed to load: ${escapeHtml(err.message)}</div>`;
+          }
+        }
+      }
+    }
+    
+    function truncate(str, len) {
+      if (!str) return '';
+      return str.length > len ? str.slice(0, len) + '...' : str;
     }
     
     function extractText(content) {
@@ -4830,6 +4992,7 @@ Response format:
       renderSessionsGrid();
       renderAppsGrid();
       renderSubagentsGrid();
+      updateStatsGrid();
     }
     
 
@@ -4886,9 +5049,17 @@ Response format:
     function renderSessionsGrid() {
       const goal = state.currentGoalId !== 'all' ? state.goals.find(g => g.id === state.currentGoalId) : null;
       const goalSessionSet = goal?.sessions ? new Set(goal.sessions) : null;
+      
+      // Build set of ALL sessions in ANY goal
+      const allSessionsInGoals = new Set();
+      state.goals.forEach(g => (g.sessions || []).forEach(s => allSessionsInGoals.add(s)));
+      
       const mainSessions = state.sessions.filter(s => {
         if (s.key.includes(':subagent:')) return false;
+        // When viewing specific goal, only show its sessions
         if (goalSessionSet && !goalSessionSet.has(s.key)) return false;
+        // When viewing "all" (Overview), hide sessions in any goal - they show under Goals
+        if (state.currentGoalId === 'all' && allSessionsInGoals.has(s.key)) return false;
         return true;
       });
       const container = document.getElementById('sessionsGrid');

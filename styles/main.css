@@ -2167,6 +2167,111 @@ body {
   background: var(--bg);
 }
 
+/* ═══ Spawn Cards (inline sub-agent) ═══ */
+.spawn-card {
+  background: linear-gradient(135deg, var(--purple-dim) 0%, var(--accent-muted) 100%);
+  border: 1px solid var(--purple);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  margin: var(--space-md) 0;
+  max-width: 100%;
+}
+
+.spawn-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.spawn-card-icon {
+  font-size: 1.2rem;
+}
+
+.spawn-card-title {
+  font-weight: 600;
+  color: var(--purple);
+  flex: 1;
+}
+
+.spawn-card-status {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.spawn-card-status.running {
+  color: var(--yellow);
+  background: var(--yellow-dim);
+}
+
+.spawn-card-status.completed {
+  color: var(--green);
+  background: var(--green-dim);
+}
+
+.spawn-card-expand {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+}
+
+.spawn-card.expanded .spawn-card-expand {
+  transform: rotate(180deg);
+}
+
+.spawn-card-task {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: var(--space-xs);
+  padding-left: 1.7rem;
+}
+
+.spawn-card-body {
+  display: none;
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.spawn-card.expanded .spawn-card-body {
+  display: block;
+}
+
+.spawn-card-messages {
+  max-height: 300px;
+  overflow-y: auto;
+  font-size: 0.85rem;
+}
+
+.spawn-card-messages .message {
+  padding: var(--space-xs) var(--space-sm);
+  margin: var(--space-xs) 0;
+  font-size: 0.8rem;
+}
+
+.spawn-card-loading {
+  color: var(--text-dim);
+  font-style: italic;
+  padding: var(--space-sm);
+}
+
+.spawn-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--accent);
+  font-size: 0.8rem;
+  margin-top: var(--space-sm);
+  cursor: pointer;
+}
+
+.spawn-card-link:hover {
+  text-decoration: underline;
+}
+
 /* (deduped) */
 
 .chat-input-area {
@@ -4492,6 +4597,64 @@ a:focus-visible {
 }
 
 .goal-card.done .goal-progress-bar { background: var(--green); }
+
+/* ═══════════════════════════════════════════
+   STATS GRID (Dashboard Overview)
+   ═══════════════════════════════════════════ */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin-top: 4px;
+  letter-spacing: -0.02em;
+}
+
+.stat-value.stat-error {
+  color: var(--red);
+}
+
+.stat-trend {
+  font-size: 11px;
+  color: var(--green);
+  margin-top: 2px;
+}
+
+.stat-trend.negative {
+  color: var(--red);
+}
 
 
 .goal-pill.pr {
