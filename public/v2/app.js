@@ -5653,7 +5653,7 @@ Response format:
         connectWebSocket();
       }
 
-      window.addEventListener('popstate', handleRoute);
+      // Hash-router: rely on hashchange (popstate can double-fire on back/forward in some browsers)
       window.addEventListener('hashchange', handleRoute);
       handleRoute();
       
