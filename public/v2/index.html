@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0a0c10">
+  <meta name="color-scheme" content="dark">
+  <title>ClawCondos v2</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link rel="stylesheet" href="/v2/styles.css">
+  <link rel="stylesheet" href="/styles/media-upload.css">
+  <link rel="stylesheet" href="/styles/voice-recorder.css">
+</head>
+<body>
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div class="modal-overlay hidden" id="loginModal">
+    <div class="modal">
+      <h2 class="modal-title">🏙️ ClawCondos</h2>
+      <p class="modal-desc">Enter your OpenClaw gateway password/token to connect.</p>
+      <div class="form-group">
+        <label class="form-label">Password / Token</label>
+        <input type="password" class="form-input" id="loginPassword" placeholder="Gateway password or token" onkeypress="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="form-btn" onclick="doLogin()">Connect</button>
+      <div class="form-error" id="loginError"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="createGoalModal">
+    <div class="modal">
+      <h2 class="modal-title">New Goal</h2>
+      <p class="modal-desc">Create a new goal inside this condo.</p>
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <input type="text" class="form-input" id="createGoalTitle" placeholder="e.g., Rebrand Dashboard" onkeypress="if(event.key==='Enter')createGoal()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Deadline (optional)</label>
+        <input type="text" class="form-input" id="createGoalDeadline" placeholder="YYYY-MM-DD or freeform">
+      </div>
+      <div style="display:flex; gap:10px; margin-top: 10px;">
+        <button class="form-btn" onclick="createGoal()">Create</button>
+        <button class="form-btn" style="background: var(--bg-input); border: 1px solid var(--border);" onclick="hideCreateGoalModal()">Cancel</button>
+      </div>
+      <div class="form-error" id="createGoalError"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="attachSessionModal">
+    <div class="modal" style="max-width: 520px;">
+      <h2 class="modal-title">Attach session to goal</h2>
+      <p class="modal-desc">Pick a goal. This moves the session (removes it from any other goal).</p>
+      <div class="form-group">
+        <label class="form-label">Session</label>
+        <div class="session-pill" id="attachSessionPill">—</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Goal</label>
+        <div class="goal-picker" id="goalPicker"></div>
+      </div>
+      <div style="display:flex; gap:10px; margin-top: 10px;">
+        <button class="form-btn" onclick="confirmAttachSession()">Attach</button>
+        <button class="form-btn" style="background: var(--bg-input); border: 1px solid var(--border);" onclick="hideAttachSessionModal()">Cancel</button>
+      </div>
+      <div class="form-error" id="attachSessionError"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="suggestGoalModal">
+    <div class="modal" style="max-width: 560px;">
+      <h2 class="modal-title">🏷️ Suggest Goal</h2>
+      <p class="modal-desc" id="suggestGoalDesc">Analyzing session...</p>
+      <div class="form-group">
+        <label class="form-label">Session</label>
+        <div class="session-pill" id="suggestSessionPill">—</div>
+      </div>
+      <div class="form-group" id="suggestGoalLoading" style="text-align: center; padding: 20px;">
+        <div class="loading-spinner"></div>
+        <p style="color: var(--text-dim); margin-top: 10px;">Analyzing conversation...</p>
+      </div>
+      <div class="form-group" id="suggestGoalResults" style="display: none;">
+        <label class="form-label">Suggested Goals</label>
+        <div class="goal-suggestions" id="goalSuggestions"></div>
+      </div>
+      <div class="form-group" id="suggestNewGoalSection" style="display: none;">
+        <label class="form-label">Or create a new goal</label>
+        <input type="text" class="form-input" id="suggestNewGoalTitle" placeholder="New goal title...">
+        <button class="form-btn" style="margin-top: 8px;" onclick="createGoalFromSuggestion()">Create & Assign</button>
+      </div>
+      <div style="display:flex; gap:10px; margin-top: 16px;">
+        <button class="form-btn" style="background: var(--bg-input); border: 1px solid var(--border);" onclick="hideSuggestGoalModal()">Cancel</button>
+        <button class="form-btn" id="skipCategorizationBtn" onclick="hideSuggestGoalModal()">Skip</button>
+      </div>
+      <div class="form-error" id="suggestGoalError"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="organizeWizardModal">
+    <div class="modal organize-wizard">
+      <div class="wiz-header">
+        <div class="wiz-header-left">
+          <h2 class="wiz-title">Organize Sessions</h2>
+          <div class="wiz-progress-text"><span id="wizardProgress">1 of 41</span> · <span id="wizardStats">0 organized</span></div>
+        </div>
+        <button class="wiz-close" onclick="closeOrganizeWizard()">✕</button>
+      </div>
+
+      <div class="wiz-progress-bar"><div class="wiz-progress-fill" id="wizardProgressBar"></div></div>
+
+      <div class="wiz-columns" id="wizardContent">
+        <div class="wiz-left">
+          <div class="wiz-section-label">SESSION</div>
+          <div class="wiz-session-card">
+            <div class="wiz-session-icon" id="wizardSessionIcon">💬</div>
+            <div class="wiz-session-name" id="wizardSessionTitle">Session Title</div>
+          </div>
+          <div class="wiz-session-key" id="wizardSessionKey">agent:main:...</div>
+
+          <div class="wiz-section-label" style="margin-top: 20px;">CONTENT PREVIEW</div>
+          <div class="wiz-content-box" id="wizardSummary">Loading session data...</div>
+        </div>
+
+        <div class="wiz-right">
+          <div class="wiz-section-label">SUGGESTED GOAL</div>
+          <div class="wiz-goal-card" id="wizardProposal">
+            <div class="wiz-goal-icon">🎯</div>
+            <div class="wiz-goal-info" id="wizardProposedGoal">
+              <div class="wiz-goal-name">Analyzing...</div>
+              <div class="wiz-goal-reason"></div>
+            </div>
+          </div>
+
+          <div class="wiz-actions">
+            <button class="wiz-btn-accept" id="wizardAcceptBtn" onclick="acceptWizardProposal()">✓ Accept</button>
+            <button class="wiz-btn-skip" onclick="skipWizardSession()">Skip →</button>
+          </div>
+
+          <button class="wiz-btn-change" onclick="showWizardGoalPicker()">Choose different goal...</button>
+
+          <div class="wiz-picker hidden" id="wizardGoalPicker">
+            <div class="wiz-picker-list" id="wizardGoalList"></div>
+            <div class="wiz-picker-new">
+              <input type="text" class="wiz-picker-input" id="wizardNewGoalTitle" placeholder="Or create new...">
+              <button class="wiz-picker-create" onclick="createGoalInWizard()">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <header class="mobile-header" id="mobileHeader">
+    <button class="menu-btn" id="menuBtn" onclick="toggleSidebar()">☰</button>
+    <button class="back-btn" id="backBtn" onclick="goBack()" style="display: none;">←</button>
+    <span class="mobile-title" id="mobileTitle">ClawCondos</span>
+    <div class="mobile-actions">
+      <button class="menu-btn" onclick="refresh()" title="Refresh">↻</button>
+    </div>
+  </header>
+
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header" onclick="navigateTo('dashboard')">
+        <span class="brand-emoji">🦀</span>
+        <h1>ClawCondos</h1>
+      </div>
+
+      <div class="condos-section">
+        <div class="section-label">Condos</div>
+        <div class="sidebar-tools">
+          <div class="auto-archive-setting" title="Auto-archive inactive sessions">
+            <span>⏰</span>
+            <select id="autoArchiveSelect" onchange="setAutoArchiveDays(this.value)">
+              <option value="0.01">15m</option>
+              <option value="0.042">1h</option>
+              <option value="0.25">6h</option>
+              <option value="1">1d</option>
+              <option value="3">3d</option>
+              <option value="never">Off</option>
+            </select>
+          </div>
+          <label class="show-archived-toggle" id="showArchivedToggle" style="display: none;">
+            <input type="checkbox" onchange="toggleShowArchived()">
+            📦
+          </label>
+          <button class="section-action" id="markAllReadBtn" onclick="markAllSessionsRead()" title="Mark all read" style="display: none;">✓</button>
+          <button class="section-action" onclick="showCreateGoalModal()" title="New goal">＋</button>
+          <button class="section-action" id="selectModeBtn" onclick="enterMultiSelect()" title="Select sessions">☑</button>
+          <button class="section-action" onclick="refresh()" title="Refresh">↻</button>
+        </div>
+        <div id="sessionsList"></div>
+      </div>
+
+      <div class="sidebar-nav">
+        <div class="nav-btn" data-route="dashboard" onclick="navigateTo('dashboard')">
+          <span class="nav-icon">📊</span>
+          <span>Dashboard</span>
+        </div>
+        <div class="nav-btn" data-route="apps" onclick="navigateTo('apps')">
+          <span class="nav-icon">📱</span>
+          <span>Apps</span>
+        </div>
+        <div class="nav-btn" data-route="recurring" onclick="navigateTo('recurring')">
+          <span class="nav-icon">🔄</span>
+          <span>Recurring Tasks</span>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <a href="/control/" class="control-ui-btn" title="Open Clawdbot Control UI">🤖 Clawdbot UI</a>
+        <div class="connection-status" onclick="showLoginModal()">
+          <span class="connection-dot" id="connectionDot" style="background: var(--yellow);"></span>
+          <span id="connectionText">Connecting...</span>
+          <span style="margin-left: auto; font-size: 10px; color: var(--text-muted);">v2</span>
+        </div>
+      </div>
+
+      <div class="hidden-panels">
+        <div id="goalsList"></div>
+        <div id="appsList"></div>
+        <div id="agentsList"></div>
+        <div class="bulk-action-bar" id="bulkActionBar">
+          <span class="bulk-count" id="bulkCount">0 selected</span>
+          <div class="bulk-actions">
+            <button class="bulk-btn" onclick="bulkArchive()">📦 Archive</button>
+            <button class="bulk-btn" onclick="bulkPin()">📌 Pin</button>
+            <button class="bulk-btn primary" onclick="exitMultiSelect()">Cancel</button>
+          </div>
+        </div>
+        <div class="select-all-row" id="selectAllRow" onclick="toggleSelectAll()">
+          <div class="session-checkbox" id="selectAllCheckbox"></div>
+          <span>Select All</span>
+        </div>
+      </div>
+    </aside>
+
+    <div class="content-area">
+      <div class="content-header">
+        <button class="back-btn" id="backButton" title="Back" onclick="goBack()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
+        <nav class="breadcrumbs" id="breadcrumbs"></nav>
+        <span style="flex: 1;"></span>
+        <div class="global-search">
+          <svg class="global-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input type="text" id="sessionSearchInput" placeholder="Search sessions, goals, apps..." oninput="handleSearchInput(this.value)" onkeydown="handleSearchKeydown(event)">
+          <span class="global-search-shortcut">⌘K</span>
+        </div>
+        <span style="flex: 1;"></span>
+        <div class="header-actions" id="headerActionArea">
+          <div class="header-status idle" id="headerStatusIndicator" data-tooltip="Ready" style="display: none;"></div>
+          <span class="main-title" id="mainTitle" style="display: none;">Dashboard</span>
+          <span class="main-subtitle" id="mainSubtitle" style="display: none;"></span>
+          <button class="header-btn" id="headerAction" onclick="headerAction()" style="display: none;">Action</button>
+          <button class="header-btn" onclick="refresh()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="content-body">
+        <main class="content-main main-content">
+          <div class="view active" id="overviewView">
+            <div id="overviewArea" class="overview-content">
+              <div class="stats-grid" id="statsGrid">
+                <div class="stat-card clickable accent-blue" onclick="scrollToSection('sessionsGrid')" title="View sessions">
+                  <div class="stat-label">Active Sessions</div>
+                  <div class="stat-value" id="statActiveSessions">-</div>
+                  <div class="stat-trend" id="statSessionsTrend"></div>
+                </div>
+                <div class="stat-card clickable accent-yellow" onclick="filterGoalsByStatus('active')" title="View pending goals">
+                  <div class="stat-label">Pending Goals</div>
+                  <div class="stat-value" id="statPendingGoals">-</div>
+                </div>
+                <div class="stat-card clickable accent-green" onclick="filterGoalsByStatus('done')" title="View completed goals">
+                  <div class="stat-label">Completed</div>
+                  <div class="stat-value" id="statCompletedGoals">-</div>
+                </div>
+                <div class="stat-card clickable accent-red" onclick="showErrorSessions()" title="View sessions with errors">
+                  <div class="stat-label">Errors</div>
+                  <div class="stat-value stat-error" id="statErrors">-</div>
+                </div>
+              </div>
+
+              <div class="grid-section" id="goalsSection">
+                <div class="grid-header">
+                  <h2 class="grid-title">🏙️ Condos (Goals)</h2>
+                  <span class="grid-count" id="goalCount">0</span>
+                  <span class="uncategorized-count" id="uncategorizedCount" onclick="autoCategorize()" title="Sessions not assigned to any goal"></span>
+                </div>
+                <div class="cards-grid goals-grid" id="goalsGrid"></div>
+              </div>
+
+              <div class="grid-section">
+                <div class="grid-header">
+                  <h2 class="grid-title">💬 Sessions</h2>
+                  <span class="grid-count" id="sessionCount">0</span>
+                  <button class="organize-btn" onclick="openOrganizeWizard()" title="Organize uncategorized sessions one by one">📂 Organize</button>
+                </div>
+                <div class="cards-grid" id="sessionsGrid"></div>
+              </div>
+
+              <div class="grid-section">
+                <div class="grid-header">
+                  <h2 class="grid-title">🚀 Apps</h2>
+                  <span class="grid-count" id="appCount">0</span>
+                </div>
+                <div class="cards-grid" id="appsGrid"></div>
+              </div>
+
+              <div class="grid-section" id="subagentsSection" style="display: none;">
+                <div class="grid-header">
+                  <h2 class="grid-title">⚡ Background Tasks</h2>
+                  <span class="grid-count" id="taskCount">0</span>
+                </div>
+                <div class="cards-grid" id="subagentsGrid"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="view" id="appsView">
+            <div class="grid" id="appsViewGrid"></div>
+          </div>
+
+          <div class="view" id="recurringView">
+            <div class="grid" id="recurringGrid"></div>
+          </div>
+
+          <div class="view" id="goalView">
+            <div class="goal-shell">
+              <div class="goal-hero">
+                <div class="goal-hero-top">
+                  <button class="goal-back" onclick="navigateTo('dashboard')">← Lobby</button>
+                  <div class="goal-hero-meta">
+                    <div class="goal-hero-title" id="goalHeroTitle">Goal</div>
+                    <div class="goal-hero-sub" id="goalHeroSub">—</div>
+                  </div>
+                  <div class="goal-hero-actions">
+                    <button class="header-btn" id="goalMarkDoneBtn" onclick="toggleGoalDone()">Mark done</button>
+                    <button class="header-btn" onclick="showAttachSessionModal(null)">Attach session</button>
+                    <button class="header-btn" style="background: var(--bg-input); border: 1px solid var(--border);" onclick="promptDeleteGoal()">Delete</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="goal-columns">
+                <section class="goal-panel">
+                  <div class="panel-title">Tasks</div>
+                  <div class="goal-tasks" id="goalTasks"></div>
+                  <div class="goal-task-new">
+                    <input class="form-input" id="goalNewTaskInput" placeholder="Add a task…" onkeypress="if(event.key==='Enter')addGoalTask()">
+                    <button class="form-btn" onclick="addGoalTask()">Add</button>
+                  </div>
+                </section>
+
+                <section class="goal-panel">
+                  <div class="panel-title">Notes</div>
+                  <textarea class="goal-notes" id="goalNotes" placeholder="Working notes, links, decisions…" oninput="debouncedSaveGoal()"></textarea>
+                  <div class="goal-meta-row">
+                    <div class="goal-meta-card">
+                      <div class="meta-label">Deadline</div>
+                      <input class="form-input" id="goalDeadlineInput" placeholder="YYYY-MM-DD or freeform" oninput="debouncedSaveGoal()">
+                    </div>
+                    <div class="goal-meta-card">
+                      <div class="meta-label">Priority</div>
+                      <select class="form-input" id="goalPriorityInput" onchange="saveGoalNow()">
+                        <option value="">—</option>
+                        <option value="P0">P0</option>
+                        <option value="P1">P1</option>
+                        <option value="P2">P2</option>
+                        <option value="P3">P3</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="goal-save-hint" id="goalSaveHint">Saved</div>
+                </section>
+
+                <section class="goal-panel">
+                  <div class="panel-title">Attached sessions</div>
+                  <div class="goal-sessions" id="goalSessions"></div>
+                  <div class="goal-sessions-hint">Tip: move sessions between condos from any session card’s ⛓ button.</div>
+                </section>
+              </div>
+            </div>
+          </div>
+
+          <div class="view" id="chatView">
+            <div id="chatArea" class="chat-shell">
+              <div class="session-info" id="sessionInfo">
+                <span class="session-info-item">📍 <span id="sessionKeyDisplay">-</span></span>
+                <span class="session-info-item">🤖 <span class="session-badge" id="sessionModel">-</span></span>
+                <span class="session-info-item">📊 <span id="sessionTokens">-</span> tokens</span>
+                <span class="session-info-spacer"></span>
+                <button class="export-btn" onclick="exportChatAsMarkdown()" title="Export as Markdown">
+                  <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                  Export
+                </button>
+              </div>
+              <div class="chat-messages" id="chatMessages"></div>
+
+              <div class="drop-overlay" id="dropOverlay">
+                <div class="drop-overlay-content">
+                  <div class="drop-overlay-icon">📎</div>
+                  <div class="drop-overlay-text">Drop files here</div>
+                  <div class="drop-overlay-hint">Images and audio supported</div>
+                </div>
+              </div>
+
+              <div class="reconnect-overlay" id="reconnectOverlay">
+                <div class="spinner"></div>
+                <div class="reconnect-text">Reconnecting...</div>
+                <div class="reconnect-attempt" id="reconnectAttempt">Attempt 1</div>
+              </div>
+              <div class="chat-input-area">
+                <div class="queue-indicator" id="queueIndicator">
+                  <span>📨</span>
+                  <span class="queue-count" id="queueCount">0</span>
+                  <span>queued</span>
+                  <button class="clear-queue" onclick="clearMessageQueue()" title="Clear queue">✕</button>
+                </div>
+
+                <div id="mediaPreviewContainer"></div>
+
+                <input type="file" id="mediaFileInput" accept="image/*,audio/*" multiple>
+
+                <div class="chat-input-wrapper">
+                  <button class="attach-btn" onclick="document.getElementById('mediaFileInput').click()" title="Attach files">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                    </svg>
+                  </button>
+                  <textarea class="chat-input" id="chatInput" placeholder="Type a message..." rows="1" onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
+                  <button class="stop-btn" id="stopBtn" onclick="stopAgent()" disabled title="Stop">⏹</button>
+                  <button class="voice-btn" id="voiceRecordBtn" title="Record voice" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3zm5 11a5 5 0 01-10 0H5a7 7 0 0014 0h-2zm-5 9a7.001 7.001 0 006.93-6H19a8.99 8.99 0 01-14 0H5.07A7.001 7.001 0 0012 21z"/>
+                    </svg>
+                    <span class="voice-btn-text">Rec</span>
+                    <span class="recording-timer" id="recordingTimer">0:00</span>
+                  </button>
+                  <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="view" id="newSessionView">
+            <div class="form-page">
+              <div class="detail-section">
+                <div class="detail-label">Agent</div>
+                <div class="agent-chip-row" id="newSessionAgents"></div>
+              </div>
+
+              <div class="detail-section">
+                <div class="detail-label">Goal (optional)</div>
+                <select id="newSessionGoal" class="form-input"></select>
+              </div>
+
+              <div class="detail-section">
+                <div class="detail-label">Initial Message</div>
+                <textarea id="newSessionMessage" class="form-input" style="min-height: 110px;" placeholder="What do you want to work on?"></textarea>
+              </div>
+
+              <div class="form-actions">
+                <button class="btn btn-success" onclick="submitNewSession()">🚀 Start Session</button>
+                <button class="btn btn-secondary" onclick="goBack()">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="view" id="newGoalView">
+            <div class="form-page">
+              <div class="detail-section">
+                <div class="detail-label">Goal Title</div>
+                <input type="text" id="newGoalTitle" class="form-input" placeholder="e.g., Implement user authentication">
+              </div>
+
+              <div class="detail-section">
+                <div class="detail-label">Description (optional)</div>
+                <textarea id="newGoalDescription" class="form-input" style="min-height: 80px;" placeholder="What needs to be accomplished?"></textarea>
+              </div>
+
+              <div class="detail-section">
+                <div class="detail-label">Start session immediately?</div>
+                <div class="radio-row">
+                  <label class="radio-card">
+                    <input type="radio" name="startGoalSession" value="yes" checked>
+                    <span>Yes, start working</span>
+                  </label>
+                  <label class="radio-card">
+                    <input type="radio" name="startGoalSession" value="no">
+                    <span>No, just create goal</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button class="btn btn-primary" onclick="submitNewGoal()">✓ Create Goal</button>
+                <button class="btn btn-secondary" onclick="goBack()">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <aside class="detail-panel">
+          <div class="detail-panel-inner">
+            <div class="detail-content" id="detailPanelContent"></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <script src="/clawcondos-lib/config.js"></script>
+  <script>
+    // If no stored gateway token, show login immediately (so the UI doesn't sit on "Connecting...")
+    try {
+      if (!localStorage.getItem('sharp_token')) {
+        document.getElementById('loginModal')?.classList.remove('hidden');
+      }
+    } catch {}
+  </script>
+  <script src="/v2/app.js"></script>
+  <script src="/js/media-upload.js"></script>
+  <script src="/js/voice-recorder.js"></script>
+</body>
+</html>

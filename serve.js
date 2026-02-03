@@ -45,16 +45,32 @@ function goalsFilePath() {
 
 function loadGoalsStore() {
   const file = goalsFilePath();
-  if (!existsSync(file)) return { version: 1, goals: [], sessionIndex: {} };
+  if (!existsSync(file)) return { version: 2, goals: [], sessionIndex: {} };
   try {
     const parsed = JSON.parse(readFileSync(file, 'utf-8'));
+    const rawGoals = Array.isArray(parsed.goals) ? parsed.goals : [];
+
+    // v2 schema adds:
+    // - condoId: goal belongs to a condo (Telegram topic)
+    // - completed: boolean (sidebar hides completed goals)
+    const goals = rawGoals.map(g => {
+      const completed = g?.completed === true || g?.status === 'done';
+      return {
+        ...g,
+        condoId: g?.condoId ?? null,
+        completed,
+        description: g?.description ?? g?.notes ?? '',
+        sessions: Array.isArray(g?.sessions) ? g.sessions : [],
+      };
+    });
+
     return {
-      version: parsed.version ?? 1,
-      goals: Array.isArray(parsed.goals) ? parsed.goals : [],
+      version: parsed.version ?? 2,
+      goals,
       sessionIndex: parsed.sessionIndex && typeof parsed.sessionIndex === 'object' ? parsed.sessionIndex : {},
     };
   } catch {
-    return { version: 1, goals: [], sessionIndex: {} };
+    return { version: 2, goals: [], sessionIndex: {} };
   }
 }
 
@@ -174,7 +190,7 @@ const server = createServer(async (req, res) => {
   
   // API: Goals (ClawCondos)
   // GET  /api/goals
-  // POST /api/goals { title, status?, priority?, deadline?, notes?, tasks? }
+  // POST /api/goals { title, condoId?, description?, completed?, status?, priority?, deadline?, notes?, tasks? }
   if (pathname === '/api/goals' && (req.method === 'GET' || req.method === 'POST')) {
     const store = loadGoalsStore();
     if (req.method === 'GET') {
@@ -184,10 +200,14 @@ const server = createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const now = Date.now();
+      const completed = body.completed === true || body.status === 'done';
       const goal = {
         id: newId('goal'),
+        condoId: body.condoId != null ? String(body.condoId).trim() : null,
         title: String(body.title || '').trim() || 'Untitled goal',
-        status: body.status || 'active',
+        description: body.description != null ? String(body.description) : '',
+        completed,
+        status: completed ? 'done' : (body.status || 'active'),
         priority: body.priority || null,
         deadline: body.deadline || null,
         notes: body.notes || '',
@@ -234,10 +254,14 @@ const server = createServer(async (req, res) => {
       try {
         const body = await readJsonBody(req);
         const now = Date.now();
+        const nextCompleted = body.completed != null ? Boolean(body.completed) : store.goals[idx].completed;
         store.goals[idx] = {
           ...store.goals[idx],
+          condoId: body.condoId != null ? String(body.condoId).trim() : store.goals[idx].condoId,
           title: body.title != null ? String(body.title).trim() : store.goals[idx].title,
-          status: body.status != null ? body.status : store.goals[idx].status,
+          description: body.description != null ? String(body.description) : store.goals[idx].description,
+          completed: nextCompleted,
+          status: body.status != null ? body.status : (nextCompleted ? 'done' : store.goals[idx].status),
           priority: body.priority != null ? body.priority : store.goals[idx].priority,
           deadline: body.deadline != null ? body.deadline : store.goals[idx].deadline,
           notes: body.notes != null ? body.notes : store.goals[idx].notes,
@@ -336,16 +360,64 @@ const server = createServer(async (req, res) => {
   }
   
   // Static files
-  if (pathname === '/') pathname = '/index.html';
+  //
+  // v2 is served at root (/) from public/v2
+  // v1 remains reachable under /v1/* for safety during migration
+
+  // Serve Sharp's config module without colliding with Apps Gateway /lib/* handler
+  if (pathname === '/clawcondos-lib/config.js') {
+    const filePath = join(__dirname, 'lib', 'config.js');
+    serveFile(res, filePath);
+    return;
+  }
+
+  if (pathname === '/' || pathname === '/v2' || pathname === '/v2/') {
+    const filePath = join(__dirname, 'public', 'v2', 'index.html');
+    serveFile(res, filePath);
+    return;
+  }
+  if (pathname.startsWith('/v2/')) {
+    const rel = pathname.slice('/v2/'.length);
+    let filePath = join(__dirname, 'public', 'v2', rel || 'index.html');
+    if (existsSync(filePath) && statSync(filePath).isDirectory()) {
+      filePath = join(filePath, 'index.html');
+    }
+    serveFile(res, filePath);
+    return;
+  }
+
+  if (pathname === '/v1' || pathname === '/v1/') pathname = '/index.html';
+  if (pathname.startsWith('/v1/')) pathname = pathname.replace('/v1', '');
+
   if (pathname === '/app') pathname = '/app.html';
-  
+
+  // /v1/* → legacy root files
+  if (pathname === '/v1') pathname = '/v1/';
+  if (pathname.startsWith('/v1/')) {
+    const legacyPath = '/' + pathname.slice('/v1/'.length);
+    const legacyRel = (legacyPath === '/' ? '/index.html' : legacyPath).replace(/^\/+/, '');
+    let filePath = join(__dirname, legacyRel);
+    if (existsSync(filePath) && statSync(filePath).isDirectory()) {
+      filePath = join(filePath, 'index.html');
+    }
+    serveFile(res, filePath);
+    return;
+  }
+
+  // Root /index.html → v2 index
+  if (pathname === '/index.html') {
+    const filePath = join(__dirname, 'public', 'v2', 'index.html');
+    serveFile(res, filePath);
+    return;
+  }
+
   let filePath = join(__dirname, pathname);
-  
+
   // If directory, try index.html
   if (existsSync(filePath) && statSync(filePath).isDirectory()) {
     filePath = join(filePath, 'index.html');
   }
-  
+
   serveFile(res, filePath);
 });
 
