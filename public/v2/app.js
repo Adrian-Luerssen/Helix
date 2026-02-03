@@ -898,14 +898,22 @@
         clearWsTimers();
         setConnectionStatus('error');
 
-        // If auth or handshake failed, prompt for token and stop reconnect loop until user acts.
+        // If auth or handshake failed, prompt for token and STOP reconnect loop until user acts.
         if (event?.code === 1008 && /unauthorized|password mismatch|device identity required|invalid connect params/i.test(event?.reason || '')) {
+          // Clear stored token to prevent infinite reconnect spam with a bad secret.
+          state.token = null;
+          localStorage.removeItem('sharp_token');
+          localStorage.removeItem('sharp_gateway_token');
+
           showLoginModal();
           const errorDiv = document.getElementById('loginError');
           if (errorDiv) {
             errorDiv.textContent = event.reason || 'Authentication required';
             errorDiv.style.display = 'block';
           }
+
+          // Also show a toast so it's visible even if modal is dismissed.
+          showToast(event.reason || 'Authentication required', 'error', 8000);
           return;
         }
         
@@ -1343,8 +1351,11 @@
           updateSendButton();
           removeStreamingMessage(runId);
           clearAllTools();  // Clear tool activity on error/abort
-          if (data.errorMessage) {
-            addChatMessage('system', `Error: ${data.errorMessage}`);
+          const msg = data.errorMessage || data.stopReason || (runState === 'aborted' ? 'Run aborted' : 'Run failed');
+          if (msg) {
+            // Make provider/network issues impossible to miss.
+            addChatMessage('system', `⚠️ ${msg}`);
+            showToast(msg, /timeout|rate_limit|429/i.test(msg) ? 'warning' : 'error', 8000);
           }
         }
       }
