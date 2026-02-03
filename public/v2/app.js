@@ -2254,7 +2254,7 @@
         const res = await fetch(`api/goals/${encodeURIComponent(goal.id)}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Failed');
         await loadGoals();
-        showOverview();
+        navigateTo('dashboard');
       } catch {
         showToast('Failed to delete goal', 'error');
       }
@@ -3824,7 +3824,7 @@ Response format:
             // If data hasn't loaded yet, defer
             if (!(state.sessions?.length || state.goals?.length)) {
               state.pendingRouteCondoId = condoId;
-              showOverview();
+              showOverview(); // don't navigate; we're already in a router call
             } else {
               openCondo(condoId, { fromRouter: true });
             }
