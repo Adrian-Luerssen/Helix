@@ -155,19 +155,29 @@ const server = createServer(async (req, res) => {
   }
 
   // Proxy to OpenClaw gateway for /api/gateway/* requests
+  // SECURITY: Never hardcode keys. Requires env vars:
+  // - GATEWAY_HTTP_HOST (default: localhost)
+  // - GATEWAY_HTTP_PORT (default: 18789)
+  // - GATEWAY_AUTH (required)
   if (pathname.startsWith('/api/gateway/')) {
     const gatewayPath = pathname.replace('/api/gateway', '');
-    const GATEWAY_PORT = 18789;
-    const GATEWAY_AUTH = 'REDACTED';
-    
+    const GATEWAY_HTTP_HOST = process.env.GATEWAY_HTTP_HOST || 'localhost';
+    const GATEWAY_HTTP_PORT = Number(process.env.GATEWAY_HTTP_PORT || 18789);
+    const GATEWAY_AUTH = process.env.GATEWAY_AUTH;
+
+    if (!GATEWAY_AUTH) {
+      json(res, 503, { error: { message: 'Gateway proxy disabled: missing GATEWAY_AUTH env', type: 'proxy_config' } });
+      return;
+    }
+
     const options = {
-      hostname: 'localhost',
-      port: GATEWAY_PORT,
+      hostname: GATEWAY_HTTP_HOST,
+      port: GATEWAY_HTTP_PORT,
       path: gatewayPath + url.search,
       method: req.method,
       headers: {
         ...req.headers,
-        host: `localhost:${GATEWAY_PORT}`,
+        host: `${GATEWAY_HTTP_HOST}:${GATEWAY_HTTP_PORT}`,
         'Authorization': `Bearer ${GATEWAY_AUTH}`,
       },
     };
@@ -386,23 +396,14 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  if (pathname === '/v1' || pathname === '/v1/') pathname = '/index.html';
-  if (pathname.startsWith('/v1/')) pathname = pathname.replace('/v1', '');
-
-  if (pathname === '/app') pathname = '/app.html';
-
-  // /v1/* → legacy root files
-  if (pathname === '/v1') pathname = '/v1/';
-  if (pathname.startsWith('/v1/')) {
-    const legacyPath = '/' + pathname.slice('/v1/'.length);
-    const legacyRel = (legacyPath === '/' ? '/index.html' : legacyPath).replace(/^\/+/, '');
-    let filePath = join(__dirname, legacyRel);
-    if (existsSync(filePath) && statSync(filePath).isDirectory()) {
-      filePath = join(filePath, 'index.html');
-    }
-    serveFile(res, filePath);
+  // v1 is deprecated; v2 is the only UI.
+  if (pathname === '/v1' || pathname.startsWith('/v1/')) {
+    res.writeHead(301, { Location: '/' });
+    res.end();
     return;
   }
+
+  if (pathname === '/app') pathname = '/app.html';
 
   // Root /index.html → v2 index
   if (pathname === '/index.html') {

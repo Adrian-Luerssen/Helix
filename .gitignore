@@ -35,3 +35,6 @@ __pycache__/
 
 # Ignore standalone app repos
 apps/prediction-market/
+
+# Local runtime registry/data
+.registry/

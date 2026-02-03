@@ -307,7 +307,7 @@
           .map(m => `${m.role}: ${typeof m.content === 'string' ? m.content.slice(0, 150) : ''}`)
           .join('\n');
         
-        const response = await fetch('api/openai/v1/chat/completions', {
+        const response = await fetch('/api/openai/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -530,7 +530,7 @@
     async function generateTitleWithLLM(conversation) {
       try {
         // Use server-side proxy that injects the API key
-        const response = await fetch('api/openai/v1/chat/completions', {
+        const response = await fetch('/api/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -1726,7 +1726,7 @@
     
     async function loadGoals() {
       try {
-        const res = await fetch('api/goals');
+        const res = await fetch('/api/goals');
         if (!res.ok) return;
         const data = await res.json();
         state.goals = (data.goals || []).map(g => {
@@ -2171,7 +2171,7 @@
 
     async function updateGoal(goalId, patch) {
       try {
-        const res = await fetch(`api/goals/${encodeURIComponent(goalId)}`, {
+        const res = await fetch(`/api/goals/${encodeURIComponent(goalId)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patch),
@@ -2251,7 +2251,7 @@
       if (!goal) return;
       if (!confirm(`Delete goal "${goal.title}"? This does not delete sessions.`)) return;
       try {
-        const res = await fetch(`api/goals/${encodeURIComponent(goal.id)}`, { method: 'DELETE' });
+        const res = await fetch(`/api/goals/${encodeURIComponent(goal.id)}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Failed');
         await loadGoals();
         navigateTo('dashboard');
@@ -2317,7 +2317,7 @@
         return;
       }
       try {
-        const res = await fetch(`api/goals/${encodeURIComponent(goalId)}/sessions`, {
+        const res = await fetch(`/api/goals/${encodeURIComponent(goalId)}/sessions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionKey }),
@@ -2544,7 +2544,7 @@ If none fit well, include a suggestion with goalId:null and a proposed new goal 
       if (!sessionKey || !title) return;
       
       try {
-        const res = await fetch('api/goals', {
+        const res = await fetch('/api/goals', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, condoId: getCondoIdForSessionKey(sessionKey) }),
@@ -2553,7 +2553,7 @@ If none fit well, include a suggestion with goalId:null and a proposed new goal 
         const data = await res.json();
         
         if (data?.goal?.id) {
-          await fetch(`api/goals/${data.goal.id}/sessions`, {
+          await fetch(`/api/goals/${data.goal.id}/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionKey }),
@@ -2599,7 +2599,7 @@ If none fit well, include a suggestion with goalId:null and a proposed new goal 
       if (!sessionKey) return;
       
       try {
-        const res = await fetch(`api/goals/${goalId}/sessions`, {
+        const res = await fetch(`/api/goals/${goalId}/sessions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionKey }),
@@ -2628,7 +2628,7 @@ If none fit well, include a suggestion with goalId:null and a proposed new goal 
       
       try {
         // Create goal
-        const res = await fetch('api/goals', {
+        const res = await fetch('/api/goals', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, condoId: getCondoIdForSessionKey(sessionKey) }),
@@ -2638,7 +2638,7 @@ If none fit well, include a suggestion with goalId:null and a proposed new goal 
         
         // Assign session to new goal
         if (sessionKey && data?.goal?.id) {
-          await fetch(`api/goals/${data.goal.id}/sessions`, {
+          await fetch(`/api/goals/${data.goal.id}/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionKey }),
@@ -3010,21 +3010,21 @@ Response format:
       try {
         if (proposal.goalId && !proposal.isNew) {
           // Assign to existing goal
-          await fetch(`api/goals/${proposal.goalId}/sessions`, {
+          await fetch(`/api/goals/${proposal.goalId}/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionKey }),
           });
         } else {
           // Create new goal and assign
-          const res = await fetch('api/goals', {
+          const res = await fetch('/api/goals', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title: proposal.title || 'New Goal', condoId: getCondoIdForSessionKey(sessionKey) }),
           });
           const data = await res.json();
           if (data?.goal?.id) {
-            await fetch(`api/goals/${data.goal.id}/sessions`, {
+            await fetch(`/api/goals/${data.goal.id}/sessions`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ sessionKey }),
@@ -3048,7 +3048,7 @@ Response format:
       if (!sessionKey) return;
       
       try {
-        await fetch(`api/goals/${goalId}/sessions`, {
+        await fetch(`/api/goals/${goalId}/sessions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionKey }),
@@ -3070,7 +3070,7 @@ Response format:
       if (!sessionKey) return;
       
       try {
-        const res = await fetch('api/goals', {
+        const res = await fetch('/api/goals', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, condoId: getCondoIdForSessionKey(state.wizardPendingSessionKey) }),
@@ -3078,7 +3078,7 @@ Response format:
         const data = await res.json();
         
         if (data?.goal?.id) {
-          await fetch(`api/goals/${data.goal.id}/sessions`, {
+          await fetch(`/api/goals/${data.goal.id}/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionKey }),
@@ -3129,7 +3129,7 @@ Response format:
         return;
       }
       try {
-        const res = await fetch('api/goals', {
+        const res = await fetch('/api/goals', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, deadline: deadline || null, condoId: state.currentCondoId || state.newGoalCondoId || null }),
@@ -3233,7 +3233,7 @@ Response format:
     
     async function loadApps() {
       try {
-        const res = await fetch('api/apps');
+        const res = await fetch('/api/apps');
         if (!res.ok) return;
         const text = await res.text();
         if (!text) return;
@@ -4363,7 +4363,7 @@ Response format:
           await rpcCall('chat.send', { sessionKey, message: 'Hello!', idempotencyKey });
         }
         if (goalId) {
-          await fetch(`api/goals/${encodeURIComponent(goalId)}/sessions`, {
+          await fetch(`/api/goals/${encodeURIComponent(goalId)}/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionKey }),
@@ -4391,7 +4391,7 @@ Response format:
         return;
       }
       try {
-        const res = await fetch('api/goals', {
+        const res = await fetch('/api/goals', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, notes: description || '', condoId: state.newGoalCondoId || state.currentCondoId || null }),
