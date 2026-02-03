@@ -15,7 +15,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   
   <link rel="stylesheet" href="/styles/main.css?v=8">
-  <link rel="stylesheet" href="/styles/v2-shell.css?v=1">
   <link rel="stylesheet" href="/styles/media-upload.css">
   <link rel="stylesheet" href="/styles/voice-recorder.css">
 </head>
@@ -206,9 +205,6 @@
   <!-- Sidebar Overlay -->
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
-  <!-- v2 shell wrapper (layout only) -->
-  <div class="v2-shell">
-
   <!-- ═══════════════════════════════════════════════════════════════
        SIDEBAR
        ═══════════════════════════════════════════════════════════════ -->
@@ -327,37 +323,17 @@
   <!-- ═══════════════════════════════════════════════════════════════
        MAIN CONTENT
        ═══════════════════════════════════════════════════════════════ -->
-  <div class="v2-right">
-    <header class="v2-shared-header">
-      <button class="v2-back-btn" id="v2BackBtn" onclick="showOverview()" title="Back" style="display:none;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m15 18-6-6 6-6"/>
-        </svg>
-      </button>
-      <div class="v2-breadcrumbs" id="v2Breadcrumbs">
-        <span class="v2-crumb">🏠</span>
-        <span class="v2-sep">›</span>
-        <span class="v2-crumb-current" id="mainTitle">Dashboard</span>
-      </div>
-      <div class="v2-header-spacer"></div>
-      <div class="v2-global-search">
-        <svg class="v2-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"></circle>
-          <path d="m21 21-4.35-4.35"></path>
-        </svg>
-        <input type="text" placeholder="Search sessions, goals, apps…" id="v2SearchInput">
-        <span class="v2-kbd">⌘K</span>
-      </div>
-      <div class="v2-header-spacer"></div>
-      <span class="main-subtitle" id="mainSubtitle"></span>
+  <main class="main">
+    <header class="main-header">
+      <h1 class="main-title" id="mainTitle">Dashboard</h1>
       <div class="header-status idle" id="headerStatusIndicator" data-tooltip="Ready" style="display: none;"></div>
+      <span class="main-subtitle" id="mainSubtitle"></span>
+      <div class="main-header-spacer"></div>
       <button class="header-btn" id="headerAction" onclick="headerAction()" style="display: none;">Action</button>
       <button class="header-btn" onclick="refresh()">↻ Refresh</button>
     </header>
-
-    <div class="v2-body">
-      <main class="main v2-main">
-        <div class="main-content">
+    
+    <div class="main-content">
       <!-- Overview View -->
       <div class="view active" id="overviewView">
         <div class="overview-content">
@@ -557,19 +533,8 @@
           <div class="voice-hint" id="voiceHint">Recording… click mic to stop</div>
         </div>
       </div>
-        </div>
-      </main>
-
-      <aside class="v2-detail">
-        <div class="v2-detail-inner">
-          <div class="v2-detail-title">Details</div>
-          <div class="v2-detail-body">Select something to see details here.</div>
-        </div>
-      </aside>
-    </div><!-- /.v2-body -->
-  </div><!-- /.v2-right -->
-
-</div><!-- /.v2-shell -->
+    </div>
+  </main>
 
   <!-- Load configuration before main script -->
   <script src="/lib/config.js"></script>
