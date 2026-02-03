@@ -46,7 +46,7 @@
       chatAutoScroll: true,          // user is at bottom (or near-bottom)
       chatUnseenCount: 0,            // new messages while scrolled up
       streamingBuffers: new Map(),   // Map<runId, string>
-      streamingRaf: new Map()        // Map<runId, rafId>
+      streamingRaf: new Map(),       // Map<runId, rafId>
       
       // Audio recording
       mediaRecorder: null,
@@ -3768,7 +3768,7 @@ Response format:
       return s.compactionCount > 0;
     }
     
-    function getSessionStatus(s) {
+    function getSessionActivityStatus(s) {
       // Check if actively streaming
       if (state.activeRuns.has(s.key)) return 'running';
       if (s.abortedLastRun) return 'error';
@@ -4414,8 +4414,8 @@ Response format:
           <div class="grid-card-meta">
             <span>${escapeHtml(timeAgo(s.updatedAt || Date.now()))}</span>
             <div class="status-indicator">
-              <span class="status-dot ${getSessionStatus(s) === 'error' ? 'stopped' : 'running'}"></span>
-              <span>${getSessionStatus(s) === 'error' ? 'Error' : 'Active'}</span>
+              <span class="status-dot ${getSessionActivityStatus(s) === 'error' ? 'stopped' : 'running'}"></span>
+              <span>${getSessionActivityStatus(s) === 'error' ? 'Error' : 'Active'}</span>
             </div>
           </div>
         </div>
