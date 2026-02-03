@@ -36,6 +36,8 @@
       pendingRouteCondoId: null,
       pendingRouteAppId: null,
       pendingRouteCronKey: null,
+      pendingRouteNewSession: null,
+      pendingRouteNewGoalCondoId: null,
       chatHistory: [],
       isThinking: false,
       messageQueue: [],  // Queued messages when agent is busy
@@ -1743,6 +1745,21 @@
           if (state.goals.find(x => x.id === pending)) {
             openGoal(pending, { fromRouter: true });
           }
+        }
+
+        if (state.pendingRouteNewSession) {
+          const pending = state.pendingRouteNewSession;
+          state.pendingRouteNewSession = null;
+          state.newSessionCondoId = pending?.condoId || state.currentCondoId;
+          state.attachGoalId = pending?.goalId || null;
+          showNewSessionView({ fromRouter: true });
+        }
+
+        if (state.pendingRouteNewGoalCondoId !== null) {
+          const pending = state.pendingRouteNewGoalCondoId;
+          state.pendingRouteNewGoalCondoId = null;
+          state.newGoalCondoId = pending || state.currentCondoId;
+          showNewGoalView({ fromRouter: true });
         }
       } catch (err) {
         console.error('[ClawCondos] Failed to load goals:', err);
@@ -3841,12 +3858,37 @@ Response format:
             showOverview();
           }
           break;
-        case 'new-session':
-          showNewSessionView();
+        case 'new-session': {
+          // /new-session/<condoId>/<goalId?>
+          const parts = payload ? payload.split('/').map(decodeURIComponent) : [];
+          const condoId = parts[0] || null;
+          const goalId = parts[1] || null;
+
+          // If goals aren't loaded yet, defer so the goal dropdown can populate.
+          if (!state.goals?.length) {
+            state.pendingRouteNewSession = { condoId, goalId };
+            showNewSessionView({ fromRouter: true });
+          } else {
+            state.newSessionCondoId = condoId || state.currentCondoId;
+            state.attachGoalId = goalId || null;
+            showNewSessionView({ fromRouter: true });
+          }
           break;
-        case 'new-goal':
-          showNewGoalView();
+        }
+        case 'new-goal': {
+          // /new-goal/<condoId>
+          const parts = payload ? payload.split('/').map(decodeURIComponent) : [];
+          const condoId = parts[0] || null;
+
+          if (!state.goals?.length) {
+            state.pendingRouteNewGoalCondoId = condoId;
+            showNewGoalView({ fromRouter: true });
+          } else {
+            state.newGoalCondoId = condoId || state.currentCondoId;
+            showNewGoalView({ fromRouter: true });
+          }
           break;
+        }
         case 'dashboard':
         default:
           showOverview();
@@ -3931,7 +3973,7 @@ Response format:
       closeSidebar();
     }
 
-    function showNewSessionView() {
+    function showNewSessionView(opts = {}) {
       state.currentView = 'new-session';
       setView('newSessionView');
       setActiveNav(null);
@@ -3945,7 +3987,7 @@ Response format:
       closeSidebar();
     }
 
-    function showNewGoalView() {
+    function showNewGoalView(opts = {}) {
       state.currentView = 'new-goal';
       setView('newGoalView');
       setActiveNav(null);
@@ -3960,14 +4002,15 @@ Response format:
     }
 
     function openNewSession(condoId, goalId = null) {
-      state.newSessionCondoId = condoId || state.currentCondoId;
-      state.attachGoalId = goalId || null;
-      navigateTo('new-session');
+      const c = condoId || state.currentCondoId || '';
+      const g = goalId || '';
+      const path = g ? `new-session/${encodeURIComponent(c)}/${encodeURIComponent(g)}` : `new-session/${encodeURIComponent(c)}`;
+      navigateTo(path);
     }
 
     function openNewGoal(condoId) {
-      state.newGoalCondoId = condoId || state.currentCondoId;
-      navigateTo('new-goal');
+      const c = condoId || state.currentCondoId || '';
+      navigateTo(`new-goal/${encodeURIComponent(c)}`);
     }
 
     function selectCondo(condoId) {
