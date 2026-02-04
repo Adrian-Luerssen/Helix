@@ -3,6 +3,8 @@
     // ═══════════════════════════════════════════════════════════════
     const WS_PROTOCOL_VERSION = 3;
     const RECONNECT_DELAYS = [1000, 2000, 5000, 10000, 30000];
+    // Sidebar should only show recently-active sessions (unless pinned / running)
+    const SIDEBAR_HIDE_INACTIVE_MS = 15 * 60 * 1000; // 15 minutes
     
     // ═══════════════════════════════════════════════════════════════
     // STATE
@@ -1697,6 +1699,13 @@ function initAutoArchiveUI() {
       }
     }
     
+    function hasFreshActiveRun(sessionKey) {
+      const data = state.activeRunsStore?.[sessionKey];
+      if (!data?.runId) return false;
+      const age = Date.now() - (data.startedAt || 0);
+      return age >= 0 && age <= ACTIVE_RUN_STALE_MS;
+    }
+
     function trackActiveRun(sessionKey, runId) {
       state.activeRuns.set(sessionKey, runId);
       state.activeRunsStore[sessionKey] = { runId, startedAt: Date.now() };
@@ -1999,10 +2008,23 @@ function initAutoArchiveUI() {
         markAllReadBtn.title = `Mark all read (${unreadCount})`;
       }
 
+      const cutoff = Date.now() - SIDEBAR_HIDE_INACTIVE_MS;
       const visibleSessions = state.sessions.filter(s => {
         if (s.key.includes(':subagent:')) return false;
         if (isSessionArchived(s.key) && !state.showArchived) return false;
         if (!matchesSearch(s)) return false;
+
+        // Hide inactive sessions from sidebar after 15 minutes.
+        // Exceptions: pinned sessions, sessions with a fresh active run, and unread sessions.
+        const pinned = isSessionPinned(s.key);
+        const unread = isSessionUnread(s.key);
+        const running = hasFreshActiveRun(s.key) || getAgentStatus(s.key) === 'thinking';
+        const updatedAt = Number(s.updatedAt || s.updatedAtMs || 0);
+
+        if (!state.showArchived && !pinned && !unread && !running && updatedAt > 0 && updatedAt < cutoff) {
+          return false;
+        }
+
         return true;
       });
 
@@ -3912,7 +3934,7 @@ Response format:
       let displayName = sessionName;
       
       return `
-        <div class="item ${isActive ? 'active' : ''} ${isArchived ? 'archived-session' : ''} ${hasUnread ? 'unread' : ''} ${isNested ? 'nested-item' : ''}" data-session-key="${escapeHtml(s.key)}" onclick="${clickHandler}">
+        <div class="item status-${agentStatus} ${isActive ? 'active' : ''} ${isArchived ? 'archived-session' : ''} ${hasUnread ? 'unread' : ''} ${isNested ? 'nested-item' : ''}" data-session-key="${escapeHtml(s.key)}" onclick="${clickHandler}">
           <div class="item-icon">${isNested ? '💬' : getSessionIcon(s)}${s.compactionCount > 0 ? '<span class="compaction-badge" title="Compacted ' + s.compactionCount + 'x">📜</span>' : ''}</div>
           <div class="item-content">
             <div class="item-name ${isGenerating ? 'title-generating' : ''}">${escapeHtml(displayName)}</div>

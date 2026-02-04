@@ -1733,3 +1733,105 @@ body {
 /* Media preview container is rendered by js/media-upload.js */
 #mediaPreviewContainer { margin-bottom: 10px; }
 
+/* ───────────────────────────────────────────────────────────────
+   Unified "item" rows (Sessions / Apps / Crons lists)
+   Ensures session color reflects *that session's* real-time status.
+   ─────────────────────────────────────────────────────────────── */
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.item:hover {
+  background: var(--bg-hover);
+  border-color: rgba(255,255,255,0.06);
+}
+
+.item.active {
+  background: rgba(96, 165, 250, 0.10);
+  border-color: rgba(96, 165, 250, 0.18);
+}
+
+.item.unread {
+  border-color: rgba(96, 165, 250, 0.20);
+}
+
+.item.archived-session {
+  opacity: 0.55;
+}
+
+.item .item-icon {
+  width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.item .item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.item .item-name {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item .item-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item .item-status {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.item .agent-status {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+  background: rgba(148, 163, 184, 0.35);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.06) inset;
+}
+
+.agent-status.idle { background: rgba(148, 163, 184, 0.35); }
+.agent-status.thinking {
+  background: var(--yellow);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.30), 0 0 10px rgba(245, 158, 11, 0.25);
+}
+.agent-status.error {
+  background: var(--red);
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.30), 0 0 10px rgba(248, 113, 113, 0.22);
+}
+.agent-status.offline {
+  background: rgba(148, 163, 184, 0.20);
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.10);
+}
+
+/* Row tint reflects per-session status (subtle, doesn’t fight unread/active) */
+.item.status-thinking { background: rgba(245, 158, 11, 0.06); }
+.item.status-error { background: rgba(248, 113, 113, 0.06); }
+.item.status-offline { background: rgba(148, 163, 184, 0.04); }
+
