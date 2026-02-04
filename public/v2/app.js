@@ -2366,9 +2366,12 @@ function initAutoArchiveUI() {
         `INSTRUCTIONS:`,
         `1) Pick the best first task to start now (you choose).`,
         `2) Start executing immediately.`,
-        `3) As you work, keep the goal state updated by emitting a compact JSON patch that the UI will auto-apply.`,
-        `   Example JSON (put this in a fenced code block in your message):`,
-        `   {"goalPatch": {"status":"active","nextTask":"…","tasks":[{"id":"task_…","text":"…","done":false}]}}`,
+        `3) FIRST REPLY: output a single-line JSON object of the form {"goalPatch": {...}} updating at least nextTask (and status if needed).`,
+        `   - Do NOT wrap it in markdown fences.`,
+        `   - Keep it compact (no commentary before/after).`,
+        `4) Do NOT use tools unless the user explicitly asks.`,
+        `5) As you progress, emit additional {"goalPatch": {...}} updates when you change status/nextTask/complete tasks.`,
+        `   Example: {"goalPatch":{"status":"active","nextTask":"…"}}`,
       ].join('\n');
 
       try {
@@ -2392,20 +2395,21 @@ function initAutoArchiveUI() {
           idempotencyKey: `kickoff-${goalId}-${timestamp}`,
         }, 130000);
 
-        // Verify delivery
-        const deadline = Date.now() + 12000;
+        // Verify delivery (best-effort). Don't exact-match content; just confirm we can see a user msg at/after kickoff.
+        const kickoffStartedAt = Date.now();
+        const deadline = Date.now() + 15000;
         let ok = false;
         while (Date.now() < deadline) {
           try {
-            const h = await rpcCall('chat.history', { sessionKey, limit: 20 }, 20000);
+            const h = await rpcCall('chat.history', { sessionKey, limit: 30 }, 20000);
             const msgs = h?.messages || [];
-            ok = msgs.some(m => m.role === 'user' && extractText(m.content).includes(`GOAL: ${goal.title || goalId}`));
+            ok = msgs.some(m => m.role === 'user' && Number(m.timestamp || 0) >= kickoffStartedAt - 2000);
           } catch {}
           if (ok) break;
-          await new Promise(r => setTimeout(r, 400));
+          await new Promise(r => setTimeout(r, 500));
         }
         if (!ok) {
-          showToast('Kickoff may not have been delivered. Please retry.', 'warning', 6000);
+          showToast('Kickoff delivery not confirmed yet. If it stays stuck on “starting…”, click Kick Off again.', 'warning', 7000);
         }
 
         await loadSessions();
@@ -2652,30 +2656,49 @@ function initAutoArchiveUI() {
       }
 
       try {
+        const sendStartedAt = Date.now();
+        const idempotencyKey = `goalmsg-${key}-${sendStartedAt}`;
+
         await rpcCall('chat.send', {
           sessionKey: key,
           message: finalMessage || '',
           attachments,
-          idempotencyKey: `goalmsg-${key}-${Date.now()}`,
+          idempotencyKey,
         }, 130000);
 
         // Reliability: verify delivery (avoid "phantom" optimistic messages).
+        // NOTE: Don't exact-match message text — history can normalize whitespace, and attachments-only sends vary.
         try {
           const sentText = (finalMessage || '').trim();
           if (sentText) {
-            const deadline = Date.now() + 8000;
+            const normalize = s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            const sentNorm = normalize(sentText);
+            const deadline = Date.now() + 12000;
             let ok = false;
+
             while (Date.now() < deadline) {
               try {
-                const h = await rpcCall('chat.history', { sessionKey: key, limit: 20 }, 20000);
+                const h = await rpcCall('chat.history', { sessionKey: key, limit: 30 }, 20000);
                 const msgs = h?.messages || [];
-                ok = msgs.some(m => m.role === 'user' && extractText(m.content).trim() === sentText);
+
+                ok = msgs.some(m => {
+                  if (m.role !== 'user') return false;
+                  const ts = Number(m.timestamp || 0);
+                  if (ts && ts < sendStartedAt - 2000) return false;
+                  const txt = extractText(m.content);
+                  if (!txt) return false;
+                  const norm = normalize(txt);
+                  return norm === sentNorm || norm.includes(sentNorm.slice(0, Math.min(60, sentNorm.length)));
+                });
               } catch {}
+
               if (ok) break;
-              await new Promise(r => setTimeout(r, 350));
+              await new Promise(r => setTimeout(r, 450));
             }
+
             if (!ok) {
-              addChatMessageTo('goal', 'system', '⚠️ Message may not have been delivered (not found in history). Please retry.');
+              // Only warn when we truly couldn't observe it; avoid spurious nags.
+              addChatMessageTo('goal', 'system', '⚠️ Delivery not confirmed yet. If you do not see a reply soon, retry once.');
             }
           }
         } catch {}
