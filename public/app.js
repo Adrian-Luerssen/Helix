@@ -1162,6 +1162,9 @@ function initAutoArchiveUI() {
         if (state.currentSession?.key === sessionKey) {
           showTypingIndicator(runId);
         }
+        if (state.currentView === 'goal' && state.goalChatSessionKey === sessionKey) {
+          showTypingIndicator(runId, 'goal');
+        }
         // Also set thinking status
         trackActiveRun(sessionKey, runId);
         state.sessionInputReady.set(sessionKey, false);
@@ -1173,6 +1176,7 @@ function initAutoArchiveUI() {
       // Hide typing indicator when agent ends
       if (stream === 'lifecycle' && eventData?.phase === 'end') {
         hideTypingIndicator(runId);
+        hideTypingIndicator(runId, 'goal');
       }
       
       // Show tool calls via compact activity indicator
