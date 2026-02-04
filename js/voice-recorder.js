@@ -335,6 +335,9 @@ const VoiceRecorder = (() => {
   };
 })();
 
+// Expose on window (top-level const isn't attached to window in modern browsers)
+try { window.VoiceRecorder = VoiceRecorder; } catch {}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => VoiceRecorder.init());
 } else {

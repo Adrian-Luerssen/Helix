@@ -551,10 +551,11 @@
 
   <script src="/clawcondos-lib/config.js"></script>
   <script>
-    // Login modal is managed by app.js (it may auto-load token from config.json on localhost).
+    // Login modal is managed by app.js.
   </script>
-  <script src="/v2/app.js"></script>
+  <!-- Load shared modules BEFORE app.js so it can mount them dynamically -->
   <script src="/js/media-upload.js"></script>
   <script src="/js/voice-recorder.js"></script>
+  <script src="/v2/app.js"></script>
 </body>
 </html>

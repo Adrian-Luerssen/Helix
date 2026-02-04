@@ -485,6 +485,9 @@ const MediaUpload = (() => {
   };
 })();
 
+// Expose on window (top-level const isn't attached to window in modern browsers)
+try { window.MediaUpload = MediaUpload; } catch {}
+
 // Auto-init when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => MediaUpload.init());
