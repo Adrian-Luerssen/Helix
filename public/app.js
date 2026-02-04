@@ -48,7 +48,6 @@
       currentSession: null,
       selectedAppId: null,
       // Recurring tasks (cron)
-      selectedCronKey: null,      // legacy: cron sessionKey (v1)
       selectedCronJobId: null,    // preferred: cron job id
       cronJobs: [],
       cronJobsLoaded: false,
@@ -58,7 +57,6 @@
       pendingRouteGoalId: null,
       pendingRouteCondoId: null,
       pendingRouteAppId: null,
-      pendingRouteCronKey: null,
       pendingRouteNewSession: null,
       pendingRouteNewGoalCondoId: null,
       chatHistory: [],
@@ -4409,13 +4407,6 @@ Response format:
             state.pendingRouteCondoId = null;
             openCondo(pending, { fromRouter: true });
           }
-          if (state.pendingRouteCronKey) {
-            const pending = state.pendingRouteCronKey;
-            state.pendingRouteCronKey = null;
-            if (state.sessions.find(s => s.key === pending)) {
-              selectCron(pending, { fromRouter: true });
-            }
-          }
           // Agents tree uses sessions for its nested view
           if (state.agents?.length) renderAgents();
         }
@@ -5378,14 +5369,10 @@ Response format:
         }
         case 'recurring': {
           if (payload) {
-            const cronKey = decodeURIComponent(payload);
-            if (!state.sessions?.length) {
-              state.pendingRouteCronKey = cronKey;
-              showRecurringView({ fromRouter: true });
-            } else {
-              showRecurringView({ fromRouter: true });
-              selectCron(cronKey, { fromRouter: true });
-            }
+            const cronJobId = decodeURIComponent(payload);
+            state.selectedCronJobId = cronJobId;
+            showRecurringView({ fromRouter: true });
+            renderDetailPanel();
           } else {
             showRecurringView({ fromRouter: true });
           }
@@ -5533,18 +5520,6 @@ Response format:
       ]);
       document.getElementById('headerAction').style.display = 'none';
       document.getElementById('headerStatusIndicator').style.display = 'none';
-      if (!state.selectedCronKey) {
-        const firstCron = state.sessions.find(s => s.key.startsWith('cron:'));
-        if (firstCron) state.selectedCronKey = firstCron.key;
-      }
-
-      if (state.pendingRouteCronKey && state.sessions?.length) {
-        const pending = state.pendingRouteCronKey;
-        state.pendingRouteCronKey = null;
-        if (state.sessions.find(s => s.key === pending)) {
-          state.selectedCronKey = pending;
-        }
-      }
       bindRecurringFilters();
       renderRecurringView();
       renderDetailPanel();
@@ -5929,6 +5904,24 @@ Response format:
           const n = String(j.name || '').toLowerCase();
           return n.includes(String(agent.id).toLowerCase());
         });
+        const activityItems = attachedJobs
+          .map(j => {
+            const st = j.state || {};
+            const lastAt = Number(st.lastRunAtMs || 0);
+            const lastStatus = String(st.lastStatus || '');
+            const lastError = st.lastError ? String(st.lastError) : '';
+            if (!lastAt && !lastStatus && !lastError) return null;
+            const errorSnippet = lastError ? lastError.split('\n')[0].slice(0, 120) : '';
+            return {
+              name: String(j.name || j.id || 'Job'),
+              lastAt,
+              status: lastStatus || (lastError ? 'error' : 'unknown'),
+              errorSnippet
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0))
+          .slice(0, 10);
 
         panel.innerHTML = `
           <div class="detail-section">
@@ -5957,6 +5950,15 @@ Response format:
           <div class="detail-section">
             <div class="detail-label">Security audit</div>
             <div class="detail-value" style="color: var(--text-dim);">${summary?.audit?.summary ? `warn: <b>${escapeHtml(String(summary.audit.summary.warn))}</b> · info: ${escapeHtml(String(summary.audit.summary.info))}` : 'Loading…'}</div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">Recent activity</div>
+            <div class="detail-value" style="color: var(--text-dim);">
+              ${!state.cronJobsLoaded ? 'Loading cron jobs…' : (activityItems.length ? activityItems.map(item => {
+                const when = item.lastAt ? formatRelativeTime(item.lastAt) : '—';
+                return `<div style="margin:6px 0;">${escapeHtml(when)} · <b>${escapeHtml(item.name)}</b> · ${escapeHtml(item.status)}${item.errorSnippet ? ` · ${escapeHtml(item.errorSnippet)}` : ''}</div>`;
+              }).join('') : 'No recent activity')}
+            </div>
           </div>
           <div class="detail-section">
             <div class="detail-label">Cron jobs</div>
@@ -5995,14 +5997,7 @@ Response format:
       }
 
       if (state.currentView === 'recurring') {
-        const cron = state.sessions.find(s => s.key === state.selectedCronKey) || state.sessions.find(s => s.key.startsWith('cron:'));
-        if (!cron) {
-          panel.innerHTML = '<div class=\"detail-section\"><div class=\"detail-label\">Recurring</div><div class=\"detail-value\">No recurring tasks found</div></div>';
-          return;
-        }
-        panel.innerHTML = `
-          <div class=\"detail-section\">\n            <div class=\"detail-label\">Task</div>\n            <div class=\"detail-value\">${escapeHtml(getSessionName(cron))}</div>\n          </div>\n          <div class=\"detail-section\">\n            <div class=\"detail-label\">Session Key</div>\n            <div class=\"detail-code\">${escapeHtml(cron.key)}</div>\n          </div>\n          <div class=\"detail-actions\">\n            <button class=\"btn btn-primary\" onclick=\"openSession('${escapeHtml(cron.key)}')\">Open Session</button>\n          </div>
-        `;
+        panel.innerHTML = '<div class=\"detail-section\"><div class=\"detail-label\">Recurring</div><div class=\"detail-value\">Select a recurring task.</div></div>';
         return;
       }
 
@@ -6227,15 +6222,15 @@ Response format:
       renderDetailPanel();
     }
 
-    function selectCron(sessionKey, opts = {}) {
-      if (!sessionKey) return;
+    function selectCron(jobId, opts = {}) {
+      if (!jobId) return;
 
       if (!opts.fromRouter) {
-        navigateTo(`recurring/${encodeURIComponent(sessionKey)}`);
+        navigateTo(`recurring/${encodeURIComponent(jobId)}`);
         return;
       }
 
-      state.selectedCronKey = sessionKey;
+      state.selectedCronJobId = String(jobId);
       if (state.currentView !== 'recurring') showRecurringView({ fromRouter: true });
       renderDetailPanel();
     }
