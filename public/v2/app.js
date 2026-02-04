@@ -2504,8 +2504,7 @@ function initAutoArchiveUI() {
 
       // optimistic render
       if (finalMessage) {
-        box.insertAdjacentHTML('beforeend', `<div class="message user"><div class="message-content">${formatMessage(escapeHtml(finalMessage))}</div></div>`);
-        box.scrollTop = box.scrollHeight;
+        addChatMessageTo('goal', 'user', finalMessage);
       }
 
       try {
@@ -2515,7 +2514,8 @@ function initAutoArchiveUI() {
           attachments,
           idempotencyKey: `goalmsg-${key}-${Date.now()}`,
         }, 130000);
-        renderGoalChat();
+        // Don't re-fetch history immediately; the WS event will append the response.
+        // (Immediate reload causes "message appears then disappears".)
       } catch (err) {
         box.insertAdjacentHTML('beforeend', `<div class="message system">Error: ${escapeHtml(err.message)}</div>`);
         box.scrollTop = box.scrollHeight;
