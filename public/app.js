@@ -2055,11 +2055,14 @@ function initAutoArchiveUI() {
     async function loadInitialData() {
       console.log('[ClawCondos] loadInitialData starting - v2');
       try {
+        // Load persisted session->condo mappings (doesn't require gateway connection)
+        await loadSessionCondos();
+
         // Fetch active runs from server first (authoritative source)
         console.log('[ClawCondos] About to call syncActiveRunsFromServer...');
         await syncActiveRunsFromServer();
         console.log('[ClawCondos] syncActiveRunsFromServer completed');
-        await loadSessionCondos();
+
         await Promise.all([loadGoals(), loadSessions(), loadApps(), loadAgents()]);
         updateOverview();
         updateStatsGrid();
@@ -2390,8 +2393,9 @@ function initAutoArchiveUI() {
 
       // Ensure SYSTEM condo is visible when there are system-tagged sessions,
       // even if it has no active goals (sessions are hidden-by-default, but condo should exist).
+      const systemTaggedKeys = Object.entries(state.sessionCondoIndex || {}).filter(([k, v]) => v === 'condo:system').map(([k]) => k);
       const systemSessions = (state.sessions || []).filter(s => getSessionCondoId(s) === 'condo:system');
-      if (systemSessions.length > 0) {
+      if (systemSessions.length > 0 || systemTaggedKeys.length > 0) {
         if (!condos.has('condo:system')) {
           condos.set('condo:system', {
             id: 'condo:system',
@@ -2403,6 +2407,13 @@ function initAutoArchiveUI() {
           });
         }
         const sys = condos.get('condo:system');
+
+        // Keys from persisted mapping (even if sessions haven't loaded yet)
+        for (const key of systemTaggedKeys) {
+          if (!key || sys.sessionKeySet.has(key)) continue;
+          sys.sessionKeySet.add(key);
+        }
+
         for (const s of systemSessions) {
           if (sys.sessionKeySet.has(s.key)) continue;
           sys.sessions.push(s);
@@ -6464,6 +6475,48 @@ Response format:
       } catch (err) {
         showToast('Failed to create goal: ' + err.message, 'error');
       }
+    }
+
+    function isModifiedEvent(e) {
+      return !!(e && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey));
+    }
+
+    function isPlainLeftClick(e) {
+      return !!(e && e.button === 0 && !isModifiedEvent(e));
+    }
+
+    function sessionRouteHash(key) {
+      return `#/session/${encodeURIComponent(key)}`;
+    }
+
+    function goalRouteHash(id) {
+      return `#/goal/${encodeURIComponent(id)}`;
+    }
+
+    function fullHref(routeHash) {
+      return `${window.location.origin}${window.location.pathname}${window.location.search}${routeHash}`;
+    }
+
+    function sessionHref(key) {
+      return fullHref(sessionRouteHash(key));
+    }
+
+    function goalHref(id) {
+      return fullHref(goalRouteHash(id));
+    }
+
+    function handleSessionLinkClick(e, key) {
+      if (!isPlainLeftClick(e)) return true; // let browser open new tab/window
+      e.preventDefault();
+      openSession(key);
+      return false;
+    }
+
+    function handleGoalLinkClick(e, goalId) {
+      if (!isPlainLeftClick(e)) return true;
+      e.preventDefault();
+      openGoal(goalId);
+      return false;
     }
 
     async function openSession(key, opts = {}) {
