@@ -41,9 +41,16 @@ const MediaUpload = (() => {
     return `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
-  function getFileType(mimeType) {
-    if (CONFIG.allowedTypes.image.includes(mimeType)) return 'image';
-    if (CONFIG.allowedTypes.audio.includes(mimeType)) return 'audio';
+  function getFileType(mimeType, fileName = '') {
+    if (mimeType && CONFIG.allowedTypes.image.includes(mimeType)) return 'image';
+    if (mimeType && CONFIG.allowedTypes.audio.includes(mimeType)) return 'audio';
+
+    // Some clipboard pastes (esp. screenshots) yield a File with empty type.
+    // Fall back to extension sniffing.
+    const lower = String(fileName || '').toLowerCase();
+    if (lower.match(/\.(png|jpg|jpeg|gif|webp)$/)) return 'image';
+    if (lower.match(/\.(mp3|wav|ogg|webm|m4a|mp4)$/)) return 'audio';
+
     return null;
   }
 
@@ -54,9 +61,9 @@ const MediaUpload = (() => {
   }
 
   function validateFile(file) {
-    const fileType = getFileType(file.type);
+    const fileType = getFileType(file.type, file.name);
     if (!fileType) {
-      return { valid: false, error: `Unsupported file type: ${file.type || 'unknown'}` };
+      return { valid: false, error: `Unsupported file type: ${file.type || file.name || 'unknown'}` };
     }
     if (file.size > CONFIG.maxFileSize) {
       return { valid: false, error: `File too large: ${formatFileSize(file.size)} (max ${formatFileSize(CONFIG.maxFileSize)})` };
@@ -393,9 +400,11 @@ const MediaUpload = (() => {
     for (const item of items) {
       if (item.kind === 'file') {
         const file = item.getAsFile();
-        if (file && getFileType(file.type)) {
-          attached = true;
-          addFile(file);
+        if (!file) continue;
+
+        if (getFileType(file.type, file.name)) {
+          const entry = addFile(file);
+          if (entry) attached = true;
         }
       }
     }
