@@ -277,9 +277,9 @@ body {
 }
 
 .goal-dot.blink-idle {
-  /* idle */
-  background: #0b0b0b;
-  opacity: 0.85;
+  /* idle: transparent, rely on border */
+  background: transparent;
+  opacity: 1;
 }
 
 @keyframes goalPulseYellow {
@@ -353,7 +353,7 @@ body {
 .session-state-dot.blink-needs-user { background: #f59e0b; }
 .session-state-dot.blink-queued { background: #3b82f6; box-shadow: 0 0 6px rgba(59, 130, 246, 0.35); }
 .session-state-dot.blink-running { background: #3b82f6; box-shadow: 0 0 6px rgba(59, 130, 246, 0.35); }
-.session-state-dot.blink-idle { background: #0b0b0b; opacity: 0.85; }
+.session-state-dot.blink-idle { background: transparent; opacity: 1; }
 
 .goal-name {
   flex: 1;
