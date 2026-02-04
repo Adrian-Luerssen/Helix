@@ -2566,11 +2566,29 @@ function initAutoArchiveUI() {
             addChatMessageTo('goal', 'system', `Warning: failed to attach session to goal: ${err.message}`);
           }
 
-          // Refresh local caches so the UI shows the session under the goal and WS state stays consistent.
+          // Refresh local caches so the UI shows the session under the goal.
+          // IMPORTANT: do NOT call renderGoalView() here — it reloads history and can
+          // wipe the optimistic first message until a manual refresh.
           try {
             await loadSessions();
             await loadGoals();
-            renderGoalView();
+
+            // Ensure in-memory goal includes this new session (even if loadGoals is slow).
+            const goal = state.goals.find(g => g.id === goalId);
+            if (goal) {
+              if (!Array.isArray(goal.sessions)) goal.sessions = [];
+              if (!goal.sessions.includes(key)) goal.sessions.push(key);
+            }
+
+            // Update sidebar/detail without nuking chat contents.
+            try { renderSidebar(); } catch {}
+            try { renderDetailPanel(); } catch {}
+
+            const chatMetaEl = document.getElementById('goalChatMeta');
+            if (chatMetaEl) {
+              const s = (state.sessions || []).find(x => x.key === key);
+              chatMetaEl.textContent = s ? `${getSessionName(s)} · ${getSessionMeta(s)}` : key;
+            }
           } catch {}
         }
 
