@@ -2439,14 +2439,20 @@ function initAutoArchiveUI() {
 
     async function sendGoalChatMessage() {
       const input = document.getElementById('goal_chatInput');
-      const box = document.getElementById('goalChatMessages');
+      const box = document.getElementById('goal_chatMessages');
       const key = state.goalChatSessionKey;
-      if (!input || !box || !key) return;
+      if (!input || !box || !key) {
+        showToast('Goal chat not ready (no session loaded yet)', 'warning', 5000);
+        return;
+      }
 
       const text = (input.value || '').trim();
       const hasMedia = typeof MediaUpload !== 'undefined' && MediaUpload.hasPendingFiles && MediaUpload.hasPendingFiles();
 
-      if (!text && !hasMedia) return;
+      if (!text && !hasMedia) {
+        showToast('Nothing to send', 'info', 1500);
+        return;
+      }
 
       // If agent is busy, queue goal messages (including attachments).
       if (state.isThinking) {
@@ -5407,8 +5413,14 @@ Response format:
       const hasMedia = typeof MediaUpload !== 'undefined' && MediaUpload.hasPendingFiles();
       
       // Need either text or media
-      if (!text && !hasMedia) return;
-      if (!state.currentSession) return;
+      if (!text && !hasMedia) {
+        showToast('Nothing to send', 'info', 1500);
+        return;
+      }
+      if (!state.currentSession) {
+        showToast('No session selected', 'warning', 3000);
+        return;
+      }
       
       const sessionKey = state.currentSession.key;
       
