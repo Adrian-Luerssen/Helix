@@ -47,7 +47,12 @@
       currentView: 'dashboard',
       currentSession: null,
       selectedAppId: null,
-      selectedCronKey: null,
+      // Recurring tasks (cron)
+      selectedCronKey: null,      // legacy: cron sessionKey (v1)
+      selectedCronJobId: null,    // preferred: cron job id
+      cronJobs: [],
+      cronJobsLoaded: false,
+      cronRunsByJobId: {},
       newSessionAgentId: null,
       pendingRouteSessionKey: null,
       pendingRouteGoalId: null,
@@ -4362,6 +4367,76 @@ Response format:
       }
     }
 
+    function formatRelativeTime(ms) {
+      const t = Number(ms || 0);
+      if (!t) return '—';
+      const delta = Date.now() - t;
+      const s = Math.floor(Math.abs(delta) / 1000);
+      const m = Math.floor(s / 60);
+      const h = Math.floor(m / 60);
+      const d = Math.floor(h / 24);
+      const fmt = d > 0 ? `${d}d` : h > 0 ? `${h}h` : m > 0 ? `${m}m` : `${s}s`;
+      return delta >= 0 ? `${fmt} ago` : `in ${fmt}`;
+    }
+
+    function formatSchedule(schedule) {
+      if (!schedule) return '—';
+      if (schedule.kind === 'cron') {
+        const tz = schedule.tz ? ` (${schedule.tz})` : '';
+        return `${schedule.expr || 'cron'}${tz}`;
+      }
+      if (schedule.kind === 'every') {
+        const ms = Number(schedule.everyMs || 0);
+        if (!ms) return 'every (unknown)';
+        const s = Math.round(ms / 1000);
+        const m = Math.round(s / 60);
+        const h = Math.round(m / 60);
+        const d = Math.round(h / 24);
+        const every = d >= 1 && d * 86400 === s ? `${d}d` : h >= 1 && h * 3600 === s ? `${h}h` : m >= 1 && m * 60 === s ? `${m}m` : `${s}s`;
+        return `every ${every}`;
+      }
+      if (schedule.kind === 'at') {
+        const at = Number(schedule.atMs || 0);
+        return at ? `at ${new Date(at).toLocaleString()}` : 'at (unknown)';
+      }
+      return schedule.kind || '—';
+    }
+
+    function getJobModel(payload) {
+      if (!payload) return 'main';
+      if (payload.kind === 'agentTurn') return payload.model || 'default';
+      return 'main';
+    }
+
+    function summarizeOutcome(payload) {
+      if (!payload) return '';
+      const txt = String(payload.message || payload.text || '').trim();
+      if (!txt) return '';
+      const line = txt.split(/\r?\n/).map(s => s.trim()).find(Boolean) || '';
+      return line.length > 120 ? line.slice(0, 117) + '…' : line;
+    }
+
+    function openCronJobDetail(jobId) {
+      state.selectedCronJobId = String(jobId || '').trim() || null;
+      renderDetailPanel();
+    }
+
+    async function ensureCronRuns(jobId) {
+      const id = String(jobId || '').trim();
+      if (!id) return;
+      if (!state.cronRunsByJobId) state.cronRunsByJobId = {};
+      const existing = state.cronRunsByJobId[id];
+      if (existing && existing.loaded) return;
+      state.cronRunsByJobId[id] = { loaded: false, loading: true, runs: [], error: null };
+      try {
+        const res = await rpcCall('cron.runs', { jobId: id });
+        const runs = res?.runs || res?.items || (Array.isArray(res) ? res : []);
+        state.cronRunsByJobId[id] = { loaded: true, loading: false, runs: Array.isArray(runs) ? runs : [], error: null };
+      } catch (e) {
+        state.cronRunsByJobId[id] = { loaded: true, loading: false, runs: [], error: e?.message || String(e) };
+      }
+    }
+
     async function loadSkillDetailsForAgent(agentId, skillIds) {
       try {
         const ids = (skillIds || []).map(String).filter(Boolean);
@@ -5590,6 +5665,84 @@ Response format:
     function renderDetailPanel() {
       const panel = document.getElementById('detailPanelContent');
       if (!panel) return;
+
+      // Cron job detail (works from any view)
+      if (state.selectedCronJobId) {
+        if (!state.cronJobsLoaded) {
+          panel.innerHTML = '<div class="detail-section"><div class="detail-label">Recurring</div><div class="detail-value">Loading jobs…</div></div>';
+          loadCronJobs().then(() => renderDetailPanel());
+          return;
+        }
+        const job = (state.cronJobs || []).find(j => String(j.id) === String(state.selectedCronJobId) || String(j.jobId) === String(state.selectedCronJobId));
+        if (!job) {
+          panel.innerHTML = '<div class="detail-section"><div class="detail-label">Recurring</div><div class="detail-value">Job not found</div></div>';
+          return;
+        }
+
+        const model = getJobModel(job.payload);
+        const schedule = formatSchedule(job.schedule);
+        const outcome = summarizeOutcome(job.payload);
+        const runsState = (state.cronRunsByJobId || {})[String(job.id)] || null;
+
+        if (!runsState || (!runsState.loaded && !runsState.loading)) {
+          ensureCronRuns(job.id).then(() => renderDetailPanel());
+        }
+
+        const deliver = job.payload?.channel || job.payload?.to ? `${job.payload.channel || ''}${job.payload.to ? ` → ${job.payload.to}` : ''}` : '—';
+        const runs = runsState?.runs || [];
+        const runsHtml = runs.length ? runs.slice(0, 20).map(r => {
+          const at = Number(r.atMs || r.runAtMs || r.startedAtMs || r.timeMs || 0);
+          const when = at ? `${new Date(at).toLocaleString()} (${formatRelativeTime(at)})` : '—';
+          const dur = r.durationMs != null ? `${Math.round(Number(r.durationMs) / 1000)}s` : '—';
+          const status = escapeHtml(String(r.status || r.lastStatus || 'unknown'));
+          const err = r.error || r.lastError;
+          return `<div style="padding:8px 0; border-top: 1px solid rgba(255,255,255,0.06);">
+            <div style="display:flex; justify-content:space-between; gap:10px;"><div><b>${status}</b></div><div style="color: var(--text-dim); font-size: 12px;">${escapeHtml(dur)}</div></div>
+            <div style="color: var(--text-dim); font-size: 12px; margin-top:4px;">${escapeHtml(when)}</div>
+            ${err ? `<div style="color: var(--accent-red); font-size: 12px; margin-top:4px; white-space: pre-wrap;">${escapeHtml(String(err))}</div>` : ''}
+          </div>`;
+        }).join('') : `<div style="color: var(--text-dim);">${runsState?.loading ? 'Loading runs…' : 'No runs found'}</div>`;
+
+        panel.innerHTML = `
+          <div class="detail-section">
+            <div class="detail-label">Recurring Task</div>
+            <div class="detail-value">${escapeHtml(job.name || job.id)}</div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">Enabled</div>
+            <div class="detail-value">${job.enabled === false ? 'No' : 'Yes'}</div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">Agent</div>
+            <div class="detail-value">${escapeHtml(String(job.agentId || 'main'))}</div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">Model</div>
+            <div class="detail-value">${escapeHtml(String(model))}</div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">Schedule</div>
+            <div class="detail-value">${escapeHtml(String(schedule))}</div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">Outcome</div>
+            <div class="detail-value" style="white-space: pre-wrap; color: var(--text-dim);">${outcome ? escapeHtml(outcome) : '—'}</div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">Payload kind</div>
+            <div class="detail-value">${escapeHtml(String(job.payload?.kind || 'systemEvent'))}</div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">Deliver</div>
+            <div class="detail-value">${escapeHtml(deliver)}</div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">Run log (last 20)</div>
+            <div class="detail-value" style="color: var(--text-dim);">${runsState?.error ? `<div style=\"color: var(--accent-red);\">${escapeHtml(runsState.error)}</div>` : ''}${runsHtml}</div>
+          </div>
+        `;
+        return;
+      }
 
       if (state.currentView === 'agents') {
         const agent = state.agents?.find(a => a.id === state.selectedAgentId) || state.agents?.[0];

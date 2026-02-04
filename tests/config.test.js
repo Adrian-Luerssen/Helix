@@ -1,5 +1,5 @@
 /**
- * Tests for Sharp Configuration Module
+ * Tests for ClawCondos Configuration Module
  * 
  * Run with: npx vitest run tests/config.test.js
  */
@@ -12,7 +12,7 @@ const DEFAULT_CONFIG = {
   gatewayHttpUrl: null,
   appsUrl: '/api/apps',
   branding: {
-    name: 'Sharp',
+    name: 'ClawCondos',
     logo: '🚀',
     tagline: 'Multi-Agent Dashboard'
   },
@@ -86,7 +86,7 @@ describe('Config Module', () => {
 
     it('should deep merge nested objects', () => {
       const base = {
-        branding: { name: 'Sharp', logo: '🚀' },
+        branding: { name: 'ClawCondos', logo: '🚀' },
         features: { showApps: true }
       };
       const override = {

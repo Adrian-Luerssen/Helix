@@ -1,4 +1,4 @@
-# Contributing to Sharp
+# Contributing to ClawCondos
 
 Thanks for your interest in contributing! 🎯
 
@@ -12,7 +12,7 @@ Thanks for your interest in contributing! 🎯
 
 ## Local Development
 
-No build step required! Sharp is vanilla HTML/CSS/JS.
+No build step required! ClawCondos is vanilla HTML/CSS/JS.
 
 ```bash
 # Serve files

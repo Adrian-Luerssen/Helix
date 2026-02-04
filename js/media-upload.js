@@ -1,5 +1,5 @@
 /**
- * Sharp Media Upload Module
+ * ClawCondos Media Upload Module
  * Handles image and audio uploads for chat
  *
  * Architecture:

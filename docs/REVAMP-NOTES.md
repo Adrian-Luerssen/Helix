@@ -1,4 +1,4 @@
-# ClawCondos (Sharp) Revamp Notes
+# ClawCondos Revamp Notes
 
 ## 2026-02-02
 

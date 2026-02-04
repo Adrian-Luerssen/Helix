@@ -1,5 +1,5 @@
 #!/bin/bash
-# Example startup script for Sharp with Caddy
+# Example startup script for ClawCondos with Caddy
 # Copy to start.sh and customize for your environment
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -12,14 +12,14 @@ if [ -f "$PIDFILE" ]; then
     rm -f "$PIDFILE"
 fi
 
-echo "Starting Sharp on port 9000..."
+echo "Starting ClawCondos on port 9000..."
 cd "$DIR"
 nohup "$CADDY" run --config Caddyfile > /tmp/sharp-caddy.log 2>&1 &
 echo $! > "$PIDFILE"
 
 sleep 2
 if curl -s http://localhost:9000 > /dev/null 2>&1; then
-    echo "✓ Sharp running at http://localhost:9000"
+    echo "✓ ClawCondos running at http://localhost:9000"
     
     # Optional: Set up Tailscale HTTPS
     # tailscale serve --bg --https=443 http://localhost:9000

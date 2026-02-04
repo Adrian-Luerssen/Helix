@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Sharp Development Server
+ * ClawCondos Development Server
  * 
  * Serves static files + /api/apps + proxies to registered apps
  * Usage: node serve.js [port]
@@ -374,7 +374,7 @@ function proxyToApp(req, res, app, path) {
   req.pipe(proxyReq, { end: true });
 }
 
-// Proxy to Sharp media-upload service (apps/media-upload) which has robust multipart parsing.
+// Proxy to ClawCondos media-upload service (apps/media-upload) which has robust multipart parsing.
 function proxyToMediaUpload(req, res, pathname, search) {
   // Map /media-upload/* → service paths
   let targetPath = pathname;
@@ -410,15 +410,23 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   let pathname = url.pathname;
   
-  // CORS headers for dev
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
+  // CORS (dev-only)
+  // SECURITY: this server can proxy to the OpenClaw gateway using an env Bearer token.
+  // Never run with permissive CORS in production.
+  const DEV_CORS = process.env.CLAWCONDOS_DEV_CORS === '1';
+  const origin = String(req.headers.origin || '');
+  const isLocalOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+  if (DEV_CORS && isLocalOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(200);
+      res.end();
+      return;
+    }
   }
 
   // Proxy to OpenClaw gateway for /api/gateway/* requests
@@ -824,7 +832,7 @@ const server = createServer(async (req, res) => {
   // - Compatibility: /v2/* redirects to /*
   // - Deprecated: /v1/* redirects to /
 
-  // Serve Sharp's config module without colliding with Apps Gateway /lib/* handler
+  // Serve ClawCondos's config module without colliding with Apps Gateway /lib/* handler
   if (pathname === '/clawcondos-lib/config.js') {
     const filePath = join(__dirname, 'lib', 'config.js');
     serveFile(res, filePath);
@@ -839,20 +847,20 @@ const server = createServer(async (req, res) => {
 
   // Back-compat: redirect /v2/* → /*
   if (pathname === '/v2' || pathname === '/v2/') {
-    res.writeHead(301, { Location: '/' });
+    res.writeHead(301, { Location: '/' + (url.search || '') });
     res.end();
     return;
   }
   if (pathname.startsWith('/v2/')) {
     const rel = pathname.slice('/v2'.length); // keep leading '/'
-    res.writeHead(301, { Location: rel || '/' });
+    res.writeHead(301, { Location: (rel || '/') + (url.search || '') });
     res.end();
     return;
   }
 
   // v1 is deprecated; v2 is the only UI.
   if (pathname === '/v1' || pathname.startsWith('/v1/')) {
-    res.writeHead(301, { Location: '/' });
+    res.writeHead(301, { Location: '/' + (url.search || '') });
     res.end();
     return;
   }
@@ -866,7 +874,35 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  let filePath = join(__dirname, pathname);
+  // Prefer serving static assets from ./public/ (so /app.css maps to public/app.css)
+  // SECURITY: prevent absolute-path reads and path traversal.
+  const rel = String(pathname || '').replace(/^\/+/, '');
+  if (!rel || rel.includes('..') || rel.includes('\\0')) {
+    res.writeHead(400);
+    res.end('Bad path');
+    return;
+  }
+
+  const publicRoot = resolvePath(__dirname, 'public');
+  const repoRoot = resolvePath(__dirname);
+
+  let filePath = resolvePath(publicRoot, rel);
+  if (!filePath.startsWith(publicRoot + '/') && filePath !== publicRoot) {
+    res.writeHead(403);
+    res.end('Forbidden');
+    return;
+  }
+
+  if (!existsSync(filePath)) {
+    // Fallback to repo-root relative paths only when needed (still traversal-safe)
+    const candidate = resolvePath(repoRoot, rel);
+    if (!candidate.startsWith(repoRoot + '/') && candidate !== repoRoot) {
+      res.writeHead(403);
+      res.end('Forbidden');
+      return;
+    }
+    filePath = candidate;
+  }
 
   // If directory, try index.html
   if (existsSync(filePath) && statSync(filePath).isDirectory()) {
@@ -879,7 +915,7 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, () => {
   const apps = loadApps();
   console.log(`
-🎯 Sharp Dashboard
+🎯 ClawCondos Dashboard
    http://localhost:${PORT}
 
 📱 Registered Apps:`);

@@ -1,8 +1,8 @@
-# AGENTS.md - Sharp Dashboard
+# AGENTS.md - ClawCondos Dashboard
 
 ## Project Overview
 
-Sharp is the **unified control panel** for the Clawdbot ecosystem:
+ClawCondos is the **unified control panel** for the Clawdbot ecosystem:
 - Agent session management (chat, monitor, control)
 - Real-time WebSocket connection to gateway
 - App embedding with assistant panels
@@ -26,7 +26,7 @@ sharp/
 
 ### Quick Start
 ```bash
-cd ~/clawd/projects/sharp
+cd ~/clawd/projects/clawcondos
 
 # Option 1: Python
 python3 -m http.server 9000

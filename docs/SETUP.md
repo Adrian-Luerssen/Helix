@@ -1,6 +1,6 @@
-# Sharp Setup Guide
+# ClawCondos Setup Guide
 
-This guide covers deploying Sharp with a compatible backend.
+This guide covers deploying ClawCondos with a compatible backend.
 
 ## Prerequisites
 
@@ -132,7 +132,7 @@ The config is loaded automatically at startup.
 | `gatewayWsUrl` | Auto-detect | WebSocket URL for backend |
 | `gatewayHttpUrl` | Auto-detect | HTTP URL for REST API |
 | `appsUrl` | `/api/apps` | URL to fetch apps registry |
-| `branding.name` | `"Sharp"` | Dashboard title |
+| `branding.name` | `"ClawCondos"` | Dashboard title |
 | `branding.logo` | `"🚀"` | Logo emoji or image URL |
 | `sessions.pollInterval` | `30000` | Session refresh interval (ms) |
 | `features.showApps` | `true` | Show apps section |
@@ -184,7 +184,7 @@ handle /my-app {
    clawdbot gateway start
    ```
 
-3. Get the gateway token from your config and add it to Sharp's Caddyfile.
+3. Get the gateway token from your config and add it to ClawCondos's Caddyfile.
 
 See [Clawdbot documentation](https://docs.clawd.bot) for full setup.
 
@@ -218,9 +218,9 @@ Implement the [Backend API](BACKEND-API.md) protocol:
 ## Security Notes
 
 - **Never commit** `Caddyfile` or `config.json` with real tokens
-- By default, Sharp **does not** apply markdown/media rendering to **user** messages. To enable it, set:
+- By default, ClawCondos **does not** apply markdown/media rendering to **user** messages. To enable it, set:
   - `features.formatUserMessages: true`
-- By default, Sharp **blocks external http(s) media embeds** (images/audio/links) for safety. To allow external embeds, set:
+- By default, ClawCondos **blocks external http(s) media embeds** (images/audio/links) for safety. To allow external embeds, set:
   - `features.allowExternalMedia: true`
 
 Recommended: keep both flags `false` when viewing chats that may include untrusted user content.

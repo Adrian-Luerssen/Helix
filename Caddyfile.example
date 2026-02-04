@@ -1,12 +1,12 @@
-# Sharp Dashboard - Caddyfile Example
+# ClawCondos Dashboard - Caddyfile Example
 # 
-# This file configures Caddy to serve Sharp and proxy requests to Clawdbot Gateway.
+# This file configures Caddy to serve ClawCondos and proxy requests to Clawdbot Gateway.
 # Copy to Caddyfile and customize for your environment.
 #
 # Requirements:
 # - Caddy 2.x (https://caddyserver.com)
 # - Clawdbot Gateway running on localhost:18789 (or your configured port)
-# - Sharp files in /path/to/sharp
+# - ClawCondos files in /path/to/sharp
 #
 # Usage:
 #   cp Caddyfile.example Caddyfile
@@ -61,7 +61,7 @@
     
     # ═══════════════════════════════════════════════════════════════
     # SHARP STATIC FILES
-    # Serve the Sharp dashboard and supporting files
+    # Serve the ClawCondos dashboard and supporting files
     # ═══════════════════════════════════════════════════════════════
     
     # App page (assistant chat interface)

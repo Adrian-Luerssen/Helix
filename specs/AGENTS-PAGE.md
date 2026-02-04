@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add an **Agents** page to Sharp's Next.js app that displays and manages configured Clawdbot agents.
+Add an **Agents** page to ClawCondos's Next.js app that displays and manages configured Clawdbot agents.
 
 ## Data Model (from `clawdbot agents list --json`)
 
@@ -110,7 +110,7 @@ Each agent displayed as a card showing:
 
 ## Styling
 
-Use existing Sharp design system (CSS variables):
+Use existing ClawCondos design system (CSS variables):
 - `var(--bg-card)` for card background
 - `var(--border-subtle)` for borders
 - `var(--accent)` for highlights
