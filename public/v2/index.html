@@ -12,6 +12,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520;9..144,720&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="/v2/styles.css">
   <link rel="stylesheet" href="/v2/dashboard-overrides.css">
@@ -329,78 +330,80 @@
           </div>
 
           <div class="view" id="condoView">
-            <div class="grid-section">
-              <div class="grid-header">
-                <div class="grid-title">GOALS</div>
-              </div>
-              <div class="condo-card" style="cursor: default;">
-                <div class="condo-card-goals" id="condoGoalsList"></div>
-              </div>
-            </div>
+            <div class="condo-shell">
+              <section class="condo-hero">
+                <div class="condo-hero-top">
+                  <div class="condo-hero-title" id="condoHeroTitle">Condo</div>
+                  <div class="condo-hero-sub" id="condoHeroSub">
+                    <span class="condo-pill" id="condoPillHealth">Healthy</span>
+                    <span class="condo-pill" id="condoPillOwner">Owner: —</span>
+                    <span class="condo-pill">Last updated: <b id="condoLastUpdated">—</b></span>
+                  </div>
+                </div>
+                <div class="condo-hero-stats">
+                  <div class="condo-stat"><div class="k">Active goals</div><div class="v"><span id="condoStatActive">0</span> <small>/ <span id="condoStatTotal">0</span></small></div></div>
+                  <div class="condo-stat"><div class="k">In progress</div><div class="v"><span id="condoStatDoing">0</span> <small>now</small></div></div>
+                  <div class="condo-stat"><div class="k">Blocked</div><div class="v"><span id="condoStatBlocked">0</span> <small>needs input</small></div></div>
+                  <div class="condo-stat"><div class="k">Focus</div><div class="v" id="condoStatFocus">—</div></div>
+                </div>
+              </section>
 
-            <div class="grid-section">
-              <div class="grid-header">
-                <div class="grid-title">SESSIONS</div>
-              </div>
-              <div class="cards-grid" id="condoSessionsList"></div>
+              <section class="condo-goals-grid" id="condoGoalGrid"></section>
+
+              <section class="condo-sessions" style="display:none">
+                <div class="grid-header"><div class="grid-title">SESSIONS</div></div>
+                <div class="cards-grid" id="condoSessionsList"></div>
+              </section>
             </div>
           </div>
 
           <div class="view" id="goalView">
-            <div class="goal-shell">
-              <div class="goal-hero">
-                <div class="goal-hero-top">
-                  <button class="goal-back" onclick="goBackFromGoal()">← Back</button>
-                  <div class="goal-hero-meta">
-                    <div class="goal-hero-title" id="goalHeroTitle">Goal</div>
-                    <div class="goal-hero-sub" id="goalHeroSub">—</div>
+            <div class="goal-shell-v2" id="goalShell">
+              <section class="goal-chat" id="goalChatPanel">
+                <div class="goal-chat-header">
+                  <div>Sessions</div>
+                  <div class="goal-chat-meta" id="goalChatMeta">—</div>
+                </div>
+                <div class="goal-chat-body" id="goalSessions"></div>
+                <div class="goal-chat-footer">
+                  <button class="ghost-btn" onclick="openNewSession(state.currentCondoId, state.currentGoalOpenId)">＋ New session</button>
+                  <button class="ghost-btn" onclick="showAttachSessionModal(null)">⛓ Attach</button>
+                </div>
+              </section>
+
+              <section class="goal-right" id="goalRightPanel">
+                <div class="goal-right-header">
+                  <div>
+                    <div class="goal-right-title" id="goalHeroTitle">Goal</div>
+                    <div class="goal-right-meta">
+                      <span id="goalCondoName">Condo</span>
+                      <span>Last updated: <b id="goalLastUpdated">—</b></span>
+                    </div>
                   </div>
-                  <div class="goal-hero-actions">
-                    <button class="header-btn" id="goalMarkDoneBtn" onclick="toggleGoalDone()">Mark done</button>
-                    <button class="header-btn" onclick="showAttachSessionModal(null)">Attach session</button>
-                    <button class="header-btn" style="background: var(--bg-input); border: 1px solid var(--border);" onclick="promptDeleteGoal()">Delete</button>
+                  <div class="goal-right-actions">
+                    <button class="ghost-btn" id="goalMarkDoneBtn" onclick="toggleGoalDone()">Mark done</button>
+                    <button class="ghost-btn danger" onclick="promptDeleteGoal()">Delete</button>
                   </div>
                 </div>
-              </div>
 
-              <div class="goal-columns">
-                <section class="goal-panel">
-                  <div class="panel-title">Tasks</div>
-                  <div class="goal-tasks" id="goalTasks"></div>
-                  <div class="goal-task-new">
-                    <input class="form-input" id="goalNewTaskInput" placeholder="Add a task…" onkeypress="if(event.key==='Enter')addGoalTask()">
-                    <button class="form-btn" onclick="addGoalTask()">Add</button>
-                  </div>
-                </section>
-
-                <section class="goal-panel">
-                  <div class="panel-title">Notes</div>
-                  <textarea class="goal-notes" id="goalNotes" placeholder="Working notes, links, decisions…" oninput="debouncedSaveGoal()"></textarea>
-                  <div class="goal-meta-row">
-                    <div class="goal-meta-card">
-                      <div class="meta-label">Deadline</div>
-                      <input class="form-input" id="goalDeadlineInput" placeholder="YYYY-MM-DD or freeform" oninput="debouncedSaveGoal()">
-                    </div>
-                    <div class="goal-meta-card">
-                      <div class="meta-label">Priority</div>
-                      <select class="form-input" id="goalPriorityInput" onchange="saveGoalNow()">
-                        <option value="">—</option>
-                        <option value="P0">P0</option>
-                        <option value="P1">P1</option>
-                        <option value="P2">P2</option>
-                        <option value="P3">P3</option>
-                      </select>
+                <div class="goal-def">
+                  <div class="goal-def-display" id="goalDefDisplay" onclick="startGoalDefEdit()">Click to add a definition… <small>(click to edit)</small></div>
+                  <div class="goal-def-edit" id="goalDefEdit">
+                    <textarea id="goalDefTA" rows="6"></textarea>
+                    <div class="goal-def-actions">
+                      <button class="ghost-btn" onclick="saveGoalDefEdit()">Save</button>
+                      <button class="ghost-btn" onclick="cancelGoalDefEdit()">Cancel</button>
                     </div>
                   </div>
-                  <div class="goal-save-hint" id="goalSaveHint">Saved</div>
-                </section>
+                </div>
 
-                <section class="goal-panel">
-                  <div class="panel-title">Attached sessions</div>
-                  <div class="goal-sessions" id="goalSessions"></div>
-                  <div class="goal-sessions-hint">Tip: move sessions between condos from any session card’s ⛓ button.</div>
-                </section>
-              </div>
+                <div class="goal-tabs">
+                  <div class="goal-tab active" id="goalTabTasks" onclick="setGoalTab('tasks')">Tasks</div>
+                  <div class="goal-tab" id="goalTabFiles" onclick="setGoalTab('files')">Files</div>
+                </div>
+
+                <div class="goal-pane" id="goalPane"></div>
+              </section>
             </div>
           </div>
 

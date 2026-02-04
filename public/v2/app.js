@@ -2241,60 +2241,167 @@ function initAutoArchiveUI() {
       const status = completed ? 'done' : (goal.status || 'active');
       const pr = goal.priority || '';
       const deadline = goal.deadline || '';
-      const { done, total } = goalTaskStats(goal);
 
-      document.getElementById('goalHeroTitle').textContent = goal.title || 'Untitled goal';
-      document.getElementById('goalHeroSub').textContent = `${status.toUpperCase()}${pr ? ` · ${pr}` : ''}${deadline ? ` · due ${deadline}` : ''} · ${done}/${total} tasks`;
+      const titleEl = document.getElementById('goalHeroTitle');
+      if (titleEl) titleEl.textContent = goal.title || 'Untitled goal';
+
+      const condoNameEl = document.getElementById('goalCondoName');
+      if (condoNameEl) {
+        const condoName = (() => {
+          const cid = goal.condoId || state.currentCondoId || '';
+          if (cid === 'cron') return 'Recurring';
+          const s = (state.sessions || []).find(x => getSessionCondoId(x) === cid);
+          return s ? getSessionCondoName(s) : (cid.split(':').pop() || 'Condo');
+        })();
+        condoNameEl.textContent = condoName;
+      }
+
+      const lastEl = document.getElementById('goalLastUpdated');
+      if (lastEl) lastEl.textContent = formatTimestamp(goal.updatedAtMs || goal.updatedAt || goal.createdAtMs || Date.now());
 
       const btn = document.getElementById('goalMarkDoneBtn');
-      btn.textContent = completed ? 'Mark active' : 'Mark done';
+      if (btn) btn.textContent = completed ? 'Mark active' : 'Mark done';
 
-      const tasks = Array.isArray(goal.tasks) ? goal.tasks : [];
-      const tasksEl = document.getElementById('goalTasks');
-      if (!tasks.length) {
-        tasksEl.innerHTML = `<div class="empty-state">No tasks yet. Add the next physical step.</div>`;
-      } else {
-        tasksEl.innerHTML = tasks.map((t, idx) => {
-          const id = escapeHtml(t.id || String(idx));
-          const checked = t.done ? 'checked' : '';
-          return `
-            <div class="goal-task ${t.done ? 'done' : ''}">
-              <label class="goal-task-check">
-                <input type="checkbox" ${checked} onchange="toggleGoalTask('${id}')">
-                <span class="goal-task-text">${escapeHtml(t.text || '')}</span>
-              </label>
-              <button class="goal-task-del" onclick="deleteGoalTask('${id}')" title="Delete">×</button>
-            </div>
-          `;
-        }).join('');
+      // Header meta line: keep it quiet but informative (matches prototype vibe)
+      const meta = [];
+      meta.push(status.toUpperCase());
+      if (pr) meta.push(pr);
+      if (deadline) meta.push(`due ${deadline}`);
+      const chatMeta = document.getElementById('goalChatMeta');
+      if (chatMeta) chatMeta.textContent = meta.join(' · ');
+
+      // Definition editor uses goal.notes (closest thing we have today)
+      const defDisplay = document.getElementById('goalDefDisplay');
+      const notes = (goal.notes || goal.description || '').trim();
+      if (defDisplay) {
+        defDisplay.innerHTML = notes ? `${escapeHtml(notes)} <small>(click to edit)</small>` : `Click to add a definition… <small>(click to edit)</small>`;
       }
 
-      document.getElementById('goalNotes').value = goal.notes || '';
-      document.getElementById('goalDeadlineInput').value = goal.deadline || '';
-      document.getElementById('goalPriorityInput').value = goal.priority || '';
-
+      // Sessions list (left panel)
       const sess = Array.isArray(goal.sessions) ? goal.sessions : [];
       const sessEl = document.getElementById('goalSessions');
-      if (!sess.length) {
-        sessEl.innerHTML = `<div class="empty-state">No sessions attached. Attach one to keep the work located.</div>`;
-      } else {
-        const byKey = new Map(state.sessions.map(s => [s.key, s]));
-        sessEl.innerHTML = sess.map(k => {
-          const s = byKey.get(k);
-          const name = s ? getSessionName(s) : k;
-          const meta = s ? getSessionMeta(s) : 'unknown';
-          return `
-            <div class="goal-session-row" onclick="openSession('${escapeHtml(k)}')">
-              <div class="goal-session-icon">${s ? getSessionIcon(s) : '💬'}</div>
-              <div class="goal-session-main">
-                <div class="goal-session-name">${escapeHtml(name)}</div>
-                <div class="goal-session-meta">${escapeHtml(meta)}</div>
+      if (sessEl) {
+        if (!sess.length) {
+          sessEl.innerHTML = `<div class="empty-state">No sessions attached. Attach one to keep work located.</div>`;
+        } else {
+          const byKey = new Map((state.sessions || []).map(s => [s.key, s]));
+          sessEl.innerHTML = sess.map(k => {
+            const s = byKey.get(k);
+            const name = s ? getSessionName(s) : k;
+            const meta = s ? getSessionMeta(s) : 'unknown';
+            return `
+              <div class="goal-session-row" onclick="openSession('${escapeHtml(k)}')">
+                <div class="goal-session-icon">${s ? getSessionIcon(s) : '💬'}</div>
+                <div class="goal-session-main">
+                  <div class="goal-session-name">${escapeHtml(name)}</div>
+                  <div class="goal-session-meta">${escapeHtml(meta)}</div>
+                </div>
+                <button class="goal-session-move" onclick="event.stopPropagation(); showAttachSessionModal('${escapeHtml(k)}')" title="Move">⛓</button>
               </div>
-              <button class="goal-session-move" onclick="event.stopPropagation(); showAttachSessionModal('${escapeHtml(k)}')" title="Move">⛓</button>
+            `;
+          }).join('');
+        }
+      }
+
+      // Tabs + pane
+      if (!state.goalTab) state.goalTab = 'tasks';
+      setGoalTab(state.goalTab, { skipRender: true });
+      renderGoalPane();
+    }
+
+    function formatTimestamp(ms) {
+      const d = new Date(Number(ms) || Date.now());
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function startGoalDefEdit() {
+      const goal = state.goals.find(g => g.id === state.currentGoalOpenId);
+      const disp = document.getElementById('goalDefDisplay');
+      const edit = document.getElementById('goalDefEdit');
+      const ta = document.getElementById('goalDefTA');
+      if (!disp || !edit || !ta) return;
+
+      const val = (goal?.notes || goal?.description || '').trim();
+      ta.value = val;
+      edit.classList.add('open');
+      disp.style.display = 'none';
+      ta.focus();
+    }
+
+    async function saveGoalDefEdit() {
+      const goal = state.goals.find(g => g.id === state.currentGoalOpenId);
+      const ta = document.getElementById('goalDefTA');
+      if (!goal || !ta) return;
+      const val = (ta.value || '').trim();
+      await updateGoal(goal.id, { notes: val });
+      cancelGoalDefEdit();
+      renderGoalView();
+    }
+
+    function cancelGoalDefEdit() {
+      const disp = document.getElementById('goalDefDisplay');
+      const edit = document.getElementById('goalDefEdit');
+      if (!disp || !edit) return;
+      edit.classList.remove('open');
+      disp.style.display = 'block';
+    }
+
+    function setGoalTab(which, opts = {}) {
+      state.goalTab = which;
+      const t1 = document.getElementById('goalTabTasks');
+      const t2 = document.getElementById('goalTabFiles');
+      if (t1) t1.classList.toggle('active', which === 'tasks');
+      if (t2) t2.classList.toggle('active', which === 'files');
+      if (!opts.skipRender) renderGoalPane();
+    }
+
+    function renderGoalPane() {
+      const goal = state.goals.find(g => g.id === state.currentGoalOpenId);
+      const pane = document.getElementById('goalPane');
+      if (!goal || !pane) return;
+
+      if ((state.goalTab || 'tasks') === 'files') {
+        pane.innerHTML = `<div class="empty-state">Files view is coming soon. For now, keep key links in the definition above.</div>`;
+        return;
+      }
+
+      // Tasks: grouped by stage, visual-only; we’ll store stage/blocked when tasks start being used.
+      const stages = [
+        { k: 'backlog', l: 'Backlog' },
+        { k: 'blocked', l: 'Blocked' },
+        { k: 'doing', l: 'Doing' },
+        { k: 'review', l: 'Review' },
+        { k: 'done', l: 'Done' },
+      ];
+
+      const tasks = Array.isArray(goal.tasks) ? goal.tasks : [];
+      const by = new Map(stages.map(s => [s.k, []]));
+      for (const t of tasks) {
+        const key = t.blocked ? 'blocked' : (t.stage || (t.done ? 'done' : 'backlog'));
+        if (!by.has(key)) by.set(key, []);
+        by.get(key).push(t);
+      }
+
+      pane.innerHTML = stages.map(s => {
+        const items = by.get(s.k) || [];
+        const rows = items.map((t, idx) => {
+          const id = escapeHtml(t.id || String(idx));
+          const checked = t.done ? 'checked' : '';
+          const badge = t.blocked ? 'blocked' : (t.stage || (t.done ? 'done' : 'backlog'));
+          const title = t.text || t.title || '';
+          return `
+            <div class="goal-task-row" onclick="toggleGoalTask('${id}')">
+              <input type="checkbox" ${checked} onclick="event.stopPropagation(); toggleGoalTask('${id}')">
+              <div class="goal-badge ${escapeHtml(badge)}"></div>
+              <div class="goal-rtitle">${escapeHtml(title)}</div>
+              <div class="goal-rmeta"><span>${escapeHtml(String(t.id || ''))}</span></div>
             </div>
           `;
         }).join('');
-      }
+
+        return `<div class="goal-group"><div class="goal-ghead"><div class="goal-gtitle">${escapeHtml(s.l)}</div><div class="goal-gcount">${items.length}</div></div>${rows || `<div class="empty-state">—</div>`}</div>`;
+      }).join('');
     }
 
     async function toggleGoalDone() {
@@ -4221,40 +4328,106 @@ Response format:
     }
 
     function renderCondoView() {
-      const goalsEl = document.getElementById('condoGoalsList');
+      const gridEl = document.getElementById('condoGoalGrid');
       const sessionsEl = document.getElementById('condoSessionsList');
-      if (!goalsEl || !sessionsEl) return;
+      if (!gridEl) return;
 
-      const condoGoals = (state.goals || [])
-        .filter(g => (g.condoId || 'misc:default') === state.currentCondoId)
-        .filter(g => !isGoalCompleted(g));
+      const condoId = state.currentCondoId;
 
-      // Goals list
-      if (!condoGoals.length) {
-        goalsEl.innerHTML = `<div class="empty-state">No pending goals in this condo.</div>`;
-      } else {
-        goalsEl.innerHTML = condoGoals.map(g => {
-          const sessCount = Array.isArray(g.sessions) ? g.sessions.length : 0;
-          return `
-            <div class="condo-goal-row" onclick="openGoal('${escapeHtml(g.id)}')">
-              <div class="condo-goal-status pending"></div>
-              <span class="condo-goal-name">${escapeHtml(g.title || 'Untitled goal')}</span>
-              <span class="condo-goal-meta">${sessCount ? `${sessCount} session${sessCount===1?'':'s'}` : '—'}</span>
-            </div>
-          `;
-        }).join('');
+      const condoName = (() => {
+        if (condoId === 'cron') return 'Recurring';
+        const s = (state.sessions || []).find(x => getSessionCondoId(x) === condoId);
+        return s ? getSessionCondoName(s) : (condoId.split(':').pop() || 'Condo');
+      })();
+
+      const titleEl = document.getElementById('condoHeroTitle');
+      if (titleEl) titleEl.textContent = condoName;
+
+      const allGoals = (state.goals || []).filter(g => (g.condoId || 'misc:default') === condoId);
+      const activeGoals = allGoals.filter(g => !isGoalCompleted(g));
+      const completedGoals = allGoals.filter(g => isGoalCompleted(g));
+
+      const doing = activeGoals.filter(g => (g.status || 'active') === 'doing' || (g.priority === 'P0'));
+      const blocked = activeGoals.filter(g => (g.status || '').toLowerCase() === 'blocked');
+
+      const statActive = document.getElementById('condoStatActive');
+      const statTotal = document.getElementById('condoStatTotal');
+      const statDoing = document.getElementById('condoStatDoing');
+      const statBlocked = document.getElementById('condoStatBlocked');
+      if (statActive) statActive.textContent = String(activeGoals.length);
+      if (statTotal) statTotal.textContent = String(allGoals.length);
+      if (statDoing) statDoing.textContent = String(doing.length);
+      if (statBlocked) statBlocked.textContent = String(blocked.length);
+
+      const focusEl = document.getElementById('condoStatFocus');
+      if (focusEl) {
+        const focus = (activeGoals[0]?.title || completedGoals[0]?.title || '—');
+        focusEl.textContent = focus;
       }
 
-      // Sessions list
-      const condoSessions = (state.sessions || [])
-        .filter(s => !s.key.includes(':subagent:'))
-        .filter(s => getSessionCondoId(s) === state.currentCondoId)
-        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      const lastEl = document.getElementById('condoLastUpdated');
+      if (lastEl) {
+        const last = Math.max(0, ...allGoals.map(g => Number(g.updatedAtMs || g.updatedAt || g.createdAtMs || 0)));
+        lastEl.textContent = last ? formatTimestamp(last) : '—';
+      }
 
-      if (!condoSessions.length) {
-        sessionsEl.innerHTML = `<div class="empty-state">No sessions in this condo.</div>`;
+      // Goal grid cards (D1)
+      if (!activeGoals.length) {
+        gridEl.innerHTML = `<div class="empty-state">No pending goals in this condo.</div>`;
       } else {
-        sessionsEl.innerHTML = condoSessions.map(s => {
+        gridEl.innerHTML = activeGoals
+          .sort((a, b) => Number(b.updatedAtMs || b.updatedAt || 0) - Number(a.updatedAtMs || a.updatedAt || 0))
+          .map(g => {
+            const status = (g.status || (isGoalCompleted(g) ? 'done' : 'doing')).toLowerCase();
+            const updated = formatTimestamp(g.updatedAtMs || g.updatedAt || g.createdAtMs || Date.now()).split(' ')[1] || '';
+
+            const tasks = Array.isArray(g.tasks) ? g.tasks : [];
+            const next = tasks.find(t => !t.done) || tasks[0] || null;
+            const nextTitle = next ? (next.text || next.title || 'Next task') : (g.notes ? 'Review definition + set next step' : 'Add the next step');
+            const nextId = next ? (next.id || '') : '';
+            const nextStage = next ? (next.blocked ? 'blocked' : (next.stage || (next.done ? 'done' : 'doing'))) : (status || 'doing');
+            const dotClass = nextStage === 'blocked' ? 'blocked' : (nextStage === 'review' ? 'review' : (nextStage === 'done' ? 'done' : ''));
+
+            const owner = (Array.isArray(g.sessions) && g.sessions.length) ? `${g.sessions.length} session${g.sessions.length===1?'':'s'}` : '—';
+
+            return `
+              <article class="condo-goal-card" onclick="openGoal('${escapeHtml(g.id)}')">
+                <div class="condo-card-top">
+                  <div>
+                    <div class="condo-card-title">${escapeHtml(g.title || 'Untitled goal')}</div>
+                    <div class="condo-card-meta">
+                      <span class="condo-tag ${escapeHtml(status)}">${escapeHtml(status)}</span>
+                      <span>${escapeHtml(owner)}</span>
+                    </div>
+                  </div>
+                  <div style="font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11px; color: var(--text-muted);">${escapeHtml(updated)}</div>
+                </div>
+
+                <div class="condo-card-body">
+                  <div class="condo-next-label">Next task</div>
+                  <div class="condo-next-task">
+                    <div class="condo-dot ${dotClass}"></div>
+                    <div>
+                      <div class="condo-task-title">${escapeHtml(nextTitle)}</div>
+                      <div class="condo-task-sub">${nextId ? `<span style=\"font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11px; color: rgba(148,163,184,.75);\">${escapeHtml(String(nextId))}</span>` : ''}${g.priority ? `<span>${escapeHtml(g.priority)}</span>` : ''}${g.deadline ? `<span>due ${escapeHtml(g.deadline)}</span>` : ''}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="condo-card-foot"><span>Updated recently</span><span>Open →</span></div>
+              </article>
+            `;
+          }).join('');
+      }
+
+      // Keep the sessions list render for now (even if hidden)
+      if (sessionsEl) {
+        const condoSessions = (state.sessions || [])
+          .filter(s => !s.key.includes(':subagent:'))
+          .filter(s => getSessionCondoId(s) === condoId)
+          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+        sessionsEl.innerHTML = condoSessions.length ? condoSessions.map(s => {
           const preview = getMessagePreview(s);
           const g = getGoalForSession(s.key);
           const goalPill = g ? `<span class="card-badge goal" onclick="event.stopPropagation(); openGoal('${escapeHtml(g.id)}')">🏙️ ${escapeHtml(g.title || 'Goal')}</span>` : '';
@@ -4274,7 +4447,7 @@ Response format:
               </div>
             </div>
           `;
-        }).join('');
+        }).join('') : `<div class="empty-state">No sessions in this condo.</div>`;
       }
     }
 

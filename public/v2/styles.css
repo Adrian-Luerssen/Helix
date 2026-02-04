@@ -1161,6 +1161,188 @@ body {
 }
 
 /* =====================================================================
+   Goal + Condo detail (prototype parity)
+   goal-g2.html + condo-d1.html
+   ===================================================================== */
+
+.goal-shell-v2{
+  display:grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap:14px;
+  height:100%;
+  min-height:0;
+}
+
+.goal-chat,
+.goal-right{
+  background: rgba(26,30,36,.72);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.03) inset;
+  overflow: hidden;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+}
+
+.goal-chat-header{
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background: linear-gradient(180deg, rgba(0,0,0,.16), transparent);
+  font-weight: 800;
+}
+
+.goal-chat-meta{ color: var(--text-muted); font-size: 11px; font-weight: 600; }
+
+.goal-chat-body{
+  flex:1;
+  min-height:0;
+  overflow:auto;
+  padding: 10px 10px;
+}
+
+.goal-chat-body .empty-state{ padding: 18px 14px; }
+
+.goal-chat-footer{
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255,255,255,.06);
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+}
+
+.ghost-btn{
+  background: rgba(13,17,23,.92);
+  border: 1px solid rgba(255,255,255,.12);
+  color: rgba(255,255,255,.82);
+  padding: 8px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+.ghost-btn:hover{ border-color: rgba(96,165,250,.55); color: rgba(255,255,255,.92); }
+.ghost-btn.danger:hover{ border-color: rgba(248,113,113,.6); }
+
+.goal-right-header{
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  background: radial-gradient(1000px 260px at 20% 0%, rgba(96,165,250,.12), transparent 62%);
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 14px;
+}
+
+.goal-right-title{
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.goal-right-meta{
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.goal-right-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+
+.goal-def{ padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.goal-def-display{ color: rgba(255,255,255,.9); font-size: 13px; line-height: 1.4; cursor: text; }
+.goal-def-display small{ color: var(--text-muted); }
+.goal-def-edit{ display:none; }
+.goal-def-edit.open{ display:block; }
+
+.goal-def textarea{
+  width:100%;
+  background: rgba(13,17,23,.92);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;
+  color: rgba(255,255,255,.92);
+  padding:10px 12px;
+  outline:none;
+  resize:none;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.25) inset;
+}
+.goal-def textarea:focus{ border-color: rgba(96,165,250,.65); box-shadow: 0 0 0 3px rgba(96,165,250,.18); }
+.goal-def-actions{ margin-top: 8px; display:flex; gap:8px; flex-wrap:wrap; }
+
+.goal-tabs{ display:flex; gap:14px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.06); background: rgba(0,0,0,.06); }
+.goal-tab{ font-size:12px; color: var(--text-muted); cursor:pointer; padding:6px 2px; border-bottom:2px solid transparent; }
+.goal-tab.active{ color: rgba(255,255,255,.92); border-bottom-color: rgba(96,165,250,.75); }
+
+.goal-pane{ flex:1; min-height:0; overflow:auto; padding: 12px 14px; }
+
+.goal-group{ padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.goal-group:last-child{ border-bottom:none; }
+.goal-ghead{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom: 8px; position:sticky; top:0; padding:6px 0; background: rgba(26,30,36,.86); backdrop-filter: blur(6px); }
+.goal-gtitle{ font-size:11px; font-weight:900; letter-spacing:.10em; text-transform:uppercase; color: rgba(148,163,184,.85); }
+.goal-gcount{ font-size:11px; color: var(--text-muted); }
+
+.goal-task-row{ display:flex; align-items:center; gap:10px; padding:8px 8px; border-radius:12px; cursor:pointer; }
+.goal-task-row:hover{ background: rgba(0,0,0,.08); }
+.goal-task-row input{ accent-color: rgba(96,165,250,.85); }
+.goal-badge{ width:10px; height:10px; border-radius:999px; flex-shrink:0; }
+.goal-badge.backlog{ background: rgba(156,163,175,.9); }
+.goal-badge.blocked{ background: rgba(248,113,113,.95); }
+.goal-badge.doing{ background: rgba(96,165,250,.95); }
+.goal-badge.review{ background: rgba(251,191,36,.95); }
+.goal-badge.done{ background: rgba(52,211,153,.95); }
+.goal-rtitle{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:13px; font-weight:650; }
+.goal-rmeta{ display:flex; gap:8px; align-items:center; color: var(--text-muted); font-size:11px; }
+
+/* Condo detail */
+.condo-shell{ max-width: 1120px; margin: 0 auto; display:flex; flex-direction:column; gap: 12px; }
+.condo-hero{ background: rgba(26,30,36,.72); border:1px solid var(--border); border-radius:16px; overflow:hidden; box-shadow:0 1px 0 rgba(255,255,255,.03) inset; }
+.condo-hero-top{ padding:14px; border-bottom:1px solid rgba(255,255,255,.06); background: radial-gradient(1000px 260px at 20% 0%, rgba(96,165,250,.14), transparent 62%); }
+.condo-hero-title{ font-size: 22px; font-weight: 850; letter-spacing: -0.02em; }
+.condo-hero-sub{ margin-top: 6px; color: var(--text-muted); display:flex; gap:10px; flex-wrap:wrap; font-size: 12px; }
+.condo-pill{ border: 1px solid rgba(255,255,255,.14); background: rgba(13,17,23,.55); padding:6px 10px; border-radius:999px; color: rgba(255,255,255,.92); }
+
+.condo-hero-stats{ display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; padding: 12px 14px; }
+.condo-stat{ border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:10px; background: rgba(0,0,0,.06); }
+.condo-stat .k{ color: rgba(148,163,184,.75); text-transform:uppercase; letter-spacing:.10em; font-weight:900; font-size:10px; }
+.condo-stat .v{ margin-top:6px; font-weight:850; font-size:14px; }
+.condo-stat .v small{ color: var(--text-muted); font-weight:600; }
+
+.condo-goals-grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.condo-goal-card{ background: rgba(26,30,36,.72); border:1px solid var(--border); border-radius:16px; overflow:hidden; box-shadow:0 1px 0 rgba(255,255,255,.03) inset; cursor:pointer; transition: transform .12s ease, border-color .12s ease; }
+.condo-goal-card:hover{ transform: translateY(-2px); border-color: rgba(96,165,250,.45); }
+.condo-card-top{ padding: 12px 12px 10px; border-bottom:1px solid rgba(255,255,255,.06); display:flex; justify-content:space-between; gap:10px; align-items:flex-start; background: linear-gradient(180deg, rgba(0,0,0,.16), transparent); }
+.condo-card-title{ font-weight:750; font-size:13px; line-height: 1.25; }
+.condo-card-meta{ margin-top:4px; color: var(--text-muted); font-size:11px; display:flex; gap:8px; flex-wrap:wrap; }
+.condo-tag{ font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background: rgba(13,17,23,.45); color: rgba(255,255,255,.9); }
+.condo-tag.doing{ border-color: rgba(96,165,250,.55); background: rgba(96,165,250,.10); }
+.condo-tag.review{ border-color: rgba(251,191,36,.55); background: rgba(251,191,36,.10); }
+.condo-tag.blocked{ border-color: rgba(248,113,113,.55); background: rgba(248,113,113,.10); }
+.condo-tag.done{ border-color: rgba(52,211,153,.55); background: rgba(52,211,153,.10); }
+
+.condo-card-body{ padding: 12px; }
+.condo-next-label{ color: rgba(148,163,184,.75); font-weight:900; letter-spacing:.10em; text-transform:uppercase; font-size:10px; }
+.condo-next-task{ margin-top:8px; display:flex; align-items:flex-start; gap:10px; }
+.condo-dot{ width:10px; height:10px; border-radius:999px; background: rgba(96,165,250,.95); margin-top:4px; box-shadow:0 0 0 4px rgba(96,165,250,.12); }
+.condo-dot.blocked{ background: rgba(248,113,113,.95); box-shadow:0 0 0 4px rgba(248,113,113,.12); }
+.condo-dot.review{ background: rgba(251,191,36,.95); box-shadow:0 0 0 4px rgba(251,191,36,.12); }
+.condo-dot.done{ background: rgba(52,211,153,.95); box-shadow:0 0 0 4px rgba(52,211,153,.12); }
+.condo-task-title{ font-weight:700; font-size:13px; line-height:1.25; }
+.condo-task-sub{ margin-top:4px; color: var(--text-muted); font-size:11px; display:flex; gap:10px; flex-wrap:wrap; }
+
+.condo-card-foot{ padding:10px 12px; border-top:1px solid rgba(255,255,255,.06); display:flex; justify-content:space-between; gap:10px; color: var(--text-muted); font-size:11px; }
+
+@media (max-width: 1100px){
+  .goal-shell-v2{ grid-template-columns: 1fr; }
+  .condo-hero-stats{ grid-template-columns: 1fr 1fr; }
+  .condo-goals-grid{ grid-template-columns: 1fr; }
+}
+
+/* =====================================================================
    Chat view (v2)
    Fix layout regressions from v1 classnames (.chat-view)
    ===================================================================== */
