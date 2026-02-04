@@ -1103,7 +1103,7 @@ function initAutoArchiveUI() {
           state.wsReconnectAttempts = 0;
           setConnectionStatus('connected');
           hideReconnectOverlay();
-          localStorage.setItem('sharp_token', state.token);
+          if (state.token) localStorage.setItem('sharp_token', state.token);
           localStorage.setItem('sharp_gateway', state.gatewayUrl);
           hideLoginModal();
           startKeepalive();
@@ -6252,8 +6252,11 @@ Response format:
       // Attach chat UX listeners (safe to call early)
       initChatUX();
 
-      // If no stored token, prompt for gateway token before attempting WS auth
-      if (!state.token) {
+      // If no stored token, try a best-effort connect on localhost (common dev setup = no auth).
+      // If auth is required, the socket will close with 1008 and we’ll prompt.
+      const host = window.location.hostname;
+      const isLocal = host === 'localhost' || host === '127.0.0.1';
+      if (!state.token && !isLocal) {
         setConnectionStatus('error');
         showLoginModal();
       } else {
