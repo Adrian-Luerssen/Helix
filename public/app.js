@@ -135,6 +135,9 @@
       
       // Custom session names
       sessionNames: JSON.parse(lsGet('session_names', '{}') || '{}'),
+
+      // Per-session UI verbose toggle (best-effort)
+      verboseBySession: JSON.parse(lsGet('verbose_by_session', '{}') || '{}'),
       
       // Search & Filters
       searchQuery: '',
@@ -6398,6 +6401,7 @@ Response format:
       document.getElementById('sessionKeyDisplay').textContent = session.key;
       document.getElementById('sessionModel').textContent = session.model?.split('/').pop() || 'unknown';
       document.getElementById('sessionTokens').textContent = session.totalTokens?.toLocaleString() || '0';
+      updateVerboseToggleUI();
       
       const actionBtn = document.getElementById('headerAction');
       if (session.key === 'agent:main:main') {
@@ -7390,6 +7394,39 @@ Response format:
       } catch {}
     }
     
+    function updateVerboseToggleUI() {
+      const wrap = document.getElementById('verboseToggle');
+      if (!wrap) return;
+      const key = state.currentSession?.key;
+      const level = (key && state.verboseBySession[key]) ? state.verboseBySession[key] : 'off';
+      wrap.querySelectorAll('.verbose-btn').forEach(btn => {
+        const v = btn.getAttribute('data-verbose');
+        btn.classList.toggle('active', v === level);
+      });
+    }
+
+    async function setVerboseMode(level) {
+      const sessionKey = state.currentSession?.key;
+      if (!sessionKey) return;
+      const normalized = (level === 'full' || level === 'on' || level === 'off') ? level : 'off';
+
+      state.verboseBySession[sessionKey] = normalized;
+      lsSet('verbose_by_session', JSON.stringify(state.verboseBySession));
+      updateVerboseToggleUI();
+
+      try {
+        const idempotencyKey = `verbose-${sessionKey}-${Date.now()}`;
+        await rpcCall('chat.send', {
+          sessionKey: sessionKey,
+          message: `/verbose ${normalized}`,
+          idempotencyKey
+        }, 10000);
+        addChatMessageTo('', 'system', `Verbose → ${normalized}`);
+      } catch (err) {
+        addChatMessageTo('', 'system', `Failed to set verbose: ${err.message}`);
+      }
+    }
+
     async function stopAgent(sessionKeyOverride = null, prefix = '') {
       if (!state.isThinking) return;
 

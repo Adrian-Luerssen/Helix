@@ -519,6 +519,13 @@
                 <span class="session-info-item">🤖 <span class="session-badge" id="sessionModel">-</span></span>
                 <span class="session-info-item">📊 <span id="sessionTokens">-</span> tokens</span>
                 <span class="session-info-spacer"></span>
+
+                <div class="verbose-toggle" id="verboseToggle" title="Debug visibility: sends /verbose on|full|off to this session">
+                  <button class="verbose-btn" data-verbose="off" onclick="setVerboseMode('off')">V off</button>
+                  <button class="verbose-btn" data-verbose="on" onclick="setVerboseMode('on')">V on</button>
+                  <button class="verbose-btn" data-verbose="full" onclick="setVerboseMode('full')">V full</button>
+                </div>
+
                 <button class="export-btn" onclick="exportChatAsMarkdown()" title="Export as Markdown">
                   <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
                   Export

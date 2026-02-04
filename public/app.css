@@ -1958,3 +1958,33 @@ body {
 .item.status-thinking { background: rgba(245, 158, 11, 0.06); }
 .item.status-error { background: rgba(248, 113, 113, 0.06); }
 .item.status-offline { background: rgba(148, 163, 184, 0.04); }
+
+/* Verbose toggle (session header) */
+.verbose-toggle {
+  display: inline-flex;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-right: 10px;
+  background: rgba(255,255,255,0.04);
+}
+
+.verbose-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.72);
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.verbose-btn:hover {
+  color: rgba(255,255,255,0.95);
+  background: rgba(255,255,255,0.06);
+}
+
+.verbose-btn.active {
+  color: rgba(91,156,244,0.98);
+  background: rgba(91,156,244,0.14);
+}
