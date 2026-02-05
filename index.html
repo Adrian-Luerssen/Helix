@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="/styles/main.css?v=8">
   <link rel="stylesheet" href="/styles/media-upload.css">
   <link rel="stylesheet" href="/styles/voice-recorder.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism-tomorrow.min.css">
 </head>
 <body>
   <!-- Toast container for notifications -->
@@ -525,6 +526,9 @@
     </div>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/plugins/autoloader/prism-autoloader.min.js"></script>
   <!-- Load configuration before main script -->
   <script src="/lib/config.js"></script>
   <script src="/lib/message-shaping.js"></script>
@@ -4749,19 +4753,48 @@ Response format:
       return { processed, tokens };
     }
     
+    // Configure marked for chat rendering
+    if (typeof marked !== 'undefined') {
+      const renderer = {
+        link(token) {
+          const href = token.href || '';
+          const text = token.text || href;
+          return '<a href="' + href + '" target="_blank" rel="noopener">' + text + '</a>';
+        },
+        code(token) {
+          const code = token.text || '';
+          const lang = (token.lang || '').trim();
+          if (lang && typeof Prism !== 'undefined') {
+            const grammar = Prism.languages[lang];
+            if (grammar) {
+              const highlighted = Prism.highlight(code, grammar, lang);
+              return '<pre class="language-' + lang + '"><code class="language-' + lang + '">' + highlighted + '</code></pre>';
+            }
+          }
+          return '<pre><code>' + code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code></pre>';
+        }
+      };
+      if (marked.use) marked.use({ breaks: true, gfm: true, renderer });
+      else if (marked.setOptions) marked.setOptions({ breaks: true, gfm: true, renderer });
+    }
+
     function formatMessage(text) {
       const { processed, tokens } = tokenizeMediaMarkdown(text);
-      let html = escapeHtml(processed)
-        .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-        .replace(/\n/g, '<br>');
-      
+      let html;
+      if (typeof marked !== 'undefined') {
+        html = marked.parse(processed);
+      } else {
+        // Fallback if marked fails to load
+        html = escapeHtml(processed)
+          .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+          .replace(/`([^`]+)`/g, '<code>$1</code>')
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+          .replace(/\n/g, '<br>');
+      }
       tokens.forEach((tokenHtml, idx) => {
         html = html.replace(`@@MEDIA_${idx}@@`, tokenHtml);
       });
-      
       return html;
     }
     

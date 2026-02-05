@@ -16,6 +16,16 @@ import crypto from 'crypto';
 import { rewriteConnectFrame, validateStaticPath, isDotfilePath } from './lib/serve-helpers.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
+
+// Auto-load env file if GATEWAY_AUTH not already set (e.g. running outside systemd)
+const ENV_FILE = join(process.env.HOME || '', '.config', 'clawcondos.env');
+if (!process.env.GATEWAY_AUTH && existsSync(ENV_FILE)) {
+  for (const line of readFileSync(ENV_FILE, 'utf-8').split('\n')) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+  }
+}
+
 const PORT = parseInt(process.argv[2]) || 9000;
 
 const MIME_TYPES = {
@@ -1022,12 +1032,14 @@ server.on('upgrade', (req, socket, head) => {
 
     wss.handleUpgrade(req, socket, head, (clientWs) => {
       const upstreamUrl = getGatewayWsUrl();
-      const upstreamWs = new WebSocket(upstreamUrl, gatewayAuth ? {
-        headers: {
-          // Gateway supports Authorization header auth (matches prior Caddy-based approach)
-          Authorization: `Bearer ${gatewayAuth}`,
-        },
-      } : undefined);
+      const gatewayHost = process.env.GATEWAY_HTTP_HOST || '127.0.0.1';
+      const gatewayPort = Number(process.env.GATEWAY_HTTP_PORT || 18789);
+      const upstreamHeaders = {
+        // Set origin to gateway host so it passes the gateway's origin check
+        Origin: `http://${gatewayHost}:${gatewayPort}`,
+      };
+      if (gatewayAuth) upstreamHeaders['Authorization'] = `Bearer ${gatewayAuth}`;
+      const upstreamWs = new WebSocket(upstreamUrl, { headers: upstreamHeaders });
 
       const closeBoth = (code, reason) => {
         try { clientWs.close(code, reason); } catch {}

@@ -4654,11 +4654,14 @@ Response format:
       if (!id) return;
       if (state.agentFileLoading) return;
       state.agentFileLoading = true;
+      state.agentFilesAgentId = id;
       try {
         const res = await fetch(`/api/agents/files?agentId=${encodeURIComponent(id)}`);
         const data = await res.json();
-        if (data?.ok) {
+        if (data?.ok && state.agentFilesAgentId === id) {
           state.agentFileEntries = data.entries || [];
+          if (!state.agentFileTreeExpanded) state.agentFileTreeExpanded = {};
+          if (!state.agentFileTreeExpanded[id]) state.agentFileTreeExpanded[id] = {};
         }
       } catch (e) {
         console.warn('agent files load failed', id, e?.message || e);
@@ -4672,7 +4675,11 @@ Response format:
       const agent = state.agents?.find(a => a.id === state.selectedAgentId) || state.agents?.[0];
       if (!agent) return;
       state.selectedAgentFile = relPath;
-      state.agentFileContent = '';
+      state.agentFileContent = null;
+      // Show panel immediately with loading state
+      renderAgentFileViewerPanel();
+      // Also update file list to highlight active file
+      if (state.currentView === 'agents') renderAgentsPage();
       try {
         const res = await fetch(`/api/agents/file?agentId=${encodeURIComponent(agent.id)}&path=${encodeURIComponent(relPath)}`);
         const data = await res.json();
@@ -4681,7 +4688,7 @@ Response format:
       } catch (e) {
         state.agentFileContent = `Failed to load file: ${e?.message || e}`;
       }
-      if (state.currentView === 'agents') renderAgentsPage();
+      if (state.currentView === 'agents') renderAgentFileViewerPanel();
     }
 
     function renderAgentOverviewTab(agent) {
@@ -4770,10 +4777,208 @@ Response format:
       return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
+    // ── File tree state ──
+    if (!state.agentFileTreeExpanded) state.agentFileTreeExpanded = {};
+    if (!state.agentFileSearch) state.agentFileSearch = '';
+    if (!state.agentFileSort) state.agentFileSort = 'name'; // 'name' | 'size' | 'modified'
+
+    function toggleFileTreeDir(dirPath) {
+      const agentId = state.agentFilesAgentId || '';
+      if (!state.agentFileTreeExpanded[agentId]) state.agentFileTreeExpanded[agentId] = {};
+      const expanded = state.agentFileTreeExpanded[agentId];
+      if (expanded[dirPath]) delete expanded[dirPath];
+      else expanded[dirPath] = true;
+      if (state.currentView === 'agents') renderAgentsPage();
+    }
+
+    function setAgentFileSearch(val) {
+      state.agentFileSearch = val;
+      if (state.currentView === 'agents') renderAgentsPage();
+    }
+
+    function setAgentFileSort(val) {
+      state.agentFileSort = val;
+      if (state.currentView === 'agents') renderAgentsPage();
+    }
+
+    function buildFileTree(entries) {
+      const root = { children: {}, dirs: {} };
+      for (const e of entries) {
+        const parts = e.path.split('/');
+        let node = root;
+        for (let i = 0; i < parts.length - 1; i++) {
+          const dirName = parts.slice(0, i + 1).join('/');
+          if (!node.dirs[dirName]) {
+            node.dirs[dirName] = { children: {}, dirs: {} };
+            node.children[dirName] = { type: 'dir', path: dirName, name: parts[i], node: node.dirs[dirName] };
+          }
+          node = node.dirs[dirName];
+        }
+        if (e.type === 'file') {
+          node.children[e.path] = { type: 'file', path: e.path, name: parts[parts.length - 1], size: e.size, mtimeMs: e.mtimeMs };
+        } else if (e.type === 'dir' && !node.dirs[e.path]) {
+          node.dirs[e.path] = { children: {}, dirs: {} };
+          node.children[e.path] = { type: 'dir', path: e.path, name: parts[parts.length - 1], node: node.dirs[e.path] };
+        }
+      }
+      return root;
+    }
+
+    function sortFileTreeItems(items) {
+      const sort = state.agentFileSort || 'name';
+      return items.sort((a, b) => {
+        // Dirs always first
+        if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+        if (sort === 'size') {
+          return (b.size || 0) - (a.size || 0);
+        }
+        if (sort === 'modified') {
+          return (b.mtimeMs || 0) - (a.mtimeMs || 0);
+        }
+        return a.name.localeCompare(b.name);
+      });
+    }
+
+    function renderTreeNode(node, depth, expanded) {
+      const selectedFile = state.selectedAgentFile;
+      let html = '';
+      const items = sortFileTreeItems(Object.values(node.children));
+      for (const item of items) {
+        const indent = depth * 18;
+        const escapedPath = escapeHtml(item.path.replace(/'/g, "\\'"));
+        if (item.type === 'dir') {
+          const isExpanded = !!expanded[item.path];
+          const icon = isExpanded ? '📂' : '📁';
+          const chevron = isExpanded ? '▾' : '▸';
+          html += '<div class="agent-file-item dir' + (isExpanded ? ' expanded' : '') + '" style="padding-left:' + indent + 'px" onclick="toggleFileTreeDir(\'' + escapedPath + '\')" oncontextmenu="showFileContextMenu(event,\'' + escapedPath + '\',\'dir\')">' +
+            '<span class="agent-tree-chevron">' + chevron + '</span>' +
+            '<span class="agent-file-icon">' + icon + '</span>' +
+            '<span class="agent-file-name">' + escapeHtml(item.name) + '</span>' +
+          '</div>';
+          if (isExpanded && item.node) {
+            html += renderTreeNode(item.node, depth + 1, expanded);
+          }
+        } else {
+          const sizeStr = item.size != null ? formatFileSize(item.size) : '';
+          const isActive = selectedFile === item.path;
+          const ext = (item.name.match(/\.(\w+)$/)?.[1] || '').toLowerCase();
+          const icon = { md: '📝', json: '📋', py: '🐍', js: '📜', mjs: '📜', sh: '⚙️', log: '📃', txt: '📃' }[ext] || '📄';
+          html += '<div class="agent-file-item' + (isActive ? ' active' : '') + '" style="padding-left:' + indent + 'px" onclick="selectAgentFile(\'' + escapedPath + '\')" oncontextmenu="showFileContextMenu(event,\'' + escapedPath + '\',\'file\')">' +
+            '<span class="agent-tree-chevron" style="visibility:hidden">▸</span>' +
+            '<span class="agent-file-icon">' + icon + '</span>' +
+            '<span class="agent-file-name">' + escapeHtml(item.name) + '</span>' +
+            (sizeStr ? '<span class="agent-file-size">' + escapeHtml(sizeStr) + '</span>' : '') +
+          '</div>';
+        }
+      }
+      return html;
+    }
+
+    // ── Flat search results (when filtering) ──
+    function renderFlatFileResults(entries, query) {
+      const selectedFile = state.selectedAgentFile;
+      const q = query.toLowerCase();
+      const matches = entries.filter(e => e.type === 'file' && e.path.toLowerCase().includes(q));
+      if (!matches.length) {
+        return '<div style="color: var(--text-muted); font-size: 12px; padding: 8px 0;">No files matching "' + escapeHtml(query) + '"</div>';
+      }
+      let html = '';
+      for (const f of matches) {
+        const isActive = selectedFile === f.path;
+        const name = f.path.split('/').pop();
+        const ext = (name.match(/\.(\w+)$/)?.[1] || '').toLowerCase();
+        const icon = { md: '📝', json: '📋', py: '🐍', js: '📜', mjs: '📜', sh: '⚙️', log: '📃', txt: '📃' }[ext] || '📄';
+        const sizeStr = f.size != null ? formatFileSize(f.size) : '';
+        const escapedPath = escapeHtml(f.path.replace(/'/g, "\\'"));
+        // Highlight matching portion
+        const idx = f.path.toLowerCase().indexOf(q);
+        let pathHtml;
+        if (idx >= 0) {
+          pathHtml = escapeHtml(f.path.slice(0, idx)) +
+            '<mark class="agent-file-match">' + escapeHtml(f.path.slice(idx, idx + query.length)) + '</mark>' +
+            escapeHtml(f.path.slice(idx + query.length));
+        } else {
+          pathHtml = escapeHtml(f.path);
+        }
+        html += '<div class="agent-file-item' + (isActive ? ' active' : '') + '" onclick="selectAgentFile(\'' + escapedPath + '\')" oncontextmenu="showFileContextMenu(event,\'' + escapedPath + '\',\'file\')">' +
+          '<span class="agent-file-icon">' + icon + '</span>' +
+          '<span class="agent-file-name">' + pathHtml + '</span>' +
+          (sizeStr ? '<span class="agent-file-size">' + escapeHtml(sizeStr) + '</span>' : '') +
+        '</div>';
+      }
+      return html;
+    }
+
+    // ── Right-click context menu ──
+    function showFileContextMenu(event, path, type) {
+      event.preventDefault();
+      event.stopPropagation();
+      // Remove existing menu
+      hideFileContextMenu();
+      const menu = document.createElement('div');
+      menu.className = 'agent-file-ctx-menu';
+      menu.id = 'agentFileCtxMenu';
+
+      const items = [];
+      items.push({ label: 'Copy path', action: function() { navigator.clipboard.writeText(path); } });
+      if (type === 'file') {
+        items.push({ label: 'Open file', action: function() { selectAgentFile(path); } });
+      }
+      if (type === 'dir') {
+        const agentId = state.agentFilesAgentId || '';
+        const expanded = state.agentFileTreeExpanded[agentId] || {};
+        const isOpen = !!expanded[path];
+        items.push({ label: isOpen ? 'Collapse folder' : 'Expand folder', action: function() { toggleFileTreeDir(path); } });
+        items.push({ label: 'Expand all inside', action: function() { expandAllInside(path); } });
+        items.push({ label: 'Collapse all inside', action: function() { collapseAllInside(path); } });
+      }
+
+      for (const it of items) {
+        const btn = document.createElement('div');
+        btn.className = 'agent-file-ctx-item';
+        btn.textContent = it.label;
+        btn.onclick = function() { hideFileContextMenu(); it.action(); };
+        menu.appendChild(btn);
+      }
+
+      document.body.appendChild(menu);
+      // Position near cursor, keep on screen
+      const x = Math.min(event.clientX, window.innerWidth - 180);
+      const y = Math.min(event.clientY, window.innerHeight - items.length * 32 - 12);
+      menu.style.left = x + 'px';
+      menu.style.top = y + 'px';
+      // Close on outside click
+      setTimeout(function() { document.addEventListener('click', hideFileContextMenu, { once: true }); }, 0);
+    }
+
+    function hideFileContextMenu() {
+      const el = document.getElementById('agentFileCtxMenu');
+      if (el) el.remove();
+    }
+
+    function expandAllInside(dirPath) {
+      const agentId = state.agentFilesAgentId || '';
+      if (!state.agentFileTreeExpanded[agentId]) state.agentFileTreeExpanded[agentId] = {};
+      const expanded = state.agentFileTreeExpanded[agentId];
+      const entries = state.agentFileEntries || [];
+      expanded[dirPath] = true;
+      for (const e of entries) {
+        if (e.type === 'dir' && e.path.startsWith(dirPath + '/')) expanded[e.path] = true;
+      }
+      if (state.currentView === 'agents') renderAgentsPage();
+    }
+
+    function collapseAllInside(dirPath) {
+      const agentId = state.agentFilesAgentId || '';
+      const expanded = state.agentFileTreeExpanded[agentId] || {};
+      for (const key of Object.keys(expanded)) {
+        if (key === dirPath || key.startsWith(dirPath + '/')) delete expanded[key];
+      }
+      if (state.currentView === 'agents') renderAgentsPage();
+    }
+
     function renderAgentFilesTab(agent) {
       const entries = state.agentFileEntries;
-      const selectedFile = state.selectedAgentFile;
-      const fileContent = state.agentFileContent;
 
       if (!entries && state.agentFileLoading) {
         return '<div style="color: var(--text-muted); font-size: 13px;">Loading files…</div>';
@@ -4783,42 +4988,101 @@ Response format:
         return '<div style="color: var(--text-muted); font-size: 13px;">No browsable files in this agent\'s workspace.</div>';
       }
 
-      // If viewing a file
-      if (selectedFile) {
-        const content = fileContent != null ? fileContent : 'Loading…';
-        return '<div class="agent-file-viewer">' +
-          '<div class="agent-file-viewer-header">' +
-            '<span style="cursor: pointer; color: var(--accent-blue);" onclick="state.selectedAgentFile = null; state.agentFileContent = null; renderAgentsPage();">← Back</span>' +
-            '<span>' + escapeHtml(selectedFile) + '</span>' +
-          '</div>' +
-          '<div class="agent-file-viewer-content">' + escapeHtml(String(content)) + '</div>' +
-        '</div>';
+      const agentId = state.agentFilesAgentId || '';
+      const expanded = (state.agentFileTreeExpanded && state.agentFileTreeExpanded[agentId]) || {};
+      const search = state.agentFileSearch || '';
+      const sort = state.agentFileSort || 'name';
+
+      // Toolbar: search + sort
+      let html = '<div class="agent-file-toolbar">' +
+        '<input class="agent-file-search" type="text" placeholder="Search files…" value="' + escapeHtml(search) + '" oninput="setAgentFileSearch(this.value)">' +
+        '<select class="agent-file-sort" onchange="setAgentFileSort(this.value)">' +
+          '<option value="name"' + (sort === 'name' ? ' selected' : '') + '>Name</option>' +
+          '<option value="size"' + (sort === 'size' ? ' selected' : '') + '>Size</option>' +
+          '<option value="modified"' + (sort === 'modified' ? ' selected' : '') + '>Modified</option>' +
+        '</select>' +
+      '</div>';
+
+      html += '<div class="agent-file-list agent-file-tree">';
+      if (search.trim()) {
+        html += renderFlatFileResults(entries, search.trim());
+      } else {
+        const tree = buildFileTree(entries);
+        html += renderTreeNode(tree, 0, expanded);
       }
-
-      // File list
-      const files = entries.filter(e => e.type === 'file');
-      const dirs = entries.filter(e => e.type === 'dir');
-
-      let html = '<div class="agent-file-list">';
-
-      for (const d of dirs) {
-        html += '<div class="agent-file-item dir">' +
-          '<span class="agent-file-icon">📁</span>' +
-          '<span class="agent-file-name">' + escapeHtml(d.path) + '/</span>' +
-        '</div>';
-      }
-
-      for (const f of files) {
-        const sizeStr = f.size != null ? formatFileSize(f.size) : '';
-        html += '<div class="agent-file-item" onclick="selectAgentFile(\'' + escapeHtml(f.path.replace(/'/g, "\\'")) + '\')">' +
-          '<span class="agent-file-icon">📄</span>' +
-          '<span class="agent-file-name">' + escapeHtml(f.path) + '</span>' +
-          (sizeStr ? '<span class="agent-file-size">' + escapeHtml(sizeStr) + '</span>' : '') +
-        '</div>';
-      }
-
       html += '</div>';
       return html;
+    }
+
+    function renderMarkdownToHtml(md) {
+      if (typeof marked !== 'undefined') {
+        return marked.parse(String(md));
+      }
+      // Fallback: minimal rendering
+      return '<pre>' + escapeHtml(String(md)) + '</pre>';
+    }
+
+    function renderBreadcrumbPath(filePath) {
+      const parts = filePath.split('/');
+      let html = '<div class="agents-right-breadcrumb">';
+      for (let i = 0; i < parts.length; i++) {
+        if (i > 0) html += '<span class="breadcrumb-sep">/</span>';
+        const isLast = i === parts.length - 1;
+        if (isLast) {
+          html += '<span class="breadcrumb-current">' + escapeHtml(parts[i]) + '</span>';
+        } else {
+          const dirPath = parts.slice(0, i + 1).join('/');
+          html += '<span class="breadcrumb-dir" onclick="navigateBreadcrumb(\'' + escapeHtml(dirPath.replace(/'/g, "\\'")) + '\')">' + escapeHtml(parts[i]) + '</span>';
+        }
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function navigateBreadcrumb(dirPath) {
+      // Expand this dir and all parents, then close the file viewer
+      const agentId = state.agentFilesAgentId || '';
+      if (!state.agentFileTreeExpanded[agentId]) state.agentFileTreeExpanded[agentId] = {};
+      const expanded = state.agentFileTreeExpanded[agentId];
+      const parts = dirPath.split('/');
+      for (let i = 0; i < parts.length; i++) {
+        expanded[parts.slice(0, i + 1).join('/')] = true;
+      }
+      state.selectedAgentFile = null;
+      state.agentFileContent = null;
+      if (state.currentView === 'agents') renderAgentsPage();
+    }
+
+    function renderAgentFileViewerPanel() {
+      const panel = document.getElementById('agentsRightPanel');
+      if (!panel) return;
+
+      const selectedFile = state.selectedAgentFile;
+      if (!selectedFile) {
+        panel.innerHTML = '';
+        panel.classList.remove('open');
+        return;
+      }
+
+      const content = state.agentFileContent != null ? state.agentFileContent : 'Loading…';
+      const isMarkdown = /\.md$/i.test(selectedFile);
+      const bodyHtml = isMarkdown && state.agentFileContent != null
+        ? '<div class="agents-right-content agents-right-md">' + renderMarkdownToHtml(content) + '</div>'
+        : '<pre class="agents-right-content">' + escapeHtml(String(content)) + '</pre>';
+
+      panel.classList.add('open');
+      panel.innerHTML =
+        '<div class="agents-right-header">' +
+          renderBreadcrumbPath(selectedFile) +
+          '<span class="agents-right-close" onclick="closeAgentFileViewer()" title="Close">✕</span>' +
+        '</div>' +
+        '<div class="agents-right-body">' + bodyHtml + '</div>';
+    }
+
+    function closeAgentFileViewer() {
+      state.selectedAgentFile = null;
+      state.agentFileContent = null;
+      renderAgentsPage();
     }
 
     function renderAgentTasksTab(agent) {
@@ -4995,7 +5259,10 @@ Response format:
         tabContentHtml = renderAgentTasksTab(agent);
       }
 
-      body.innerHTML = tabBarHtml + '<div style="padding: 16px 18px;">' + tabContentHtml + '</div>';
+      body.innerHTML = tabBarHtml + '<div style="padding: 18px 20px;">' + tabContentHtml + '</div>';
+
+      // Render file viewer in right panel
+      renderAgentFileViewerPanel();
 
       // Wire up Tasks tab event handlers
       if (activeTab === 'tasks') {
@@ -5007,7 +5274,7 @@ Response format:
       if (!sum) loadAgentSummary(agent.id);
       const skillIds = Array.isArray(agent.skills) ? agent.skills : (Array.isArray(agent.skillIds) ? agent.skillIds : []);
       if (skillIds.length && !state.resolvedSkillsByAgent?.[agent.id]) loadSkillDetailsForAgent(agent.id, skillIds);
-      if (!state.agentFileEntries && !state.agentFileLoading) loadAgentFiles(agent.id);
+      if ((!state.agentFileEntries || state.agentFilesAgentId !== agent.id) && !state.agentFileLoading) loadAgentFiles(agent.id);
       if (!state.cronJobsLoaded) loadCronJobs().then(() => { if (state.currentView === 'agents') renderAgentsPage(); });
     }
 
@@ -5019,7 +5286,7 @@ Response format:
       state.agentFileEntries = null;
       state.selectedAgentFile = null;
       state.agentFileContent = null;
-      state.agentTab = 'overview';
+      // keep current tab (don't reset to overview)
       renderAgentsPage();
       renderDetailPanel();
     }
@@ -7371,26 +7638,48 @@ Response format:
       return { processed, tokens };
     }
     
+    // Configure marked for chat rendering
+    if (typeof marked !== 'undefined') {
+      const renderer = {
+        link(token) {
+          const href = token.href || '';
+          const text = token.text || href;
+          return '<a href="' + href + '" target="_blank" rel="noopener">' + text + '</a>';
+        },
+        code(token) {
+          const code = token.text || '';
+          const lang = (token.lang || '').trim();
+          if (lang && typeof Prism !== 'undefined') {
+            const grammar = Prism.languages[lang];
+            if (grammar) {
+              const highlighted = Prism.highlight(code, grammar, lang);
+              return '<pre class="language-' + lang + '"><code class="language-' + lang + '">' + highlighted + '</code></pre>';
+            }
+          }
+          return '<pre><code>' + code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code></pre>';
+        }
+      };
+      if (marked.use) marked.use({ breaks: true, gfm: true, renderer });
+      else if (marked.setOptions) marked.setOptions({ breaks: true, gfm: true, renderer });
+    }
+
     function formatMessage(text) {
       const { processed, tokens } = tokenizeMediaMarkdown(text);
-      let html = escapeHtml(processed)
-        .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-        .replace(/\n/g, '<br>');
-
-      // ClawCondos formatting helpers:
-      // If a line is ONLY a bold title and is surrounded by blank lines in the source,
-      // render it as a block heading with consistent spacing.
-      // Pattern from our recommended template: **Title**\n\n...
-      html = html
-        .replace(/(^|<br>)(<strong>[^<]+<\/strong>)(<br>){2}/g, '$1<div class="msg-heading">$2</div><div class="msg-gap"></div>');
-      
+      let html;
+      if (typeof marked !== 'undefined') {
+        html = marked.parse(processed);
+      } else {
+        // Fallback if marked fails to load
+        html = escapeHtml(processed)
+          .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+          .replace(/`([^`]+)`/g, '<code>$1</code>')
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+          .replace(/\n/g, '<br>');
+      }
       tokens.forEach((tokenHtml, idx) => {
         html = html.replace(`@@MEDIA_${idx}@@`, tokenHtml);
       });
-      
       return html;
     }
     
