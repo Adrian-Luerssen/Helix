@@ -44,7 +44,8 @@ The frontend is vanilla JS with no framework and no build pipeline. Edit files a
 
 - **`index.html`** - Main dashboard UI. Single-file monolith (~5500 lines) containing all dashboard HTML, CSS, and JS inline. This is the primary file you'll edit for UI changes.
 - **`app.html`** - Separate page for the app viewer with assistant panel.
-- **`serve.js`** - Node.js HTTP/WebSocket server (~1100 lines). Serves static files, proxies WebSocket and HTTP requests to the OpenClaw gateway (with auth injection), handles media upload, goal CRUD, agent introspection, and the apps registry.
+- **`serve.js`** - Node.js HTTP/WebSocket server. Serves static files, proxies WebSocket and HTTP requests to the OpenClaw gateway (with auth injection), handles media upload, agent introspection, and the apps registry.
+- **`openclaw-plugin/`** - OpenClaw plugin for goals/tasks/condos management (see below).
 - **`lib/config.js`** - Configuration loader used by both browser and server. Priority: `window.CLAWCONDOS_CONFIG` > `/config.json` > auto-detect from hostname.
 - **`lib/message-shaping.js`** - Message formatting and reply tag extraction (frontend only, loaded via `<script>` tag).
 - **`js/media-upload.js`** - Browser file upload handler (images/audio).
@@ -83,17 +84,40 @@ Sessions are identified by structured keys:
 
 The frontend uses a single global `state` object. WebSocket events drive UI updates. No reactive framework - DOM manipulation is direct via `getElementById` and innerHTML.
 
+### OpenClaw Plugin (clawcondos-goals)
+
+Goals, tasks, and session-goal mappings are managed by an OpenClaw plugin at `openclaw-plugin/`. The plugin registers gateway RPC methods that the frontend calls over WebSocket.
+
+**Plugin files:**
+- `openclaw-plugin/index.js` - Plugin entry point, registers gateway methods + hooks + tools
+- `openclaw-plugin/lib/goals-store.js` - File-backed JSON storage for goals
+- `openclaw-plugin/lib/goals-handlers.js` - Gateway method handlers for goals CRUD
+- `openclaw-plugin/lib/context-builder.js` - Builds goal context for agent prompt injection
+- `openclaw-plugin/lib/goal-update-tool.js` - Agent tool for reporting task status
+- `openclaw-plugin/migrate.js` - Migration script from `.registry/goals.json`
+
+**Gateway methods:** `goals.list`, `goals.create`, `goals.get`, `goals.update`, `goals.delete`, `goals.addSession`, `goals.removeSession`, `goals.sessionLookup`, `goals.setSessionCondo`, `goals.getSessionCondo`, `goals.listSessionCondos`
+
+**Plugin hooks:**
+- `before_agent_start` - Injects goal/task context when a session belongs to a goal
+- `agent_end` - Tracks session activity timestamps on goals
+
+**Plugin tools:**
+- `goal_update` - Agents can report task status (done/in-progress/blocked) and summaries
+
 ### File-backed storage
 
-Goals and app registrations persist in `.registry/` (gitignored):
-- `.registry/goals.json` - Goals storage
+App registrations persist in `.registry/` (gitignored):
 - `.registry/apps.json` - Registered embedded applications
+
+Goals data lives in the plugin:
+- `openclaw-plugin/.data/goals.json` - Goals storage (gitignored)
 
 ## Testing
 
 Tests use **Vitest 2.0** in Node environment. Test files live in `tests/` and match `tests/**/*.test.js`.
 
-`tests/setup.js` provides browser API mocks (MockWebSocket, localStorage, document, fetch) since tests run in Node. Only `lib/` modules have test coverage currently.
+`tests/setup.js` provides browser API mocks (MockWebSocket, localStorage, document, fetch) since tests run in Node. `lib/` modules and `openclaw-plugin/lib/` modules have test coverage.
 
 ## Code Conventions
 
