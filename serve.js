@@ -1042,9 +1042,14 @@ server.on('upgrade', (req, socket, head) => {
         }
       });
 
-      upstreamWs.on('message', (data) => {
+      upstreamWs.on('message', (data, isBinary) => {
         try {
-          if (clientWs.readyState === WebSocket.OPEN) clientWs.send(data);
+          // Browser WebSocket expects text frames for JSON; if we forward Buffer frames,
+          // event.data becomes a Blob/ArrayBuffer and JSON.parse(event.data) fails.
+          const payload = isBinary
+            ? (Buffer.isBuffer(data) ? data.toString('utf-8') : String(data))
+            : (typeof data === 'string' ? data : (Buffer.isBuffer(data) ? data.toString('utf-8') : String(data)));
+          if (clientWs.readyState === WebSocket.OPEN) clientWs.send(payload);
         } catch {
           closeBoth(1011, 'proxy send failed');
         }
@@ -1058,8 +1063,12 @@ server.on('upgrade', (req, socket, head) => {
         closeBoth(1011, 'gateway ws error');
       });
 
-      clientWs.on('message', (data) => {
-        const rewritten = rewriteConnectFrame(data, gatewayAuth);
+      clientWs.on('message', (data, isBinary) => {
+        const raw = isBinary
+          ? (Buffer.isBuffer(data) ? data.toString('utf-8') : String(data))
+          : (typeof data === 'string' ? data : (Buffer.isBuffer(data) ? data.toString('utf-8') : String(data)));
+
+        const rewritten = rewriteConnectFrame(raw, gatewayAuth);
         try {
           sendUpstream(rewritten);
         } catch {
