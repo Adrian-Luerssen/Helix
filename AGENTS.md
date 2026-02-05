@@ -10,15 +10,16 @@ ClawCondos is the **unified control panel** for the Clawdbot ecosystem:
 ## Architecture
 
 ```
-sharp/
+clawcondos/
 ├── index.html           # Main dashboard (vanilla JS, all-in-one)
 ├── app.html             # App viewer with assistant panel
+├── serve.js             # Node.js HTTP/WebSocket server
 ├── styles/main.css      # Extracted CSS (referenced by index.html)
 ├── lib/config.js        # Configuration loader
+├── js/                  # Browser JS modules (media upload, voice)
 ├── .registry/
 │   └── apps.json        # App registry (user-specific, gitignored)
 ├── docs/                # Documentation
-├── specs/               # Feature specifications
 └── tests/               # Unit tests (vitest)
 ```
 

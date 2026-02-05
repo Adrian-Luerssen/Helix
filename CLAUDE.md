@@ -46,7 +46,6 @@ The frontend is vanilla JS with no framework and no build pipeline. Edit files a
 - **`app.html`** - Separate page for the app viewer with assistant panel.
 - **`serve.js`** - Node.js HTTP/WebSocket server (~1100 lines). Serves static files, proxies WebSocket and HTTP requests to the OpenClaw gateway (with auth injection), handles media upload, goal CRUD, agent introspection, and the apps registry.
 - **`lib/config.js`** - Configuration loader used by both browser and server. Priority: `window.CLAWCONDOS_CONFIG` > `/config.json` > auto-detect from hostname.
-- **`lib/goal-session-links.js`** - Dead code (unused). File-backed goal-to-session mapping, superseded by inline logic in `serve.js`.
 - **`lib/message-shaping.js`** - Message formatting and reply tag extraction (frontend only, loaded via `<script>` tag).
 - **`js/media-upload.js`** - Browser file upload handler (images/audio).
 - **`js/voice-recorder.js`** - In-browser voice recording via MediaRecorder API.
@@ -122,4 +121,5 @@ Tests use **Vitest 2.0** in Node environment. Test files live in `tests/` and ma
 - `start.example.sh` - Example startup script with Caddy
 - `Caddyfile.example` - Example reverse proxy config
 - `docs/SETUP.md` - Full setup guide
+- `docs/BUILDING-APPS.md` - Guide for building embedded apps
 - `docs/BACKEND-API.md` - Gateway WebSocket/HTTP protocol spec

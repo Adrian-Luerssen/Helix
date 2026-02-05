@@ -14,7 +14,7 @@ For local development without a full backend:
 
 ```bash
 # Clone the repo
-git clone https://github.com/clawdbot/clawcondos.git
+git clone https://github.com/acastellana/clawcondos.git
 cd clawcondos
 
 # Serve with Node.js
