@@ -1898,8 +1898,10 @@ function initAutoArchiveUI() {
 
     function deriveSessionBlinker(sessionKey, opts = {}) {
       const goalId = opts?.goalId || null;
-      const agentStatus = sessionKey ? getAgentStatus(sessionKey) : 'offline';
-      const isDisconnected = state.connectionStatus === 'error' || agentStatus === 'offline';
+      // If a goal has no session yet, it should not render as Disconnected.
+      // Reserve "Disconnected" for real gateway disconnects or explicit offline session status.
+      const agentStatus = sessionKey ? getAgentStatus(sessionKey) : 'idle';
+      const isDisconnected = state.connectionStatus === 'error' || (sessionKey && agentStatus === 'offline');
       const hasQueue = !!(sessionKey && state.messageQueue?.some?.(m => m.sessionKey === sessionKey));
       const isRunning = !!(sessionKey && (state.activeRuns?.has?.(sessionKey) || agentStatus === 'thinking' || agentStatus === 'running'));
       const isError = agentStatus === 'error' || agentStatus === 'rate_limited';
