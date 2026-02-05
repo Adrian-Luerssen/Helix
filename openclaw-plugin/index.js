@@ -2,8 +2,10 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createGoalsStore } from './lib/goals-store.js';
 import { createGoalHandlers } from './lib/goals-handlers.js';
+import { createCondoHandlers } from './lib/condos-handlers.js';
 import { buildGoalContext } from './lib/context-builder.js';
 import { createGoalUpdateExecutor } from './lib/goal-update-tool.js';
+import { createTaskSpawnHandler } from './lib/task-spawn.js';
 
 export default function register(api) {
   const dataDir = api.pluginConfig?.dataDir
@@ -15,6 +17,13 @@ export default function register(api) {
     api.registerGatewayMethod(method, handler);
   }
 
+  const condoHandlers = createCondoHandlers(store);
+  for (const [method, handler] of Object.entries(condoHandlers)) {
+    api.registerGatewayMethod(method, handler);
+  }
+
+  api.registerGatewayMethod('goals.spawnTaskSession', createTaskSpawnHandler(store));
+
   // Hook: inject goal context into agent prompts
   api.registerHook('before_agent_start', async (event) => {
     const sessionKey = event.context?.sessionKey;
@@ -24,7 +33,7 @@ export default function register(api) {
     if (!entry) return;
     const goal = data.goals.find(g => g.id === entry.goalId);
     if (!goal) return;
-    const context = buildGoalContext(goal);
+    const context = buildGoalContext(goal, { currentSessionKey: sessionKey });
     if (!context) return;
     return { prependContext: context };
   });
@@ -74,5 +83,6 @@ export default function register(api) {
     { names: ['goal_update'] }
   );
 
-  api.logger.info(`clawcondos-goals: registered ${Object.keys(handlers).length} gateway methods, data at ${dataDir}`);
+  const totalMethods = Object.keys(handlers).length + Object.keys(condoHandlers).length + 1;
+  api.logger.info(`clawcondos-goals: registered ${totalMethods} gateway methods, data at ${dataDir}`);
 }

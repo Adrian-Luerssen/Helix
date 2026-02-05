@@ -120,6 +120,33 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════
+       SPAWN TASK SESSION MODAL
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="spawnTaskModal">
+    <div class="modal" style="max-width: 440px;">
+      <h2 class="modal-title">Spawn Session for Task</h2>
+      <p class="modal-desc" id="spawnTaskDesc">Pick an agent and model to work on this task.</p>
+      <div class="form-group">
+        <label class="form-label">Agent</label>
+        <select class="form-input" id="spawnAgentSelect"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Model</label>
+        <select class="form-input" id="spawnModelSelect">
+          <option value="claude-sonnet-4-5-20250929">sonnet-4-5</option>
+          <option value="claude-opus-4-5-20251101">opus-4-5</option>
+          <option value="claude-haiku-4-5-20251001">haiku-4-5</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:10px; margin-top: 10px;">
+        <button class="form-btn" id="spawnTaskBtn" onclick="confirmSpawnTask()">Spawn Session</button>
+        <button class="form-btn" style="background: var(--bg-input); border: 1px solid var(--border);" onclick="hideSpawnTaskModal()">Cancel</button>
+      </div>
+      <div class="form-error" id="spawnTaskError"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
        ORGANIZE WIZARD (Sequential session triage)
        ═══════════════════════════════════════════════════════════════ -->
   <div class="modal-overlay hidden" id="organizeWizardModal">
@@ -2338,12 +2365,20 @@
         tasksEl.innerHTML = tasks.map((t, idx) => {
           const id = escapeHtml(t.id || String(idx));
           const checked = t.done ? 'checked' : '';
+          const spawnBtn = (!t.sessionKey && !t.done)
+            ? `<button class="goal-task-spawn" onclick="event.stopPropagation(); openSpawnTaskModal('${escapeHtml(goal.id)}','${id}')" title="Spawn agent session">▶</button>`
+            : '';
+          const sessionTag = t.sessionKey
+            ? `<span class="goal-task-session" title="${escapeHtml(t.sessionKey)}">${escapeHtml(t.sessionKey.split(':').pop())}</span>`
+            : '';
           return `
             <div class="goal-task ${t.done ? 'done' : ''}">
               <label class="goal-task-check">
                 <input type="checkbox" ${checked} onchange="toggleGoalTask('${id}')">
                 <span class="goal-task-text">${escapeHtml(t.text || '')}</span>
+                ${sessionTag}
               </label>
+              ${spawnBtn}
               <button class="goal-task-del" onclick="deleteGoalTask('${id}')" title="Delete">×</button>
             </div>
           `;
@@ -2429,6 +2464,87 @@
       if (!goal) return;
       const tasks = Array.isArray(goal.tasks) ? goal.tasks.filter(t => String(t.id) != String(taskId)) : [];
       await updateGoal(goal.id, { tasks });
+    }
+
+    // Spawn task session modal
+    state.spawnGoalId = null;
+    state.spawnTaskId = null;
+
+    async function openSpawnTaskModal(goalId, taskId) {
+      const goal = state.goals.find(g => g.id === goalId);
+      const task = goal?.tasks?.find(t => t.id === taskId);
+      if (!task) return;
+
+      state.spawnGoalId = goalId;
+      state.spawnTaskId = taskId;
+
+      document.getElementById('spawnTaskDesc').textContent = 'Spawn session for: ' + (task.text || 'Untitled task');
+      document.getElementById('spawnTaskError').style.display = 'none';
+
+      // Populate agent select
+      const agentSelect = document.getElementById('spawnAgentSelect');
+      agentSelect.textContent = '';
+      let agents = [];
+      try {
+        const res = await rpcCall('agents.list', {});
+        agents = res?.agents || [];
+      } catch (e) { /* fallback */ }
+      if (!agents.length) agents = [{ id: 'main' }];
+      for (const a of agents) {
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = a.identity?.name || a.id;
+        agentSelect.appendChild(opt);
+      }
+
+      const btn = document.getElementById('spawnTaskBtn');
+      btn.disabled = false;
+      btn.textContent = 'Spawn Session';
+
+      document.getElementById('spawnTaskModal').classList.remove('hidden');
+    }
+
+    function hideSpawnTaskModal() {
+      document.getElementById('spawnTaskModal').classList.add('hidden');
+    }
+
+    async function confirmSpawnTask() {
+      const errEl = document.getElementById('spawnTaskError');
+      errEl.style.display = 'none';
+      const btn = document.getElementById('spawnTaskBtn');
+      btn.disabled = true;
+      btn.textContent = 'Spawning…';
+
+      const agentId = document.getElementById('spawnAgentSelect').value;
+      const model = document.getElementById('spawnModelSelect').value;
+
+      try {
+        const res = await rpcCall('goals.spawnTaskSession', {
+          goalId: state.spawnGoalId,
+          taskId: state.spawnTaskId,
+          agentId,
+          model,
+        });
+        const sessionKey = res?.sessionKey;
+        if (sessionKey) {
+          const taskContext = res.taskContext;
+          await rpcCall('chat.send', {
+            sessionKey,
+            message: taskContext + '\n\nPlease begin working on this task.',
+          });
+          hideSpawnTaskModal();
+          await loadGoals();
+          await loadSessions();
+          showToast('Session spawned', 'success');
+        } else {
+          throw new Error('No session key returned');
+        }
+      } catch (err) {
+        errEl.textContent = 'Failed to spawn session: ' + (err.message || err);
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Spawn Session';
+      }
     }
 
     let goalSaveTimer = null;

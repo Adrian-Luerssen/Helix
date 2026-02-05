@@ -5094,6 +5094,33 @@ a:focus-visible {
 .goal-task:hover .goal-task-del { opacity: 1; }
 .goal-task-del:hover { background: var(--red-dim); color: var(--red); }
 
+.goal-task-spawn {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--transition-fast);
+  font-size: 10px;
+}
+.goal-task:hover .goal-task-spawn { opacity: 1; }
+.goal-task-spawn:hover { background: var(--accent-dim); }
+
+.goal-task-session {
+  font-size: 10px;
+  color: var(--text-dim);
+  background: var(--bg-input);
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+
 .goal-task-new {
   display: flex;
   gap: 8px;
