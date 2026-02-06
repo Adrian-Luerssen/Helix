@@ -2598,18 +2598,50 @@ function initAutoArchiveUI() {
       const timestamp = Date.now();
       const sessionKey = `agent:${agentId}:webchat:${timestamp}`;
 
-      // Build kickoff payload (short — agent gets state from hook context every turn).
+      // Build kickoff payload — self-contained so the agent always knows the goal,
+      // even if the before_agent_start hook context injection doesn't reach it.
+      // Instructions adapt based on how much context is available.
       const hasTasks = Array.isArray(goal.tasks) && goal.tasks.length > 0;
       const hasCondo = !!goal.condoId;
+      const desc = (goal.description || goal.notes || '').trim();
+      const hasDescription = !!desc;
+      const condoLabel = hasCondo
+        ? (goal.condoName || (goal.condoId.includes(':') ? goal.condoId.split(':').pop() : goal.condoId))
+        : null;
+
+      const taskLines = hasTasks
+        ? ['', 'Tasks:', ...goal.tasks.map(t => {
+            const st = t.status || (t.done ? 'done' : 'pending');
+            return `- [${st}] ${t.text} [${t.id}]`;
+          })]
+        : [];
+
+      // Adapt workflow instructions to context richness.
+      let workflow;
+      if (hasTasks) {
+        // Tasks exist — just execute them.
+        workflow = `Pick a pending task, mark in-progress via goal_update, do the work, mark done with a summary. Repeat until all done, then set goalStatus: "done". If blocked, mark "blocked" and explain.`;
+      } else if (hasDescription) {
+        // Description but no tasks — plan from the description.
+        workflow = `Break this into 2-5 concrete tasks using goal_update({ goalId: "${goal.id}", addTasks: [...] }), then execute each in sequence. Mark in-progress, do the work, mark done with a summary. When all tasks are done, set goalStatus: "done".`;
+      } else {
+        // Title only — assess clarity before acting.
+        workflow = [
+          `This goal has only a title — no description or tasks yet.`,
+          `If the intent is clear from the title alone, create 2-5 concrete tasks using goal_update({ goalId: "${goal.id}", addTasks: [...] }) and begin executing.`,
+          `If the title is ambiguous or could mean very different things, ask the user to clarify the scope before creating tasks.`,
+          ``,
+          `For each task: mark in-progress, do the work, mark done with a summary. When all tasks are done, set goalStatus: "done".`,
+        ].join('\n');
+      }
+
       const kickoff = [
-        `Execute this goal autonomously.`,
-        hasCondo ? `The project summary above is context only — focus on this goal's tasks.` : null,
+        `Goal: ${goal.title} [${goal.id}]`,
+        condoLabel ? `Project: ${condoLabel}` : null,
+        hasDescription ? desc : null,
+        ...taskLines,
         ``,
-        hasTasks
-          ? `Workflow: pick a pending task, mark in-progress, do the work, mark done with a summary, then next task. When all tasks are done, set goalStatus: "done". If blocked, mark the task "blocked" and explain.`
-          : `First, break this into 2-5 concrete tasks using goal_update({ addTasks: [...] }). Then execute each: mark in-progress, do the work, mark done. When all tasks are done, set goalStatus: "done".`,
-        ``,
-        `Begin.`,
+        workflow,
       ].filter(line => line != null).join('\n');
 
       try {
@@ -7093,13 +7125,14 @@ Response format:
       const sessionKey = `agent:${agentId}:webchat:${timestamp}`;
       const idempotencyKey = `new-${agentId}-${timestamp}`;
       try {
+        // Link session to goal BEFORE sending so the before_agent_start hook can inject context.
+        if (goalId) {
+          await rpcCall('goals.addSession', { id: goalId, sessionKey });
+        }
         if (message) {
           await rpcCall('chat.send', { sessionKey, message, idempotencyKey });
         } else {
           await rpcCall('chat.send', { sessionKey, message: 'Hello!', idempotencyKey });
-        }
-        if (goalId) {
-          await rpcCall('goals.addSession', { id: goalId, sessionKey });
         }
         await loadSessions();
         await loadGoals();
@@ -7171,7 +7204,7 @@ Response format:
       e.stopPropagation();
       if (!isPlainLeftClick(e)) return true; // let browser open new tab/window
       e.preventDefault();
-      openSession(key, { fromRouter: true });
+      openSession(key);  // UI click → update URL
       return false;
     }
 
@@ -7180,7 +7213,7 @@ Response format:
       e.stopPropagation();
       if (!isPlainLeftClick(e)) return true;
       e.preventDefault();
-      openGoal(goalId, { fromRouter: true });
+      openGoal(goalId);  // UI click → update URL
       return false;
     }
 
@@ -7189,7 +7222,7 @@ Response format:
       e.stopPropagation();
       if (!isPlainLeftClick(e)) return true;
       e.preventDefault();
-      openCondo(condoId, { fromRouter: true });
+      openCondo(condoId);  // UI click → update URL
       return false;
     }
 
@@ -8553,16 +8586,14 @@ Response format:
           .slice(0, 50);
         const filename = `chat-${safeKey}-${dateStr}.md`;
         
-        // Trigger download
-        const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
+        // Trigger download via data URI (more reliable filename than blob URLs
+        // which some Chromium builds ignore the download attribute for).
         const a = document.createElement('a');
-        a.href = url;
+        a.href = 'data:text/markdown;charset=utf-8,' + encodeURIComponent(md);
         a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
         
       } catch (err) {
         console.error('Export failed:', err);
