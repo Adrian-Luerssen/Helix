@@ -2614,17 +2614,20 @@ function initAutoArchiveUI() {
         tasksText,
         ``,
         `INSTRUCTIONS:`,
+        `You have a goal_update tool. Use it to track your progress.`,
         ...(hasTasks
-          ? [`1) Pick the best first task to start now (you choose).`]
-          : [`1) Break the goal into 2-5 concrete tasks and include them in your first goalPatch as a "tasks" array. Each task: {"id":"task_<short>","text":"…","done":false,"stage":"backlog"}.`]
+          ? [
+            `1) Pick the best first task to start and call goal_update({ nextTask: "..." }) to signal what you're doing.`,
+          ]
+          : [
+            `1) Break the goal into 2-5 concrete tasks using goal_update({ addTasks: [{text: "..."}, ...], nextTask: "..." }).`,
+          ]
         ),
-        `2) Start executing immediately.`,
-        `3) FIRST REPLY: output a single-line JSON object of the form {"goalPatch": {...}} updating at least nextTask (and status if needed)${hasTasks ? '' : ', and include the tasks array'}.`,
-        `   - Do NOT wrap it in markdown fences.`,
-        `   - Keep it compact (no commentary before/after).`,
-        `4) Do NOT use tools unless the user explicitly asks.`,
-        `5) As you progress, emit additional {"goalPatch": {...}} updates when you change status/nextTask/complete tasks.`,
-        `   Example: {"goalPatch":{"status":"active","nextTask":"…"}}`,
+        `2) Work autonomously. Use your tools (bash, file editing, search, etc.) to complete each task.`,
+        `3) After completing a task, call goal_update({ taskId: "...", status: "done", summary: "..." }).`,
+        `4) If you need user input, call goal_update({ taskId: "...", status: "blocked", summary: "what you need" }) and explain in chat what you're waiting for.`,
+        `5) When all tasks are done, call goal_update({ goalStatus: "done" }).`,
+        `6) Start executing now.`,
       ].join('\n');
 
       try {

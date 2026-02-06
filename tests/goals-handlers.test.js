@@ -3,6 +3,7 @@ import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { createGoalsStore } from '../openclaw-plugin/lib/goals-store.js';
 import { createGoalHandlers } from '../openclaw-plugin/lib/goals-handlers.js';
+import { createCondoHandlers } from '../openclaw-plugin/lib/condos-handlers.js';
 
 const TEST_DIR = join(import.meta.dirname, '__fixtures__', 'goals-handlers-test');
 
@@ -14,6 +15,11 @@ function makeResponder() {
 
 describe('GoalHandlers', () => {
   let store, handlers;
+
+  // Helper: create condo handlers sharing the same store
+  function require_condoHandlers() {
+    return createCondoHandlers(store);
+  }
 
   beforeEach(() => {
     rmSync(TEST_DIR, { recursive: true, force: true });
@@ -319,19 +325,95 @@ describe('GoalHandlers', () => {
 
   describe('goals.setSessionCondo', () => {
     it('maps a session to a condo', () => {
+      // First create a condo
+      const rc = makeResponder();
+      const condoHandlers = require_condoHandlers();
+      condoHandlers['condos.create']({
+        params: { name: 'Test Condo' },
+        respond: rc.respond,
+      });
+      const condoId = rc.getResult().payload.condo.id;
+
       const { respond, getResult } = makeResponder();
       handlers['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:main:main', condoId: 'condo:genlayer' },
+        params: { sessionKey: 'agent:main:main', condoId },
         respond,
       });
       expect(getResult().ok).toBe(true);
+    });
+
+    it('rejects nonexistent condoId', () => {
+      const { respond, getResult } = makeResponder();
+      handlers['goals.setSessionCondo']({
+        params: { sessionKey: 'agent:main:main', condoId: 'condo_nonexistent' },
+        respond,
+      });
+      expect(getResult().ok).toBe(false);
+      expect(getResult().error.message).toBe('Condo not found');
+    });
+
+    it('rejects missing params', () => {
+      const { respond, getResult } = makeResponder();
+      handlers['goals.setSessionCondo']({
+        params: { sessionKey: 'agent:main:main' },
+        respond,
+      });
+      expect(getResult().ok).toBe(false);
+    });
+  });
+
+  describe('goals.removeSessionCondo', () => {
+    it('removes a session-condo mapping', () => {
+      // First create a condo and map it
+      const rc = makeResponder();
+      const condoHandlers = require_condoHandlers();
+      condoHandlers['condos.create']({
+        params: { name: 'Test Condo' },
+        respond: rc.respond,
+      });
+      const condoId = rc.getResult().payload.condo.id;
+
+      handlers['goals.setSessionCondo']({
+        params: { sessionKey: 'agent:main:main', condoId },
+        respond: makeResponder().respond,
+      });
+
+      const { respond, getResult } = makeResponder();
+      handlers['goals.removeSessionCondo']({
+        params: { sessionKey: 'agent:main:main' },
+        respond,
+      });
+      expect(getResult().ok).toBe(true);
+
+      // Verify it's gone
+      const r2 = makeResponder();
+      handlers['goals.getSessionCondo']({
+        params: { sessionKey: 'agent:main:main' },
+        respond: r2.respond,
+      });
+      expect(r2.getResult().payload.condoId).toBeNull();
+    });
+
+    it('rejects missing sessionKey', () => {
+      const { respond, getResult } = makeResponder();
+      handlers['goals.removeSessionCondo']({
+        params: {},
+        respond,
+      });
+      expect(getResult().ok).toBe(false);
+      expect(getResult().error.message).toBe('sessionKey is required');
     });
   });
 
   describe('goals.getSessionCondo', () => {
     it('returns condo for a mapped session', () => {
+      const condoHandlers = require_condoHandlers();
+      const rc = makeResponder();
+      condoHandlers['condos.create']({ params: { name: 'Test Condo' }, respond: rc.respond });
+      const condoId = rc.getResult().payload.condo.id;
+
       handlers['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:main:main', condoId: 'condo:test' },
+        params: { sessionKey: 'agent:main:main', condoId },
         respond: makeResponder().respond,
       });
       const { respond, getResult } = makeResponder();
@@ -339,7 +421,7 @@ describe('GoalHandlers', () => {
         params: { sessionKey: 'agent:main:main' },
         respond,
       });
-      expect(getResult().payload.condoId).toBe('condo:test');
+      expect(getResult().payload.condoId).toBe(condoId);
     });
 
     it('returns null for unmapped session', () => {
@@ -354,12 +436,20 @@ describe('GoalHandlers', () => {
 
   describe('goals.listSessionCondos', () => {
     it('returns all session-condo mappings', () => {
+      const condoHandlers = require_condoHandlers();
+      const rc1 = makeResponder();
+      condoHandlers['condos.create']({ params: { name: 'Condo 1' }, respond: rc1.respond });
+      const c1 = rc1.getResult().payload.condo.id;
+      const rc2 = makeResponder();
+      condoHandlers['condos.create']({ params: { name: 'Condo 2' }, respond: rc2.respond });
+      const c2 = rc2.getResult().payload.condo.id;
+
       handlers['goals.setSessionCondo']({
-        params: { sessionKey: 'a', condoId: 'c1' },
+        params: { sessionKey: 'a', condoId: c1 },
         respond: makeResponder().respond,
       });
       handlers['goals.setSessionCondo']({
-        params: { sessionKey: 'b', condoId: 'c2' },
+        params: { sessionKey: 'b', condoId: c2 },
         respond: makeResponder().respond,
       });
       const { respond, getResult } = makeResponder();

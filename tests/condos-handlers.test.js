@@ -636,15 +636,16 @@ describe('CondoHandlers', () => {
 
     it('cleans up sessionCondoIndex entries pointing to deleted condo', () => {
       const condo = createCondo(handlers, { name: 'Doomed' });
+      const otherCondo = createCondo(handlers, { name: 'Survivor' });
 
-      // Map sessions to the condo
+      // Map sessions to the condos
       const goalH = createGoalHandlers(store);
       goalH['goals.setSessionCondo']({
         params: { sessionKey: 'agent:main:main', condoId: condo.id },
         respond: makeResponder().respond,
       });
       goalH['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:other:main', condoId: 'condo_other' },
+        params: { sessionKey: 'agent:other:main', condoId: otherCondo.id },
         respond: makeResponder().respond,
       });
 
@@ -659,7 +660,7 @@ describe('CondoHandlers', () => {
       // Session mapped to other condo should be untouched
       const r2 = makeResponder();
       goalH['goals.getSessionCondo']({ params: { sessionKey: 'agent:other:main' }, respond: r2.respond });
-      expect(r2.getResult().payload.condoId).toBe('condo_other');
+      expect(r2.getResult().payload.condoId).toBe(otherCondo.id);
     });
   });
 

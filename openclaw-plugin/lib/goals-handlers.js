@@ -192,6 +192,11 @@ export function createGoalHandlers(store) {
           return;
         }
         const data = loadData();
+        const condo = data.condos.find(c => c.id === condoId);
+        if (!condo) {
+          respond(false, undefined, { message: 'Condo not found' });
+          return;
+        }
         data.sessionCondoIndex[sessionKey] = condoId;
         saveData(data);
         respond(true, { ok: true, sessionKey, condoId });
@@ -213,6 +218,22 @@ export function createGoalHandlers(store) {
       try {
         const data = loadData();
         respond(true, { sessionCondoIndex: data.sessionCondoIndex });
+      } catch (err) {
+        respond(false, undefined, { message: String(err) });
+      }
+    },
+
+    'goals.removeSessionCondo': ({ params, respond }) => {
+      try {
+        const { sessionKey } = params;
+        if (!sessionKey) {
+          respond(false, undefined, { message: 'sessionKey is required' });
+          return;
+        }
+        const data = loadData();
+        delete data.sessionCondoIndex[sessionKey];
+        saveData(data);
+        respond(true, { ok: true });
       } catch (err) {
         respond(false, undefined, { message: String(err) });
       }

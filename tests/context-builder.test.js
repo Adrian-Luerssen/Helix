@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGoalContext } from '../openclaw-plugin/lib/context-builder.js';
+import { buildGoalContext, buildCondoContext } from '../openclaw-plugin/lib/context-builder.js';
 
 describe('buildGoalContext', () => {
   const baseGoal = {
@@ -28,10 +28,10 @@ describe('buildGoalContext', () => {
     expect(ctx).toContain('Launch the v2 release');
   });
 
-  it('includes task list with completion markers', () => {
+  it('includes task list with completion markers and IDs', () => {
     const ctx = buildGoalContext(baseGoal);
-    expect(ctx).toContain('[x] Build API endpoints');
-    expect(ctx).toContain('[ ] Wire up frontend');
+    expect(ctx).toContain('[x] Build API endpoints [t1]');
+    expect(ctx).toContain('[ ] Wire up frontend [t2]');
   });
 
   it('includes priority and deadline', () => {
@@ -119,13 +119,105 @@ describe('auto-completion prompt', () => {
     expect(ctx).toContain('goal_update');
   });
 
-  it('does not include prompt when all tasks are done', () => {
+  it('shows completion prompt when all tasks are done', () => {
     const goal = {
       id: 'g1', title: 'G', description: '', status: 'done',
       tasks: [{ id: 't1', text: 'Done thing', done: true }],
       sessions: [],
     };
     const ctx = buildGoalContext(goal);
-    expect(ctx).not.toContain('goal_update');
+    expect(ctx).toContain('All tasks are complete');
+    expect(ctx).toContain('goalStatus');
+  });
+
+  it('does not show completion prompt when goal has no tasks', () => {
+    const goal = {
+      id: 'g1', title: 'G', description: '', status: 'active',
+      tasks: [], sessions: [],
+    };
+    const ctx = buildGoalContext(goal);
+    expect(ctx).not.toContain('All tasks are complete');
+  });
+});
+
+describe('buildCondoContext', () => {
+  const condo = {
+    id: 'condo_1',
+    name: 'Website Redesign',
+    description: 'Full redesign of the marketing site',
+  };
+
+  const goals = [
+    {
+      id: 'goal_1', title: 'Ship Landing Page', description: '', status: 'active',
+      priority: 'P0', deadline: null,
+      tasks: [
+        { id: 't1', text: 'Design mockups', done: true, summary: 'Completed 3 variants' },
+        { id: 't2', text: 'Implement responsive layout', done: false, sessionKey: null },
+      ],
+      sessions: [],
+    },
+    {
+      id: 'goal_2', title: 'SEO Optimization', description: '', status: 'active',
+      priority: 'P1', deadline: null,
+      tasks: [
+        { id: 't3', text: 'Keyword research', done: false, sessionKey: null },
+      ],
+      sessions: [],
+    },
+  ];
+
+  it('returns null if no condo provided', () => {
+    expect(buildCondoContext(null, [])).toBeNull();
+  });
+
+  it('includes condo name and description', () => {
+    const ctx = buildCondoContext(condo, goals);
+    expect(ctx).toContain('Website Redesign');
+    expect(ctx).toContain('Full redesign of the marketing site');
+  });
+
+  it('includes all goals with tasks', () => {
+    const ctx = buildCondoContext(condo, goals);
+    expect(ctx).toContain('Ship Landing Page');
+    expect(ctx).toContain('SEO Optimization');
+    expect(ctx).toContain('Design mockups');
+    expect(ctx).toContain('Keyword research');
+  });
+
+  it('renders goals as ### headings (nested under condo)', () => {
+    const ctx = buildCondoContext(condo, goals);
+    expect(ctx).toContain('### Goal: Ship Landing Page');
+    // Should not have top-level "# Goal:" (only "### Goal:")
+    expect(ctx).not.toMatch(/^# Goal:/m);
+  });
+
+  it('includes summary line', () => {
+    const ctx = buildCondoContext(condo, goals);
+    expect(ctx).toContain('Active: 2 goals, 2 pending tasks');
+    expect(ctx).toContain('Completed: 0 goals');
+  });
+
+  it('counts completed goals correctly', () => {
+    const mixed = [
+      { ...goals[0], status: 'done', tasks: [{ id: 't1', text: 'Done', done: true }] },
+      goals[1],
+    ];
+    const ctx = buildCondoContext(condo, mixed);
+    expect(ctx).toContain('Active: 1 goals, 1 pending tasks');
+    expect(ctx).toContain('Completed: 1 goals');
+  });
+
+  it('includes tool usage instructions', () => {
+    const ctx = buildCondoContext(condo, goals);
+    expect(ctx).toContain('condo_create_goal');
+    expect(ctx).toContain('condo_add_task');
+    expect(ctx).toContain('goal_update');
+  });
+
+  it('handles empty goals list', () => {
+    const ctx = buildCondoContext(condo, []);
+    expect(ctx).toContain('Website Redesign');
+    expect(ctx).toContain('Active: 0 goals, 0 pending tasks');
   });
 });
