@@ -1,6 +1,6 @@
 # ClawCondos Goals Plugin (`clawcondos-goals`)
 
-An OpenClaw plugin that manages goals, tasks, condos, and session-goal mappings for the ClawCondos dashboard. Replaces the previous HTTP-based goals routes in `serve.js` with native gateway RPC methods, lifecycle hooks, and an agent tool.
+An OpenClaw plugin that manages goals, tasks, condos, and session-goal mappings for the ClawCondos dashboard. Provides native gateway RPC methods, lifecycle hooks, and agent tools for autonomous goal-driven orchestration.
 
 ## Architecture
 
@@ -20,9 +20,9 @@ An OpenClaw plugin that manages goals, tasks, condos, and session-goal mappings 
 │  │ clawcondos-goals   │  │
 │  │ plugin             │  │
 │  │                    │  │
-│  │  20 RPC methods    │  │
+│  │  21 RPC methods    │  │
 │  │  2 lifecycle hooks │  │
-│  │  1 agent tool      │  │
+│  │  5 agent tools     │  │
 │  └────────┬───────────┘  │
 │           │               │
 │  ┌────────▼───────────┐  │
@@ -82,6 +82,7 @@ clawcondos/condo-management/
     condos-handlers.js      # Condos RPC handlers
     context-builder.js      # Builds goal context for agent prompt injection
     goal-update-tool.js     # Agent tool executor for reporting task status
+    condo-tools.js          # Agent tools for condo binding, goal creation, task management
     task-spawn.js           # Spawn subagent session for a task
   .data/
     goals.json              # Data file (gitignored)
@@ -148,16 +149,62 @@ The injected context includes:
 
 Fires after a successful agent response. Updates `goal.updatedAtMs` to track last activity.
 
-## Agent Tool: `goal_update`
+## Agent Tools
 
-Agents call this tool to report task progress. Only available to sessions assigned to a goal.
+### `goal_update`
+
+Agents call this tool to report task progress. Available to any session with a `sessionKey`.
 
 **Parameters:**
+- `goalId` (string, optional) — explicit goal to update (required for condo-bound sessions updating non-own goals)
 - `taskId` (string, optional) — task to update
-- `status` (required: `done` | `in-progress` | `blocked`)
+- `status` (`done` | `in-progress` | `blocked`) — required when `taskId` is set
 - `summary` (string, optional) — what was accomplished or what's blocking
+- `addTasks` (array, optional) — new tasks to create on the goal
+- `nextTask` (string, optional) — set the goal's next task hint
+- `goalStatus` (`done` | `active`, optional) — mark goal as done or reactivate
+- `notes` (string, optional) — append notes to the goal
 
-**Behavior:** Sets both `task.done` and `task.status` to stay in sync. Updates `goal.updatedAtMs`.
+**Cross-goal boundaries:** Sessions bound to a condo can update sibling goals, but only `addTasks` and `notes` are allowed cross-goal. Task status updates, `goalStatus`, and `nextTask` are restricted to the session's own goal.
+
+### `condo_bind`
+
+Binds the current session to a condo. Available when the session is not yet bound.
+
+**Parameters:**
+- `condoId` (string, optional) — bind to existing condo
+- `name` (string, optional) — create a new condo and bind to it
+- `description` (string, optional) — description for new condo
+
+### `condo_create_goal`
+
+Creates a goal in the bound condo. Available when session is bound to a condo.
+
+**Parameters:**
+- `title` (string, required) — goal title
+- `description` (string, optional) — goal description
+- `priority` (string, optional) — priority level
+- `tasks` (array, optional) — initial tasks (strings or `{text, description, priority}` objects)
+
+### `condo_add_task`
+
+Adds a task to a goal in the bound condo.
+
+**Parameters:**
+- `goalId` (string, required) — goal to add the task to
+- `text` (string, required) — task description
+- `description` (string, optional) — detailed description
+- `priority` (string, optional) — priority level
+
+### `condo_spawn_task`
+
+Spawns a subagent session for a task in the bound condo.
+
+**Parameters:**
+- `goalId` (string, required) — goal containing the task
+- `taskId` (string, required) — task to spawn for
+- `agentId` (string, optional) — agent to use (default: `main`)
+- `model` (string, optional) — model override
 
 ## Storage Layer
 
@@ -184,15 +231,16 @@ All handlers follow consistent validation:
 
 ## Testing
 
-181 tests across 10 test files. Run with `npm test`.
+283 tests across 11 test files. Run with `npm test`.
 
 | Test File | Coverage |
 |-----------|----------|
 | `goals-handlers.test.js` | Goals CRUD, session management, task CRUD, validation |
 | `condos-handlers.test.js` | Condos CRUD, goalCount enrichment, cascade delete, sessionCondoIndex cleanup |
-| `goal-update-tool.test.js` | Status sync (done/in-progress/blocked), goal-level update, error cases |
-| `task-spawn.test.js` | Spawn config, session linking, validation, re-spawn guard |
-| `context-builder.test.js` | Context generation, session awareness, auto-completion prompt, null safety |
+| `goal-update-tool.test.js` | Status sync, cross-goal boundaries, goal-level update, error cases |
+| `condo-tools.test.js` | condo_bind, condo_create_goal, condo_add_task, condo_spawn_task |
+| `task-spawn.test.js` | Spawn config, session linking, project summary, re-spawn guard |
+| `context-builder.test.js` | Goal context, project summary, condo context, null safety |
 | `goals-store.test.js` | Load/save, atomic writes, v2 migration, ID generation, condos array |
 | `plugin-index.test.js` | Plugin registration, hook integration, tool factory |
 | `config.test.js` | Config loader (not plugin-specific) |

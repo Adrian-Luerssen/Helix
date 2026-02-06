@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A goals-first multi-agent dashboard for the Clawdbot ecosystem",
   "type": "module",
-  "main": "index.html",
+  "main": "serve.js",
   "scripts": {
     "start": "node serve.js",
     "test": "vitest run",
@@ -11,10 +11,16 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui"
   },
+  "dependencies": {
+    "ws": "^8.19.0"
+  },
   "devDependencies": {
-    "vitest": "^2.0.0",
     "@vitest/coverage-v8": "^2.0.0",
-    "@vitest/ui": "^2.0.0"
+    "@vitest/ui": "^2.0.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "keywords": [
     "dashboard",
@@ -30,5 +36,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/acastellana/clawcondos"
+  },
+  "homepage": "https://github.com/acastellana/clawcondos#readme",
+  "bugs": {
+    "url": "https://github.com/acastellana/clawcondos/issues"
   }
 }

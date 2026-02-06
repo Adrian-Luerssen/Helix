@@ -12,7 +12,8 @@
   <a href="LICENSE">MIT License</a> &middot;
   <a href="docs/SETUP.md">Setup Guide</a> &middot;
   <a href="docs/BUILDING-APPS.md">Build Apps</a> &middot;
-  <a href="docs/BACKEND-API.md">API Reference</a>
+  <a href="docs/BACKEND-API.md">API Reference</a> &middot;
+  <a href="docs/GOALS-PLUGIN.md">Goals Plugin</a>
 </p>
 
 ---
@@ -96,36 +97,51 @@ Register apps in `.registry/apps.json`:
 
 See [docs/BUILDING-APPS.md](docs/BUILDING-APPS.md) for the full guide including schema reference, assistant integration, and example apps.
 
+## Goals & Condos Plugin
+
+ClawCondos includes an [OpenClaw](https://github.com/acastellana/openclaw) plugin for goals and task management. When installed in your gateway, it provides:
+
+- **21 RPC methods** for goals, tasks, condos, and session management
+- **Context injection** — agents automatically receive their goal/project context
+- **Agent tools** — agents can report progress, create goals, and spawn sub-agents
+- **File-backed storage** — no database required
+
+See [docs/GOALS-PLUGIN.md](docs/GOALS-PLUGIN.md) for the full specification and [clawcondos/condo-management/](clawcondos/condo-management/) for the plugin source.
+
 ## Project Structure
 
 ```
 clawcondos/
-├── index.html              # Main dashboard (all HTML/CSS/JS inline)
-├── app.html                # App viewer with assistant panel
-├── serve.js                # Node.js dev server (static files, WS proxy, app proxy)
+├── index.html                     # Main dashboard (all HTML/CSS/JS inline)
+├── app.html                       # App viewer with assistant panel
+├── serve.js                       # Node.js server (static files, WS proxy, app proxy)
 ├── lib/
-│   ├── config.js           # Configuration loader (browser + server)
-│   ├── message-shaping.js  # Message formatting (browser)
-│   └── serve-helpers.js    # Server utilities
+│   ├── config.js                  # Configuration loader (browser + server)
+│   ├── message-shaping.js         # Message formatting (browser)
+│   └── serve-helpers.js           # Server utilities
 ├── js/
-│   ├── media-upload.js     # Image/file upload handler
-│   └── voice-recorder.js   # Voice recording via MediaRecorder
+│   ├── media-upload.js            # Image/file upload handler
+│   └── voice-recorder.js          # Voice recording via MediaRecorder
 ├── styles/
-│   ├── main.css            # All theming and CSS variables
-│   ├── agents.css          # Agent-specific styles
-│   ├── media-upload.css    # Upload UI styles
-│   └── voice-recorder.css  # Recorder UI styles
+│   ├── main.css                   # All theming and CSS variables
+│   ├── agents.css                 # Agent-specific styles
+│   ├── media-upload.css           # Upload UI styles
+│   └── voice-recorder.css         # Recorder UI styles
+├── clawcondos/condo-management/   # OpenClaw goals plugin
+│   ├── index.js                   # Plugin entry (21 methods, 2 hooks, 5 tools)
+│   └── lib/                       # Handlers, storage, context, tools
 ├── .registry/
-│   ├── apps.json           # Your registered apps (gitignored)
-│   └── apps.example.json   # Example app registry
+│   ├── apps.json                  # Your registered apps (gitignored)
+│   └── apps.example.json          # Example app registry
 ├── docs/
-│   ├── SETUP.md            # Deployment guide
-│   ├── BUILDING-APPS.md    # App development guide
-│   └── BACKEND-API.md      # WebSocket protocol spec
-├── tests/                  # Vitest tests
-├── config.example.json     # Example configuration
-├── Caddyfile.example       # Example Caddy reverse proxy config
-└── start.example.sh        # Example startup script
+│   ├── SETUP.md                   # Deployment guide
+│   ├── BUILDING-APPS.md           # App development guide
+│   ├── BACKEND-API.md             # WebSocket protocol spec
+│   └── GOALS-PLUGIN.md            # Goals plugin specification
+├── tests/                         # Vitest tests
+├── config.example.json            # Example configuration
+├── Caddyfile.example              # Example Caddy reverse proxy config
+└── start.example.sh               # Example startup script
 ```
 
 ## Backend API

@@ -151,6 +151,9 @@ Tests use **Vitest 2.0** in Node environment. Test files live in `tests/` and ma
 - `CLAWCONDOS_WHISPER_MODEL` - Whisper model name (default: `base`)
 - `CLAWCONDOS_WHISPER_DEVICE` - Whisper device (default: `cpu`)
 - `CLAWCONDOS_WHISPER_TIMEOUT_MS` - Whisper transcription timeout in ms (default: `120000`)
+- `CLAWCONDOS_AGENT_WORKSPACES` - JSON mapping agent IDs to workspace paths for introspection (default: `{}`)
+- `CLAWCONDOS_SKILLS_DIRS` - Colon-separated skill directory paths (default: empty)
+- `CLAWCONDOS_UPLOAD_DIR` - Additional upload directory allowed for Whisper transcription
 
 ## Reference Files
 

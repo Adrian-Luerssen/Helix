@@ -247,16 +247,18 @@ function safeReadFile(path, maxBytes = 200_000) {
   }
 }
 
+// Agent workspace mapping: set CLAWCONDOS_AGENT_WORKSPACES as JSON, e.g.
+//   {"main":"/path/to/main","caffeine":"/path/to/caffeine"}
+// Agents not in the map return null (introspection disabled for them).
+const AGENT_WORKSPACES = (() => {
+  try { return JSON.parse(process.env.CLAWCONDOS_AGENT_WORKSPACES || '{}'); } catch { return {}; }
+})();
+
 function resolveAgentWorkspace(agentId) {
   const id = String(agentId || '').trim();
   if (!id) return null;
-
-  // Known local agent workspaces (cheap + reliable; can be generalized later)
-  if (id === 'main' || id === 'app-assistant') return resolvePath('/home/albert/clawd');
-  if (id === 'caffeine') return resolvePath('/home/albert/clawd-caffeine');
-  if (id === 'codex') return resolvePath('/home/albert/clawd');
-
-  return null;
+  const ws = AGENT_WORKSPACES[id];
+  return ws ? resolvePath(ws) : null;
 }
 
 function parseMissionFromIdentity(md) {
@@ -302,12 +304,14 @@ function buildAgentSummary(agentId) {
   };
 }
 
+// Skill directories: set CLAWCONDOS_SKILLS_DIRS as colon-separated paths, e.g.
+//   /usr/lib/node_modules/openclaw/skills:/home/user/skills
+const SKILLS_DIRS = (process.env.CLAWCONDOS_SKILLS_DIRS || '')
+  .split(':').map(s => s.trim()).filter(Boolean).map(s => resolvePath(s));
+
 function resolveSkills(ids) {
   const out = [];
-  const bases = [
-    resolvePath('/home/albert/.npm-global/lib/node_modules/openclaw/skills'),
-    resolvePath('/home/albert/clawd/skills'),
-  ];
+  const bases = SKILLS_DIRS;
 
   for (const id of ids) {
     let found = null;
@@ -609,9 +613,10 @@ const server = createServer(async (req, res) => {
       const p = url.searchParams.get('path') || '';
       if (!p) throw new Error('Missing path');
       const full = resolvePath(p);
+      const extraUploadDir = process.env.CLAWCONDOS_UPLOAD_DIR;
       const allowedRoots = [
         resolvePath(join(__dirname, 'media')),
-        resolvePath('/home/albert/clawd/apps/uploads'),
+        ...(extraUploadDir ? [resolvePath(extraUploadDir)] : []),
       ];
       if (!allowedRoots.some(r => full.startsWith(r))) throw new Error('Bad path');
       const text = await whisperTranscribeLocal(full);

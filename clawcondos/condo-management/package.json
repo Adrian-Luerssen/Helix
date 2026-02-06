@@ -1,8 +1,24 @@
 {
   "name": "clawcondos-goals",
   "version": "0.1.0",
+  "description": "Goals, tasks, and condos management plugin for OpenClaw",
   "type": "module",
   "main": "index.js",
+  "license": "MIT",
+  "author": "Albert Castellana",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/acastellana/clawcondos",
+    "directory": "clawcondos/condo-management"
+  },
+  "keywords": [
+    "openclaw",
+    "plugin",
+    "goals",
+    "tasks",
+    "condos",
+    "multi-agent"
+  ],
   "openclaw": {
     "extensions": [
       "./index.js"
