@@ -219,6 +219,23 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════
+       KEYBOARD SHORTCUTS MODAL (?)
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="shortcutsModal" onclick="closeShortcutsModal()">
+    <div class="shortcuts-modal" onclick="event.stopPropagation()">
+      <h3 class="shortcuts-title">⌨️ Keyboard Shortcuts</h3>
+      <div class="shortcuts-grid">
+        <div class="shortcut-row"><kbd>⌘K</kbd> <span>Search</span></div>
+        <div class="shortcut-row"><kbd>Esc</kbd> <span>Close / Go back</span></div>
+        <div class="shortcut-row"><kbd>?</kbd> <span>Show this help</span></div>
+        <div class="shortcut-row"><kbd>Enter</kbd> <span>Send message</span></div>
+        <div class="shortcut-row"><kbd>Shift+Enter</kbd> <span>New line</span></div>
+      </div>
+      <div class="shortcuts-footer">Press <kbd>Esc</kbd> or <kbd>?</kbd> to close</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
        SEARCH PALETTE (Cmd+K)
        ═══════════════════════════════════════════════════════════════ -->
   <div class="modal-overlay hidden" id="searchPalette" onclick="closeSearchPalette()">
@@ -6875,15 +6892,41 @@ Response format:
     // ═══════════════════════════════════════════════════════════════
     // KEYBOARD SHORTCUTS
     // ═══════════════════════════════════════════════════════════════
+    function openShortcutsModal() {
+      document.getElementById('shortcutsModal').classList.remove('hidden');
+    }
+    function closeShortcutsModal() {
+      document.getElementById('shortcutsModal').classList.add('hidden');
+    }
+    function toggleShortcutsModal() {
+      document.getElementById('shortcutsModal').classList.toggle('hidden');
+    }
+
     document.addEventListener('keydown', (e) => {
-      // Cmd+K / Ctrl+K -> search view
+      // Ignore shortcuts when typing in inputs (except Escape)
+      const tag = e.target.tagName;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable;
+
+      // Cmd+K / Ctrl+K -> search view (works even in inputs)
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         toggleSearchView();
         return;
       }
 
+      // ? -> shortcuts help (only when not typing)
+      if (e.key === '?' && !isInput) {
+        e.preventDefault();
+        toggleShortcutsModal();
+        return;
+      }
+
       if (e.key === 'Escape') {
+        // Close shortcuts modal first
+        if (!document.getElementById('shortcutsModal').classList.contains('hidden')) {
+          closeShortcutsModal();
+          return;
+        }
         // Close search palette first if open
         if (!document.getElementById('searchPalette').classList.contains('hidden')) {
           closeSearchPalette();
