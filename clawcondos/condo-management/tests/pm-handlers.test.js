@@ -23,17 +23,24 @@ function createResponder() {
   return { respond, getResult: () => result };
 }
 
-// Setup: create a condo
-function setupCondo(condoId = 'test-condo') {
+// Setup: create a condo and goal
+function setupCondoAndGoal(condoId = 'test-condo', goalId = 'test-goal') {
   const data = store.load();
   data.condos.push({
     id: condoId,
     name: 'Test Condo',
     createdAtMs: Date.now(),
   });
+  data.goals.push({
+    id: goalId,
+    title: 'Test Goal',
+    condoId,
+    tasks: [],
+    createdAtMs: Date.now(),
+  });
   data.config = { pmSession: 'agent:test:main' };
   store.save(data);
-  return condoId;
+  return { condoId, goalId };
 }
 
 describe('PM Handlers - Chat History', () => {
@@ -58,11 +65,11 @@ describe('PM Handlers - Chat History', () => {
     }
   });
 
-  test('pm.getHistory returns empty array for new condo', async () => {
-    const condoId = setupCondo();
+  test('pm.getHistory returns empty array for new goal', async () => {
+    const { goalId } = setupCondoAndGoal();
     const { respond, getResult } = createResponder();
     
-    await handlers['pm.getHistory']({ params: { condoId }, respond });
+    await handlers['pm.getHistory']({ params: { goalId }, respond });
     
     const result = getResult();
     assert(result.success, 'Should succeed');
@@ -71,12 +78,12 @@ describe('PM Handlers - Chat History', () => {
   });
 
   test('pm.chat saves user and assistant messages to history', async () => {
-    const condoId = setupCondo();
+    const { condoId, goalId } = setupCondoAndGoal();
     const { respond, getResult } = createResponder();
     
     // Send a chat message
     await handlers['pm.chat']({ 
-      params: { condoId, message: 'Hello PM!' }, 
+      params: { condoId, goalId, message: 'Hello PM!' }, 
       respond 
     });
     
@@ -87,7 +94,7 @@ describe('PM Handlers - Chat History', () => {
     
     // Check history via getHistory
     const { respond: respond2, getResult: getResult2 } = createResponder();
-    await handlers['pm.getHistory']({ params: { condoId }, respond: respond2 });
+    await handlers['pm.getHistory']({ params: { goalId }, respond: respond2 });
     
     const historyResult = getResult2();
     assert(historyResult.success, 'getHistory should succeed');
@@ -98,23 +105,23 @@ describe('PM Handlers - Chat History', () => {
   });
 
   test('pm.clearHistory clears all messages', async () => {
-    const condoId = setupCondo();
+    const { condoId, goalId } = setupCondoAndGoal();
     
     // Add some messages first
     const { respond: r1 } = createResponder();
-    await handlers['pm.chat']({ params: { condoId, message: 'Message 1' }, respond: r1 });
+    await handlers['pm.chat']({ params: { condoId, goalId, message: 'Message 1' }, respond: r1 });
     
     const { respond: r2 } = createResponder();
-    await handlers['pm.chat']({ params: { condoId, message: 'Message 2' }, respond: r2 });
+    await handlers['pm.chat']({ params: { condoId, goalId, message: 'Message 2' }, respond: r2 });
     
     // Verify we have messages
     const { respond: r3, getResult: gr3 } = createResponder();
-    await handlers['pm.getHistory']({ params: { condoId }, respond: r3 });
+    await handlers['pm.getHistory']({ params: { goalId }, respond: r3 });
     assert.equal(gr3().data.total, 4, 'Should have 4 messages (2 user + 2 assistant)');
     
     // Clear history
     const { respond: r4, getResult: gr4 } = createResponder();
-    await handlers['pm.clearHistory']({ params: { condoId }, respond: r4 });
+    await handlers['pm.clearHistory']({ params: { goalId }, respond: r4 });
     
     const clearResult = gr4();
     assert(clearResult.success, 'Clear should succeed');
@@ -122,54 +129,54 @@ describe('PM Handlers - Chat History', () => {
     
     // Verify empty
     const { respond: r5, getResult: gr5 } = createResponder();
-    await handlers['pm.getHistory']({ params: { condoId }, respond: r5 });
+    await handlers['pm.getHistory']({ params: { goalId }, respond: r5 });
     assert.equal(gr5().data.total, 0, 'Should be empty after clear');
   });
 
   test('pm.getHistory respects limit parameter', async () => {
-    const condoId = setupCondo();
+    const { condoId, goalId } = setupCondoAndGoal();
     
     // Add messages
     const { respond: r1 } = createResponder();
-    await handlers['pm.chat']({ params: { condoId, message: 'Msg 1' }, respond: r1 });
+    await handlers['pm.chat']({ params: { condoId, goalId, message: 'Msg 1' }, respond: r1 });
     const { respond: r2 } = createResponder();
-    await handlers['pm.chat']({ params: { condoId, message: 'Msg 2' }, respond: r2 });
+    await handlers['pm.chat']({ params: { condoId, goalId, message: 'Msg 2' }, respond: r2 });
     const { respond: r3 } = createResponder();
-    await handlers['pm.chat']({ params: { condoId, message: 'Msg 3' }, respond: r3 });
+    await handlers['pm.chat']({ params: { condoId, goalId, message: 'Msg 3' }, respond: r3 });
     
     // Get with limit=2
     const { respond: r4, getResult: gr4 } = createResponder();
-    await handlers['pm.getHistory']({ params: { condoId, limit: 2 }, respond: r4 });
+    await handlers['pm.getHistory']({ params: { goalId, limit: 2 }, respond: r4 });
     
     const result = gr4();
     assert.equal(result.data.messages.length, 2, 'Should return only 2 messages');
     assert.equal(result.data.total, 6, 'Total should still be 6');
   });
 
-  test('pm.getHistory fails without condoId', async () => {
+  test('pm.getHistory fails without goalId', async () => {
     const { respond: r1, getResult: gr1 } = createResponder();
     await handlers['pm.getHistory']({ params: {}, respond: r1 });
-    assert(!gr1().success, 'Should fail without condoId');
-    assert(gr1().error.includes('condoId'), 'Error should mention condoId');
+    assert(!gr1().success, 'Should fail without goalId');
+    assert(gr1().error.includes('goalId'), 'Error should mention goalId');
   });
 
-  test('pm.clearHistory fails without condoId', async () => {
+  test('pm.clearHistory fails without goalId', async () => {
     const { respond: r1, getResult: gr1 } = createResponder();
     await handlers['pm.clearHistory']({ params: {}, respond: r1 });
-    assert(!gr1().success, 'Should fail without condoId');
+    assert(!gr1().success, 'Should fail without goalId');
   });
 
-  test('pm.getHistory fails for nonexistent condo', async () => {
+  test('pm.getHistory fails for nonexistent goal', async () => {
     const { respond: r1, getResult: gr1 } = createResponder();
-    await handlers['pm.getHistory']({ params: { condoId: 'nonexistent' }, respond: r1 });
-    assert(!gr1().success, 'Should fail for nonexistent condo');
+    await handlers['pm.getHistory']({ params: { goalId: 'nonexistent' }, respond: r1 });
+    assert(!gr1().success, 'Should fail for nonexistent goal');
     assert(gr1().error.includes('not found'), 'Error should mention not found');
   });
 
-  test('pm.clearHistory fails for nonexistent condo', async () => {
+  test('pm.clearHistory fails for nonexistent goal', async () => {
     const { respond: r1, getResult: gr1 } = createResponder();
-    await handlers['pm.clearHistory']({ params: { condoId: 'nonexistent' }, respond: r1 });
-    assert(!gr1().success, 'Should fail for nonexistent condo');
+    await handlers['pm.clearHistory']({ params: { goalId: 'nonexistent' }, respond: r1 });
+    assert(!gr1().success, 'Should fail for nonexistent goal');
   });
 
   test('pm.chat detects plan in response', async () => {
@@ -183,11 +190,11 @@ describe('PM Handlers - Chat History', () => {
       logger: { info: () => {}, error: () => {} }
     });
     
-    const condoId = setupCondo('plan-test-condo');
+    const { condoId, goalId } = setupCondoAndGoal('plan-test-condo', 'plan-test-goal');
     const { respond, getResult } = createResponder();
     
     await handlersWithPlan['pm.chat']({
-      params: { condoId, message: 'Create a plan' },
+      params: { condoId, goalId, message: 'Create a plan' },
       respond
     });
     
@@ -197,11 +204,11 @@ describe('PM Handlers - Chat History', () => {
   });
 
   test('pm.chat does not detect plan in regular response', async () => {
-    const condoId = setupCondo('no-plan-condo');
+    const { condoId, goalId } = setupCondoAndGoal('no-plan-condo', 'no-plan-goal');
     const { respond, getResult } = createResponder();
     
     await handlers['pm.chat']({
-      params: { condoId, message: 'Just a question' },
+      params: { condoId, goalId, message: 'Just a question' },
       respond
     });
     
@@ -328,10 +335,6 @@ describe('PM Handlers - createTasksFromPlan', () => {
     data.condos.push({
       id: condoId,
       name: 'Chat History Condo',
-      pmChatHistory: [
-        { role: 'user', content: 'Create a plan' },
-        { role: 'assistant', content: '## Plan\n\n| Task | Agent |\n|------|-------|\n| Deploy app | Devon |' },
-      ],
       createdAtMs: Date.now(),
     });
     const goalId = store.newId('goal');
@@ -340,6 +343,11 @@ describe('PM Handlers - createTasksFromPlan', () => {
       title: 'Goal from Chat',
       condoId,
       tasks: [],
+      // PM chat history is now on the goal
+      pmChatHistory: [
+        { role: 'user', content: 'Create a plan' },
+        { role: 'assistant', content: '## Plan\n\n| Task | Agent |\n|------|-------|\n| Deploy app | Devon |' },
+      ],
       createdAtMs: Date.now(),
     });
     store.save(data);
