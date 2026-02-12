@@ -2500,10 +2500,9 @@
       }
       const filteredUncat = uncategorized.filter(g => allGoals.some(ag => ag.id === g.id));
 
-      // Build sorted condo list
+      // Build sorted condo list (include empty condos)
       const condos = (state.condos || [])
-        .filter(c => filteredGrouped[c.id])
-        .map(c => ({ condo: c, goals: filteredGrouped[c.id] }))
+        .map(c => ({ condo: c, goals: filteredGrouped[c.id] || [] }))
         .sort((a, b) => getCondoLatestActivity(b.condo, b.goals) - getCondoLatestActivity(a.condo, a.goals));
 
       // Flatten all goals for counting
@@ -2511,7 +2510,7 @@
       condos.forEach(({ goals }) => allFilteredGoals.push(...goals));
       allFilteredGoals.push(...filteredUncat);
 
-      if (!allFilteredGoals.length) {
+      if (!allFilteredGoals.length && !condos.length) {
         container.innerHTML = '<div style="padding: 12px 16px; color: var(--text-dim); font-size: 0.82rem;">No goals in this time range</div>';
         updateUncategorizedLink();
         return;
@@ -2542,6 +2541,9 @@
             return s && getAgentStatus(s.key) === 'thinking';
           }).length;
 
+          const emptyState = goals.length === 0 
+            ? '<div style="padding: 8px 16px 12px; color: var(--text-dim); font-size: 0.8rem;">No goals yet</div>' 
+            : renderGoalItems(goals, true);
           html.push(
             '<div class="condo-group ' + (expanded ? 'expanded' : '') + '">' +
               '<div class="condo-group-header" onclick="toggleCondoExpanded(\'' + escapeHtml(condo.id) + '\')">' +
@@ -2552,7 +2554,7 @@
                 '<span class="group-count">' + goals.length + '</span>' +
                 '<button class="condo-add-goal-btn" onclick="event.stopPropagation(); showCreateGoalModalForCondo(\'' + escapeHtml(condo.id) + '\', \'' + escapeHtml(condo.name || 'Unnamed') + '\')" title="Add goal to this condo">＋</button>' +
               '</div>' +
-              (expanded ? '<div class="condo-group-items">' + renderGoalItems(goals, true) + '</div>' : '') +
+              (expanded ? '<div class="condo-group-items">' + emptyState + '</div>' : '') +
             '</div>'
           );
         }
