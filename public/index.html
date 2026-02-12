@@ -8226,10 +8226,9 @@ Response format:
 
       const { grouped, uncategorized } = groupGoalsByCondoId();
 
-      // Build condo entries with their goals
+      // Build condo entries with their goals (include empty condos)
       const condoEntries = (state.condos || [])
-        .filter(c => grouped[c.id] && grouped[c.id].length)
-        .map(c => ({ condo: c, goals: grouped[c.id] }))
+        .map(c => ({ condo: c, goals: grouped[c.id] || [] }))
         .sort((a, b) => getCondoLatestActivity(b.condo, b.goals) - getCondoLatestActivity(a.condo, a.goals));
 
       const totalCondos = condoEntries.length + (uncategorized.length ? 1 : 0);
@@ -8299,9 +8298,21 @@ Response format:
 
       // Header stats
       const headerStats = [];
-      headerStats.push(activeGoals.length + ' active');
-      if (doneGoals.length) headerStats.push(doneGoals.length + ' done');
+      if (goals.length === 0) {
+        headerStats.push('No goals');
+      } else {
+        headerStats.push(activeGoals.length + ' active');
+        if (doneGoals.length) headerStats.push(doneGoals.length + ' done');
+      }
       if (activeSessions > 0) headerStats.push(activeSessions + ' running');
+
+      // Empty state for condos with no goals
+      const emptyGoalsHtml = goals.length === 0
+        ? '<div class="condo-empty-state" style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 0.85rem;">' +
+            '<div style="margin-bottom: 8px;">No goals yet</div>' +
+            '<button class="btn btn-sm" onclick="event.stopPropagation(); showCreateGoalModal()" style="font-size: 0.8rem;">+ Add Goal</button>' +
+          '</div>'
+        : '';
 
       return '<div class="condo-status-card' + attentionBorder + '">' +
         '<div class="condo-status-header">' +
@@ -8311,7 +8322,7 @@ Response format:
           '</div>' +
           '<span class="condo-status-count">' + headerStats.join(' \u00b7 ') + '</span>' +
         '</div>' +
-        '<div class="condo-status-goals">' + goalRows + doneSummary + '</div>' +
+        '<div class="condo-status-goals">' + (goals.length > 0 ? goalRows + doneSummary : emptyGoalsHtml) + '</div>' +
       '</div>';
     }
 
