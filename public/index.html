@@ -43,12 +43,40 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════
+       CREATE CONDO MODAL
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="createCondoModal">
+    <div class="modal">
+      <h2 class="modal-title">New Condo</h2>
+      <p class="modal-desc">Create a new condo (project container). You can add goals inside it.</p>
+      <div class="form-group">
+        <label class="form-label">Name</label>
+        <input type="text" class="form-input" id="createCondoName" placeholder="e.g., GenLayer, Dashboard Redesign" 
+               onkeypress="if(event.key==='Enter')createCondo()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description (optional)</label>
+        <input type="text" class="form-input" id="createCondoDescription" placeholder="Brief description...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Color (optional)</label>
+        <input type="color" class="form-input" id="createCondoColor" value="#60a5fa" style="height: 40px; padding: 4px;">
+      </div>
+      <div style="display:flex; gap:10px; margin-top: 10px;">
+        <button class="form-btn" onclick="createCondo()">Create</button>
+        <button class="form-btn" style="background: var(--bg-input); border: 1px solid var(--border);" onclick="hideCreateCondoModal()">Cancel</button>
+      </div>
+      <div class="form-error" id="createCondoError"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
        CREATE GOAL MODAL
        ═══════════════════════════════════════════════════════════════ -->
   <div class="modal-overlay hidden" id="createGoalModal">
     <div class="modal">
       <h2 class="modal-title">New Goal</h2>
-      <p class="modal-desc">Create a new condo (goal). You can attach sessions and spawn agents inside it.</p>
+      <p class="modal-desc" id="createGoalDesc">Create a new goal. You can attach sessions and spawn agents inside it.</p>
       <div class="form-group">
         <label class="form-label">Title</label>
         <input type="text" class="form-input" id="createGoalTitle" placeholder="e.g., Rebrand Dashboard" 
@@ -58,6 +86,7 @@
         <label class="form-label">Deadline (optional)</label>
         <input type="text" class="form-input" id="createGoalDeadline" placeholder="YYYY-MM-DD or freeform">
       </div>
+      <input type="hidden" id="createGoalCondoId" value="">
       <div style="display:flex; gap:10px; margin-top: 10px;">
         <button class="form-btn" onclick="createGoal()">Create</button>
         <button class="form-btn" style="background: var(--bg-input); border: 1px solid var(--border);" onclick="hideCreateGoalModal()">Cancel</button>
@@ -366,7 +395,7 @@
             </select>
           </div>
           <button class="section-action" id="markAllReadBtn" onclick="markAllSessionsRead()" title="Mark all read" style="display: none;">✓</button>
-          <button class="section-action" onclick="showCreateGoalModal()" title="New goal">＋</button>
+          <button class="section-action" onclick="showCreateCondoModal()" title="New condo">＋</button>
           <button class="section-action" onclick="refresh()" title="Refresh">↻</button>
         </div>
         <div id="goalsList" style="padding: 4px 0;"></div>
@@ -2521,6 +2550,7 @@
                 '<span class="condo-group-name">' + escapeHtml(condo.name || 'Unnamed condo') + '</span>' +
                 (activeCount > 0 ? '<span class="condo-active-badge">' + activeCount + ' active</span>' : '') +
                 '<span class="group-count">' + goals.length + '</span>' +
+                '<button class="condo-add-goal-btn" onclick="event.stopPropagation(); showCreateGoalModalForCondo(\'' + escapeHtml(condo.id) + '\', \'' + escapeHtml(condo.name || 'Unnamed') + '\')" title="Add goal to this condo">＋</button>' +
               '</div>' +
               (expanded ? '<div class="condo-group-items">' + renderGoalItems(goals, true) + '</div>' : '') +
             '</div>'
@@ -5622,10 +5652,66 @@ Response format:
       loadWizardSession();
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // CREATE CONDO MODAL
+    // ═══════════════════════════════════════════════════════════════
+    function showCreateCondoModal() {
+      document.getElementById('createCondoModal').classList.remove('hidden');
+      document.getElementById('createCondoName').value = '';
+      document.getElementById('createCondoDescription').value = '';
+      document.getElementById('createCondoColor').value = '#60a5fa';
+      document.getElementById('createCondoError').style.display = 'none';
+      setTimeout(() => document.getElementById('createCondoName')?.focus(), 0);
+    }
+
+    function hideCreateCondoModal() {
+      document.getElementById('createCondoModal').classList.add('hidden');
+    }
+
+    async function createCondo() {
+      const name = document.getElementById('createCondoName').value.trim();
+      const description = document.getElementById('createCondoDescription').value.trim();
+      const color = document.getElementById('createCondoColor').value;
+      const errEl = document.getElementById('createCondoError');
+      if (!name) {
+        errEl.textContent = 'Name is required';
+        errEl.style.display = 'block';
+        return;
+      }
+      try {
+        const params = { name };
+        if (description) params.description = description;
+        if (color && color !== '#60a5fa') params.color = color;
+        await rpcCall('condos.create', params);
+        hideCreateCondoModal();
+        await loadCondos();
+        renderGoals();
+        showToast('Condo created: ' + name);
+      } catch (e) {
+        errEl.textContent = 'Failed to create condo';
+        errEl.style.display = 'block';
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CREATE GOAL MODAL
+    // ═══════════════════════════════════════════════════════════════
     function showCreateGoalModal() {
       document.getElementById('createGoalModal').classList.remove('hidden');
       document.getElementById('createGoalTitle').value = '';
       document.getElementById('createGoalDeadline').value = '';
+      document.getElementById('createGoalCondoId').value = '';
+      document.getElementById('createGoalDesc').textContent = 'Create a new goal. You can attach sessions and spawn agents inside it.';
+      document.getElementById('createGoalError').style.display = 'none';
+      setTimeout(() => document.getElementById('createGoalTitle')?.focus(), 0);
+    }
+
+    function showCreateGoalModalForCondo(condoId, condoName) {
+      document.getElementById('createGoalModal').classList.remove('hidden');
+      document.getElementById('createGoalTitle').value = '';
+      document.getElementById('createGoalDeadline').value = '';
+      document.getElementById('createGoalCondoId').value = condoId;
+      document.getElementById('createGoalDesc').textContent = 'Create a new goal in "' + condoName + '".';
       document.getElementById('createGoalError').style.display = 'none';
       setTimeout(() => document.getElementById('createGoalTitle')?.focus(), 0);
     }
@@ -5637,6 +5723,7 @@ Response format:
     async function createGoal() {
       const title = document.getElementById('createGoalTitle').value.trim();
       const deadline = document.getElementById('createGoalDeadline').value.trim();
+      const condoId = document.getElementById('createGoalCondoId').value.trim();
       const errEl = document.getElementById('createGoalError');
       if (!title) {
         errEl.textContent = 'Title is required';
@@ -5644,9 +5731,12 @@ Response format:
         return;
       }
       try {
-        const data = await rpcCall('goals.create', { title, deadline: deadline || undefined });
+        const params = { title };
+        if (deadline) params.deadline = deadline;
+        if (condoId) params.condoId = condoId;
+        const data = await rpcCall('goals.create', params);
         hideCreateGoalModal();
-        await loadGoals();
+        await Promise.all([loadCondos(), loadGoals()]);
         if (data?.goal?.id) openGoal(data.goal.id);
       } catch (e) {
         errEl.textContent = 'Failed to create goal';
@@ -8148,7 +8238,7 @@ Response format:
       if (!totalCondos && !state.goals.length) {
         // All values escaped via escapeHtml()
         container.innerHTML =
-          '<div class="condo-status-card empty" onclick="showCreateGoalModal()" style="border-style: dashed; opacity: 0.6; cursor: pointer; padding: 24px; text-align: center;">' +
+          '<div class="condo-status-card empty" onclick="showCreateCondoModal()" style="border-style: dashed; opacity: 0.6; cursor: pointer; padding: 24px; text-align: center;">' +
             '<div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 4px;">Create your first condo</div>' +
             '<div style="color: var(--text-dim); font-size: 0.85rem;">Organize goals, tasks, and sessions into projects.</div>' +
           '</div>';
