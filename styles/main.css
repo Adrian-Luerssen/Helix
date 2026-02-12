@@ -5977,6 +5977,319 @@ a:focus-visible {
 }
 
 
+/* ═══════════════════════════════════════════════════════════════
+   PLAN DISPLAY (Phase 4 - Claude Code Integration)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Task wrapper for plan expandable */
+.goal-task-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.goal-task.has-plan {
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+  margin-left: -2px;
+}
+
+/* Plan badge on task row */
+.plan-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-left: 8px;
+}
+
+.plan-badge:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+.plan-badge-expand {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  transition: transform var(--transition-fast);
+}
+
+.plan-badge-emoji {
+  font-size: 0.85rem;
+}
+
+.plan-badge-label {
+  color: var(--text-secondary);
+}
+
+/* Plan badge status variants */
+.plan-badge.plan-draft {
+  border-color: var(--text-dim);
+}
+
+.plan-badge.plan-awaiting {
+  border-color: var(--yellow);
+  background: var(--yellow-dim);
+}
+.plan-badge.plan-awaiting .plan-badge-label { color: var(--yellow); }
+
+.plan-badge.plan-approved {
+  border-color: var(--green);
+  background: var(--green-dim);
+}
+.plan-badge.plan-approved .plan-badge-label { color: var(--green); }
+
+.plan-badge.plan-rejected {
+  border-color: var(--red);
+  background: var(--red-dim);
+}
+.plan-badge.plan-rejected .plan-badge-label { color: var(--red); }
+
+.plan-badge.plan-executing {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  animation: plan-executing-pulse 1.5s ease-in-out infinite;
+}
+.plan-badge.plan-executing .plan-badge-label { color: var(--accent); }
+
+.plan-badge.plan-completed {
+  border-color: var(--green);
+  background: var(--green-dim);
+}
+.plan-badge.plan-completed .plan-badge-label { color: var(--green); }
+
+@keyframes plan-executing-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Plan detail panel (expandable) */
+.plan-detail-panel {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-top: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  padding: 12px 14px;
+  margin-top: -1px;
+  margin-left: 10px;
+  animation: plan-panel-expand 0.2s ease-out;
+}
+
+@keyframes plan-panel-expand {
+  from { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+  to { opacity: 1; max-height: 500px; }
+}
+
+.plan-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.plan-detail-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.plan-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.plan-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Progress visualization */
+.plan-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.plan-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-panel);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.plan-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--green) 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.plan-progress-text {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* Steps list */
+.plan-steps {
+  margin-bottom: 12px;
+}
+
+.plan-steps-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.plan-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plan-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  font-size: 0.85rem;
+  transition: background var(--transition-fast);
+}
+
+.plan-step:hover {
+  background: var(--bg-hover);
+}
+
+.plan-step-indicator {
+  width: 16px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.plan-step.step-pending .plan-step-indicator { color: var(--text-dim); }
+.plan-step.step-in-progress .plan-step-indicator { 
+  color: var(--yellow); 
+  animation: step-pulse 1s ease-in-out infinite;
+}
+.plan-step.step-done .plan-step-indicator { color: var(--green); }
+.plan-step.step-skipped .plan-step-indicator { color: var(--text-muted); }
+
+@keyframes step-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.plan-step-index {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  min-width: 20px;
+}
+
+.plan-step-title {
+  flex: 1;
+  color: var(--text);
+}
+
+.plan-step.step-done .plan-step-title {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.plan-step.step-skipped .plan-step-title {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.plan-step-duration {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* Feedback section (for rejected plans) */
+.plan-feedback {
+  background: var(--red-dim);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.plan-feedback-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--red);
+  margin-bottom: 4px;
+}
+
+.plan-feedback-text {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+/* Raw markdown content */
+.plan-content {
+  margin-top: 8px;
+}
+
+.plan-content-details {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+}
+
+.plan-content-summary {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-fast);
+}
+
+.plan-content-summary:hover {
+  background: var(--bg-hover);
+}
+
+.plan-content-body {
+  padding: 12px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.85rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.plan-content-body pre {
+  background: var(--bg-input);
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+}
+
+.plan-content-body code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+
 /* Attached Sessions */
 .goal-sessions {
   display: flex;
