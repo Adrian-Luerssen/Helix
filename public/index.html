@@ -5695,6 +5695,30 @@ Response format:
       // Show
       dropdown.classList.remove('hidden');
       customInput.value = '';
+      
+      // Adjust position if dropdown goes off-screen
+      const dropdownRect = dropdown.getBoundingClientRect();
+      
+      // Check right edge
+      if (dropdownRect.right > window.innerWidth) {
+        dropdown.style.left = Math.max(10, window.innerWidth - dropdownRect.width - 10) + 'px';
+      }
+      
+      // Check left edge
+      if (dropdownRect.left < 0) {
+        dropdown.style.left = '10px';
+      }
+      
+      // Check bottom edge - show above if doesn't fit below
+      if (dropdownRect.bottom > window.innerHeight) {
+        dropdown.style.top = Math.max(10, rect.top - dropdownRect.height - 4) + 'px';
+      }
+      
+      // Check top edge (if we flipped and now it's above viewport)
+      const finalRect = dropdown.getBoundingClientRect();
+      if (finalRect.top < 0) {
+        dropdown.style.top = '10px';
+      }
     }
     
     /**
