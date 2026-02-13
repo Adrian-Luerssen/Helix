@@ -83,8 +83,10 @@ GATEWAY_HTTP_HOST=127.0.0.1
 GATEWAY_WS_URL=ws://127.0.0.1:18789/ws
 GATEWAY_AUTH=your-gateway-token-here
 
-# Optional: Enable condo workspaces (git repos per condo, worktrees per goal)
-# CLAWCONDOS_WORKSPACES_DIR=/home/youruser/clawcondos-workspaces
+# Condo workspaces — git repos per condo, worktrees per goal
+# This MUST be set for workspace/worktree features to work.
+# Create the directory first: mkdir -p /home/youruser/clawcondos-workspaces
+CLAWCONDOS_WORKSPACES_DIR=/home/youruser/clawcondos-workspaces
 EOF
 
 chmod 600 ~/.config/clawcondos.env
