@@ -281,7 +281,17 @@
           <button class="section-action" onclick="refresh()" title="Refresh">↻</button>
         </div>
         <div id="goalsList" style="padding: 4px 0;"></div>
-        <div id="uncategorizedLink" class="uncategorized-link" style="display: none;" onclick="showOverview(); scrollToSection('recentActivitySection')"></div>
+        <div id="uncategorizedLink" style="display: none;">
+          <div class="condo-group expanded">
+            <div class="condo-group-header" onclick="toggleCondoExpanded('__uncat_sessions__')">
+              <span class="group-expand-icon">&#9654;</span>
+              <div class="goal-item-dot none"></div>
+              <span class="condo-group-name" id="uncatSessionsLabel">Uncategorized</span>
+              <span class="group-count" id="uncatSessionsCount">0</span>
+            </div>
+            <div class="condo-group-items" id="uncatSessionsList"></div>
+          </div>
+        </div>
         <div id="sessionsList" style="display: none;"></div>
       </div>
       
@@ -381,6 +391,7 @@
                   <span class="session-state-label" id="goalSessionStateLabel">Idle</span>
                 </div>
                 <button class="ghost-btn" id="goalOpenBtn" onclick="openGoalChatInFull()">Open →</button>
+                <button class="collapse-panel-btn expand-hint" onclick="toggleGoalRightPanel()" title="Show panel">◀ Panel</button>
               </div>
             </div>
             <div class="goal-chat-body">
@@ -408,6 +419,7 @@
                 <button class="ghost-btn" id="goalMarkDoneBtn" onclick="toggleGoalDone()">Mark done</button>
                 <button class="ghost-btn" onclick="showAttachSessionModal(null)">⛓</button>
                 <button class="ghost-btn danger" onclick="promptDeleteGoal()" title="Delete goal">Delete</button>
+                <button class="collapse-panel-btn" onclick="toggleGoalRightPanel()" title="Collapse panel">&#x25B6;</button>
               </div>
             </div>
 
@@ -429,6 +441,9 @@
 
             <div class="goal-pane" id="goalPane"></div>
           </section>
+          <div class="goal-collapse-bar" id="goalCollapseBar" onclick="toggleGoalRightPanel()" title="Expand panel">
+            <span class="collapse-bar-icon">&#x25C0; Panel</span>
+          </div>
         </div>
       </div>
 
@@ -671,6 +686,9 @@
       generatingTitles: new Set(),  // Currently generating
       attemptedTitles: new Set(),   // Already tried (avoid retries)
       
+      // Collapsible right panel
+      goalRightCollapsed: localStorage.getItem('sharp_goal_right_collapsed') === '1',
+
       // Goal time filter (sidebar): days to show
       goalTimeFilter: localStorage.getItem('sharp_goal_time_filter') || '7',
       goalPanelOpen: false,
@@ -2323,61 +2341,51 @@
         return;
       }
 
-      // Auto-flatten: if only 1 condo and no uncategorized, skip tree nesting
-      const singleCondo = condos.length === 1 && !filteredUncat.length;
-
       // All user-generated content is escaped via escapeHtml() before insertion
       const html = [];
 
-      if (singleCondo) {
-        // Flat list — just show goals directly with a subtle condo label
-        const { condo, goals } = condos[0];
+      // Always use condo tree so action buttons are accessible
+      for (const { condo, goals } of condos) {
         goals.sort((a, b) => getGoalLatestActivity(b) - getGoalLatestActivity(a));
+        const expanded = state.condoExpanded[condo.id] !== false; // default expanded
+        const attention = getCondoAttention(condo, goals);
+        const activeCount = goals.filter(g => {
+          const s = getGoalLatestSession(g);
+          return s && getAgentStatus(s.key) === 'thinking';
+        }).length;
+
+        const emptyState = goals.length === 0
+          ? '<div style="padding: 8px 16px 12px; color: var(--text-dim); font-size: 0.8rem;">No goals yet</div>'
+          : renderGoalItems(goals, true);
         html.push(
-          '<div class="condo-label">' + escapeHtml(condo.name || 'Unnamed condo') + '</div>'
+          '<div class="condo-group ' + (expanded ? 'expanded' : '') + '">' +
+            '<div class="condo-group-header" onclick="toggleCondoExpanded(\'' + escapeHtml(condo.id) + '\')">' +
+              '<span class="group-expand-icon">&#9654;</span>' +
+              '<div class="goal-item-dot ' + attention + '"></div>' +
+              '<span class="condo-group-name">' + escapeHtml(condo.name || 'Unnamed condo') + '</span>' +
+              (activeCount > 0 ? '<span class="condo-active-badge">' + activeCount + ' active</span>' : '') +
+              '<span class="group-count">' + goals.length + '</span>' +
+            '</div>' +
+            (expanded ? '<div class="condo-group-items">' + emptyState + '</div>' : '') +
+          '</div>'
         );
-        html.push(renderGoalItems(goals, false));
-      } else {
-        // Multi-condo tree
-        for (const { condo, goals } of condos) {
-          goals.sort((a, b) => getGoalLatestActivity(b) - getGoalLatestActivity(a));
-          const expanded = state.condoExpanded[condo.id] !== false; // default expanded
-          const attention = getCondoAttention(condo, goals);
-          const activeCount = goals.filter(g => {
-            const s = getGoalLatestSession(g);
-            return s && getAgentStatus(s.key) === 'thinking';
-          }).length;
+      }
 
-          html.push(
-            '<div class="condo-group ' + (expanded ? 'expanded' : '') + '">' +
-              '<div class="condo-group-header" onclick="toggleCondoExpanded(\'' + escapeHtml(condo.id) + '\')">' +
-                '<span class="group-expand-icon">&#9654;</span>' +
-                '<div class="goal-item-dot ' + attention + '"></div>' +
-                '<span class="condo-group-name">' + escapeHtml(condo.name || 'Unnamed condo') + '</span>' +
-                (activeCount > 0 ? '<span class="condo-active-badge">' + activeCount + ' active</span>' : '') +
-                '<span class="group-count">' + goals.length + '</span>' +
-              '</div>' +
-              (expanded ? '<div class="condo-group-items">' + renderGoalItems(goals, true) + '</div>' : '') +
-            '</div>'
-          );
-        }
-
-        // Uncategorized goals
-        if (filteredUncat.length) {
-          filteredUncat.sort((a, b) => getGoalLatestActivity(b) - getGoalLatestActivity(a));
-          const expanded = state.condoExpanded['__uncategorized__'] !== false;
-          html.push(
-            '<div class="condo-group ' + (expanded ? 'expanded' : '') + '">' +
-              '<div class="condo-group-header" onclick="toggleCondoExpanded(\'__uncategorized__\')">' +
-                '<span class="group-expand-icon">&#9654;</span>' +
-                '<div class="goal-item-dot none"></div>' +
-                '<span class="condo-group-name">Uncategorized</span>' +
-                '<span class="group-count">' + filteredUncat.length + '</span>' +
-              '</div>' +
-              (expanded ? '<div class="condo-group-items">' + renderGoalItems(filteredUncat, true) + '</div>' : '') +
-            '</div>'
-          );
-        }
+      // Uncategorized goals
+      if (filteredUncat.length) {
+        filteredUncat.sort((a, b) => getGoalLatestActivity(b) - getGoalLatestActivity(a));
+        const expanded = state.condoExpanded['__uncategorized__'] !== false;
+        html.push(
+          '<div class="condo-group ' + (expanded ? 'expanded' : '') + '">' +
+            '<div class="condo-group-header" onclick="toggleCondoExpanded(\'__uncategorized__\')">' +
+              '<span class="group-expand-icon">&#9654;</span>' +
+              '<div class="goal-item-dot none"></div>' +
+              '<span class="condo-group-name">Uncategorized</span>' +
+              '<span class="group-count">' + filteredUncat.length + '</span>' +
+            '</div>' +
+            (expanded ? '<div class="condo-group-items">' + renderGoalItems(filteredUncat, true) + '</div>' : '') +
+          '</div>'
+        );
       }
 
       container.innerHTML = html.join('');
@@ -2452,10 +2460,39 @@
       if (!el) return;
       const allSessionsInGoals = new Set();
       state.goals.forEach(g => (g.sessions || []).forEach(s => allSessionsInGoals.add(s)));
-      const uncatCount = state.sessions.filter(s => !allSessionsInGoals.has(s.key) && !s.key.includes(':subagent:')).length;
-      if (uncatCount > 0) {
+      const uncatSessions = state.sessions.filter(s => !allSessionsInGoals.has(s.key) && !s.key.includes(':subagent:'));
+      if (uncatSessions.length > 0) {
         el.style.display = 'block';
-        el.textContent = `Uncategorized (${uncatCount})`;
+        const countEl = document.getElementById('uncatSessionsCount');
+        if (countEl) countEl.textContent = uncatSessions.length;
+
+        const expanded = state.condoExpanded['__uncat_sessions__'] !== false;
+        const group = el.querySelector('.condo-group');
+        if (group) {
+          if (expanded) group.classList.add('expanded');
+          else group.classList.remove('expanded');
+        }
+        const listEl = document.getElementById('uncatSessionsList');
+        if (listEl) {
+          if (expanded) {
+            uncatSessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+            listEl.innerHTML = uncatSessions.map(s => {
+              const name = getSessionName(s, false);
+              const agentStatus = getAgentStatus(s.key);
+              const activity = s.updatedAt ? timeAgo(s.updatedAt) : '';
+              return '<div class="goal-item" onclick="openSession(\'' + escapeHtml(s.key) + '\')" style="cursor: pointer;">' +
+                '<div class="goal-item-dot ' + (agentStatus === 'thinking' ? 'active' : 'none') + '"></div>' +
+                '<div class="goal-item-text">' +
+                  '<div class="goal-item-title">' + escapeHtml(name) + '</div>' +
+                  (activity ? '<span class="goal-item-activity">' + escapeHtml(activity) + '</span>' : '') +
+                '</div>' +
+              '</div>';
+            }).join('');
+            listEl.style.display = '';
+          } else {
+            listEl.style.display = 'none';
+          }
+        }
       } else {
         el.style.display = 'none';
       }
@@ -2866,6 +2903,10 @@
       const goal = state.goals.find(g => g.id === state.currentGoalOpenId);
       if (!goal) return;
 
+      // Restore collapsed state
+      var goalShell = document.getElementById('goalShell');
+      if (goalShell) goalShell.classList.toggle('right-collapsed', !!state.goalRightCollapsed);
+
       const completed = (goal.status === 'done');
       const { done, total } = goalTaskStats(goal);
 
@@ -2942,6 +2983,14 @@
       } catch (e) {
         showToast('Failed to remove file', 'error');
       }
+    }
+
+    function toggleGoalRightPanel() {
+      var shell = document.getElementById('goalShell');
+      if (!shell) return;
+      var collapsed = shell.classList.toggle('right-collapsed');
+      state.goalRightCollapsed = collapsed;
+      localStorage.setItem('sharp_goal_right_collapsed', collapsed ? '1' : '0');
     }
 
     async function toggleGoalDone() {

@@ -399,7 +399,17 @@
           <button class="section-action" onclick="refresh()" title="Refresh">↻</button>
         </div>
         <div id="goalsList" style="padding: 4px 0;"></div>
-        <div id="uncategorizedLink" class="uncategorized-link" style="display: none;" onclick="showOverview(); scrollToSection('recentActivitySection')"></div>
+        <div id="uncategorizedLink" style="display: none;">
+          <div class="condo-group expanded">
+            <div class="condo-group-header" onclick="toggleCondoExpanded('__uncat_sessions__')">
+              <span class="group-expand-icon">&#9654;</span>
+              <div class="goal-item-dot none"></div>
+              <span class="condo-group-name" id="uncatSessionsLabel">Uncategorized</span>
+              <span class="group-count" id="uncatSessionsCount">0</span>
+            </div>
+            <div class="condo-group-items" id="uncatSessionsList"></div>
+          </div>
+        </div>
         <div id="sessionsList" style="display: none;"></div>
       </div>
       
@@ -518,6 +528,7 @@
                   <span class="session-state-label" id="goalSessionStateLabel">Idle</span>
                 </div>
                 <button class="ghost-btn" id="goalOpenBtn" onclick="openGoalChatInFull()">Open →</button>
+                <button class="collapse-panel-btn expand-hint" onclick="toggleGoalRightPanel()" title="Show panel">◀ Panel</button>
               </div>
             </div>
             <div class="goal-chat-body">
@@ -545,6 +556,7 @@
                 <button class="ghost-btn" id="goalMarkDoneBtn" onclick="toggleGoalDone()">Mark done</button>
                 <button class="ghost-btn" onclick="showAttachSessionModal(null)">⛓</button>
                 <button class="ghost-btn danger" onclick="promptDeleteGoal()" title="Delete goal">Delete</button>
+                <button class="collapse-panel-btn" onclick="toggleGoalRightPanel()" title="Collapse panel">&#x25B6;</button>
               </div>
             </div>
 
@@ -567,6 +579,57 @@
 
             <div class="goal-pane" id="goalPane"></div>
           </section>
+          <div class="goal-collapse-bar" id="goalCollapseBar" onclick="toggleGoalRightPanel()" title="Expand panel">
+            <span class="collapse-bar-icon">&#x25C0; Panel</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Condo View (Condo-Level PM) -->
+      <div class="view" id="condoView">
+        <div class="goal-shell" id="condoShell">
+          <section class="goal-chat" id="condoChatPanel">
+            <div class="goal-chat-header">
+              <div style="display:flex; gap:10px; align-items:baseline; min-width:0;">
+                <div class="goal-chat-mode-label">Condo PM</div>
+                <div class="goal-chat-meta" id="condoChatMeta" style="min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <div class="session-state-pill" id="condoSessionStatePill" title="Status">
+                  <span class="session-state-dot blink-idle" id="condoSessionStateDot"></span>
+                  <span class="session-state-label" id="condoSessionStateLabel">Idle</span>
+                </div>
+                <button class="collapse-panel-btn" onclick="closeCondoPanel()" title="Close">&times;</button>
+                <button class="collapse-panel-btn expand-hint" onclick="toggleCondoRightPanel()" title="Show goals panel">◀ Goals</button>
+              </div>
+            </div>
+            <div class="goal-chat-body">
+              <div class="chat-messages" id="condoChatMessages">
+                <div class="empty-state" style="padding:32px; text-align:center; color:var(--text-dim); font-size:0.9rem;">
+                  Describe your project and the Condo PM will break it into goals.
+                </div>
+              </div>
+            </div>
+            <div class="chat-input-area" style="border-top:1px solid var(--border-subtle);padding:10px 14px;">
+              <div style="display:flex;gap:8px;align-items:flex-end;">
+                <textarea class="chat-input goal-chat-textarea" id="condoChatInput" placeholder="Describe your project..." rows="1"
+                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCondoPmMessage();}"
+                  oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px';this.style.overflowY=this.scrollHeight>120?'auto':'hidden';"></textarea>
+                <button class="send-btn" id="condoChatSendBtn" onclick="sendCondoPmMessage()" style="padding:8px 16px;height:38px;">Send</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="goal-detail" id="condoGoalsPane">
+            <div class="goal-detail-header" id="condoGoalsPaneHeader">
+              <h3 style="margin:0; font-size:1rem;">Goals</h3>
+              <button class="collapse-panel-btn" onclick="toggleCondoRightPanel()" title="Collapse panel" style="margin-left:auto;">&#x25B6;</button>
+            </div>
+            <div class="goal-pane" id="condoGoalsList"></div>
+          </section>
+          <div class="goal-collapse-bar" id="condoCollapseBar" onclick="toggleCondoRightPanel()" title="Expand panel">
+            <span class="collapse-bar-icon">&#x25C0; Goals</span>
+          </div>
         </div>
       </div>
 
@@ -819,6 +882,7 @@
       // Goal time filter (sidebar): days to show
       goalTimeFilter: localStorage.getItem('sharp_goal_time_filter') || '7',
       goalPanelOpen: false,
+      goalRightCollapsed: localStorage.getItem('sharp_goal_right_collapsed') === '1',
       goalChatSessionKey: null,
       goalTab: 'tasks',
       pendingRouteGoalId: null,
@@ -849,6 +913,16 @@
       // Condos
       condos: [],
       condoExpanded: JSON.parse(localStorage.getItem('sharp_condo_expanded') || '{}'),
+
+      // Condo PM
+      condoPmMode: false,
+      condoRightCollapsed: localStorage.getItem('sharp_condo_right_collapsed') === '1',
+      currentCondoOpenId: null,
+      condoPmPendingResponse: false,
+      condoPmSession: null,
+      condoPmGoalId: null,
+      condoCascadeMode: null,        // null | 'plan' | 'full'
+      condoCascadePending: new Set(), // goalIds awaiting PM plan response
       
       // Plan display - track which task plans are expanded
       expandedTaskPlans: JSON.parse(localStorage.getItem('sharp_expanded_task_plans') || '{}'),
@@ -1817,9 +1891,8 @@
         state.sessionInputReady.set(sessionKey, true);
         setSessionStatus(sessionKey, 'idle');
         
-        // Check if this is a response from the PM session
-        const pmKey = getPmSessionKey();
-        if (sessionKey === pmKey && message?.content) {
+        // Check if this is a response from the PM session (global or per-goal)
+        if (isPmSessionKey(sessionKey) && message?.content) {
           const text = extractText(message.content);
           if (text) {
             // Check wizard first
@@ -1857,6 +1930,87 @@
               state.pmChatGoalId = null;
               state.pmChatPmSession = null;
             }
+            // Condo PM response — show in condo chat panel
+            else if (state.condoPmPendingResponse && state.condoPmSession === sessionKey) {
+              removeCondoChatThinking();
+              const condoPlanDetected = detectCondoPlanInContent(text);
+              appendCondoChatMessage('assistant', text);
+              state.condoPmPendingResponse = false;
+              const savedCondoId = state.currentCondoOpenId;
+
+              // Persist condo PM response
+              rpcCall('pm.condoSaveResponse', {
+                condoId: savedCondoId,
+                content: text,
+              }, 10000).then(function(saveResult) {
+                // Add plan action buttons if a plan was detected
+                if (saveResult && saveResult.hasPlan) {
+                  var container = document.getElementById('condoChatMessages');
+                  if (container && !container.querySelector('.pm-plan-actions')) {
+                    container.insertAdjacentHTML('beforeend', renderCondoPlanActionButtons());
+                  }
+                } else if (condoPlanDetected) {
+                  var container2 = document.getElementById('condoChatMessages');
+                  if (container2 && !container2.querySelector('.pm-plan-actions')) {
+                    container2.insertAdjacentHTML('beforeend', renderCondoPlanActionButtons());
+                  }
+                }
+              }).catch(function(err) {
+                console.warn('Failed to save condo PM response:', err);
+              });
+
+              state.condoPmSession = null;
+            }
+            // Cascade response — a goal PM responded during cascade
+            else if (state.condoCascadePending.size > 0) {
+              // Find which goal this PM session belongs to
+              var cascadeGoal = state.goals.find(function(g) {
+                return g.pmSessionKey === sessionKey && state.condoCascadePending.has(g.id);
+              });
+              if (cascadeGoal) {
+                state.condoCascadePending.delete(cascadeGoal.id);
+
+                if (state.condoCascadeMode === 'full') {
+                  // Auto-create tasks and auto-kickoff
+                  rpcCall('pm.createTasksFromPlan', {
+                    goalId: cascadeGoal.id,
+                    planContent: text,
+                  }, 30000).then(function(taskResult) {
+                    if (taskResult && taskResult.ok) {
+                      showToast('Tasks created for "' + (cascadeGoal.title || cascadeGoal.id) + '"', 'success');
+                      // Auto-kickoff
+                      return rpcCall('goals.kickoff', { goalId: cascadeGoal.id }, 120000);
+                    }
+                  }).then(function(kickoffResult) {
+                    if (kickoffResult) {
+                      showToast('Agents started for "' + (cascadeGoal.title || cascadeGoal.id) + '"', 'success');
+                    }
+                    loadGoals().then(function() { renderCondoGoalsPane(); });
+                  }).catch(function(err) {
+                    console.error('Cascade auto-execute failed for goal', cascadeGoal.id, err);
+                    showToast('Auto-execute failed for "' + (cascadeGoal.title || cascadeGoal.id) + '"', 'error');
+                  });
+                } else {
+                  // Plan mode — just save the response for the goal PM
+                  rpcCall('pm.saveResponse', {
+                    goalId: cascadeGoal.id,
+                    content: text,
+                  }, 10000).catch(function(err) {
+                    console.warn('Failed to save cascade PM response for goal', cascadeGoal.id, err);
+                  });
+                  showToast('Plan ready for "' + (cascadeGoal.title || cascadeGoal.id) + '"', 'info');
+                }
+
+                // Refresh goals pane
+                loadGoals().then(function() { renderCondoGoalsPane(); });
+
+                // Check if all cascade goals are done
+                if (state.condoCascadePending.size === 0) {
+                  state.condoCascadeMode = null;
+                  showToast('All goal planning complete', 'success');
+                }
+              }
+            }
           }
         }
         
@@ -1890,6 +2044,14 @@
           state.pmChatPendingResponse = false;
           state.pmChatGoalId = null;
           state.pmChatPmSession = null;
+        }
+
+        // Handle condo PM chat errors
+        if (state.condoPmPendingResponse && sessionKey === state.condoPmSession) {
+          removeCondoChatThinking();
+          appendCondoChatMessage('error', 'Condo PM error: ' + (data.errorMessage || 'Request failed'));
+          state.condoPmPendingResponse = false;
+          state.condoPmSession = null;
         }
 
         if (state.currentSession?.key === sessionKey) {
@@ -2403,6 +2565,17 @@
       renderGoals();
     }
 
+    function onCondoHeaderClick(condoId) {
+      // Expand sidebar dropdown
+      if (!state.condoExpanded[condoId]) {
+        state.condoExpanded[condoId] = true;
+        localStorage.setItem('sharp_condo_expanded', JSON.stringify(state.condoExpanded));
+        renderGoals();
+      }
+      // Open the condo view in the main content area
+      openCondoPanel(condoId);
+    }
+
     function updateUncategorizedCount() {
       const el = document.getElementById('uncategorizedCount');
       if (!el) return;
@@ -2569,66 +2742,54 @@
         return;
       }
 
-      // Auto-flatten: if only 1 condo and no uncategorized, skip tree nesting
-      const singleCondo = condos.length === 1 && !filteredUncat.length;
-
       // All user-generated content is escaped via escapeHtml() before insertion
       const html = [];
 
-      if (singleCondo) {
-        // Flat list — just show goals directly with a subtle condo label
-        const { condo, goals } = condos[0];
+      // Always use condo tree so action buttons (delete, add goal) are accessible
+      for (const { condo, goals } of condos) {
         goals.sort((a, b) => getGoalLatestActivity(b) - getGoalLatestActivity(a));
+        const expanded = state.condoExpanded[condo.id] !== false; // default expanded
+        const attention = getCondoAttention(condo, goals);
+        const activeCount = goals.filter(g => {
+          const s = getGoalLatestSession(g);
+          return s && getAgentStatus(s.key) === 'thinking';
+        }).length;
+
+        const isCondoActive = state.currentView === 'condo' && state.currentCondoOpenId === condo.id;
+        const emptyState = goals.length === 0
+          ? '<div style="padding: 8px 16px 12px; color: var(--text-dim); font-size: 0.8rem;">No goals yet</div>'
+          : renderGoalItems(goals, true);
         html.push(
-          '<div class="condo-label">' + escapeHtml(condo.name || 'Unnamed condo') + '</div>'
+          '<div class="condo-group ' + (expanded ? 'expanded' : '') + (isCondoActive ? ' condo-active' : '') + '">' +
+            '<div class="condo-group-header" onclick="onCondoHeaderClick(\'' + escapeHtml(condo.id) + '\')">' +
+              '<span class="group-expand-icon">&#9654;</span>' +
+              '<div class="goal-item-dot ' + attention + '"></div>' +
+              '<span class="condo-group-name">' + escapeHtml(condo.name || 'Unnamed condo') + '</span>' +
+              (activeCount > 0 ? '<span class="condo-active-badge">' + activeCount + ' active</span>' : '') +
+              '<span class="group-count">' + goals.length + '</span>' +
+              '<button class="condo-add-goal-btn" onclick="event.stopPropagation(); showCreateGoalModalForCondo(\'' + escapeHtml(condo.id) + '\', \'' + escapeHtml(condo.name || 'Unnamed') + '\')" title="Add goal to this condo">+</button>' +
+              '<button class="condo-delete-btn" onclick="event.stopPropagation(); deleteCondo(\'' + escapeHtml(condo.id) + '\', \'' + escapeHtml(condo.name || 'Unnamed') + '\')" title="Delete condo">×</button>' +
+            '</div>' +
+            (expanded ? '<div class="condo-group-items">' + emptyState + '</div>' : '') +
+          '</div>'
         );
-        html.push(renderGoalItems(goals, false));
-      } else {
-        // Multi-condo tree
-        for (const { condo, goals } of condos) {
-          goals.sort((a, b) => getGoalLatestActivity(b) - getGoalLatestActivity(a));
-          const expanded = state.condoExpanded[condo.id] !== false; // default expanded
-          const attention = getCondoAttention(condo, goals);
-          const activeCount = goals.filter(g => {
-            const s = getGoalLatestSession(g);
-            return s && getAgentStatus(s.key) === 'thinking';
-          }).length;
+      }
 
-          const emptyState = goals.length === 0 
-            ? '<div style="padding: 8px 16px 12px; color: var(--text-dim); font-size: 0.8rem;">No goals yet</div>' 
-            : renderGoalItems(goals, true);
-          html.push(
-            '<div class="condo-group ' + (expanded ? 'expanded' : '') + '">' +
-              '<div class="condo-group-header" onclick="toggleCondoExpanded(\'' + escapeHtml(condo.id) + '\')">' +
-                '<span class="group-expand-icon">&#9654;</span>' +
-                '<div class="goal-item-dot ' + attention + '"></div>' +
-                '<span class="condo-group-name">' + escapeHtml(condo.name || 'Unnamed condo') + '</span>' +
-                (activeCount > 0 ? '<span class="condo-active-badge">' + activeCount + ' active</span>' : '') +
-                '<span class="group-count">' + goals.length + '</span>' +
-                '<button class="condo-add-goal-btn" onclick="event.stopPropagation(); showCreateGoalModalForCondo(\'' + escapeHtml(condo.id) + '\', \'' + escapeHtml(condo.name || 'Unnamed') + '\')" title="Add goal to this condo">＋</button>' +
-                '<button class="condo-delete-btn" onclick="event.stopPropagation(); deleteCondo(\'' + escapeHtml(condo.id) + '\', \'' + escapeHtml(condo.name || 'Unnamed') + '\')" title="Delete condo">×</button>' +
-              '</div>' +
-              (expanded ? '<div class="condo-group-items">' + emptyState + '</div>' : '') +
-            '</div>'
-          );
-        }
-
-        // Uncategorized goals
-        if (filteredUncat.length) {
-          filteredUncat.sort((a, b) => getGoalLatestActivity(b) - getGoalLatestActivity(a));
-          const expanded = state.condoExpanded['__uncategorized__'] !== false;
-          html.push(
-            '<div class="condo-group ' + (expanded ? 'expanded' : '') + '">' +
-              '<div class="condo-group-header" onclick="toggleCondoExpanded(\'__uncategorized__\')">' +
-                '<span class="group-expand-icon">&#9654;</span>' +
-                '<div class="goal-item-dot none"></div>' +
-                '<span class="condo-group-name">Uncategorized</span>' +
-                '<span class="group-count">' + filteredUncat.length + '</span>' +
-              '</div>' +
-              (expanded ? '<div class="condo-group-items">' + renderGoalItems(filteredUncat, true) + '</div>' : '') +
-            '</div>'
-          );
-        }
+      // Uncategorized goals
+      if (filteredUncat.length) {
+        filteredUncat.sort((a, b) => getGoalLatestActivity(b) - getGoalLatestActivity(a));
+        const expanded = state.condoExpanded['__uncategorized__'] !== false;
+        html.push(
+          '<div class="condo-group ' + (expanded ? 'expanded' : '') + '">' +
+            '<div class="condo-group-header" onclick="toggleCondoExpanded(\'__uncategorized__\')">' +
+              '<span class="group-expand-icon">&#9654;</span>' +
+              '<div class="goal-item-dot none"></div>' +
+              '<span class="condo-group-name">Uncategorized</span>' +
+              '<span class="group-count">' + filteredUncat.length + '</span>' +
+            '</div>' +
+            (expanded ? '<div class="condo-group-items">' + renderGoalItems(filteredUncat, true) + '</div>' : '') +
+          '</div>'
+        );
       }
 
       container.innerHTML = html.join('');
@@ -2703,10 +2864,40 @@
       if (!el) return;
       const allSessionsInGoals = new Set();
       state.goals.forEach(g => (g.sessions || []).forEach(s => allSessionsInGoals.add(s)));
-      const uncatCount = state.sessions.filter(s => !allSessionsInGoals.has(s.key) && !s.key.includes(':subagent:')).length;
-      if (uncatCount > 0) {
+      const uncatSessions = state.sessions.filter(s => !allSessionsInGoals.has(s.key) && !s.key.includes(':subagent:'));
+      if (uncatSessions.length > 0) {
         el.style.display = 'block';
-        el.textContent = `Uncategorized (${uncatCount})`;
+        const countEl = document.getElementById('uncatSessionsCount');
+        if (countEl) countEl.textContent = uncatSessions.length;
+
+        const expanded = state.condoExpanded['__uncat_sessions__'] !== false;
+        const group = el.querySelector('.condo-group');
+        if (group) {
+          if (expanded) group.classList.add('expanded');
+          else group.classList.remove('expanded');
+        }
+        const listEl = document.getElementById('uncatSessionsList');
+        if (listEl) {
+          if (expanded) {
+            // Sort by most recent activity
+            uncatSessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+            listEl.innerHTML = uncatSessions.map(s => {
+              const name = getSessionName(s, false);
+              const agentStatus = getAgentStatus(s.key);
+              const activity = s.updatedAt ? timeAgo(s.updatedAt) : '';
+              return '<div class="goal-item" onclick="openSession(\'' + escapeHtml(s.key) + '\')" style="cursor: pointer;">' +
+                '<div class="goal-item-dot ' + (agentStatus === 'thinking' ? 'active' : 'none') + '"></div>' +
+                '<div class="goal-item-text">' +
+                  '<div class="goal-item-title">' + escapeHtml(name) + '</div>' +
+                  (activity ? '<span class="goal-item-activity">' + escapeHtml(activity) + '</span>' : '') +
+                '</div>' +
+              '</div>';
+            }).join('');
+            listEl.style.display = '';
+          } else {
+            listEl.style.display = 'none';
+          }
+        }
       } else {
         el.style.display = 'none';
       }
@@ -2755,6 +2946,8 @@
 
       state.currentView = 'goal';
       state.currentGoalOpenId = goalId;
+      state.currentCondoOpenId = null;
+      state.condoPmMode = false;
       state.goalPanelOpen = false;
 
       document.getElementById('overviewView').classList.remove('active');
@@ -2931,7 +3124,8 @@
       // Determine which session to load based on mode
       var sessionKey;
       if (state.goalChatMode === 'pm') {
-        sessionKey = getPmSessionKey();
+        var currentGoal = state.goals.find(g => g.id === state.currentGoalOpenId);
+        sessionKey = getGoalPmSessionKey(currentGoal);
         state.goalChatSessionKey = sessionKey;
       } else {
         sessionKey = state.goalChatSessionKey;
@@ -3803,7 +3997,28 @@
     function getPmSessionKey() {
       return window.ClawCondosConfig?.getPmSessionKey?.() || 'agent:main:main';
     }
-    
+
+    /**
+     * Check if a session key is a PM session (global or per-goal)
+     * @param {string} sessionKey
+     * @returns {boolean}
+     */
+    function isPmSessionKey(sessionKey) {
+      return sessionKey === getPmSessionKey() ||
+        (typeof sessionKey === 'string' && (
+          sessionKey.includes(':subagent:pm-') || sessionKey.includes(':webchat:pm-')
+        ));
+    }
+
+    /**
+     * Get the PM session key for the current goal, falling back to global PM
+     * @param {Object} [goal] - Goal object (may have pmSessionKey)
+     * @returns {string}
+     */
+    function getGoalPmSessionKey(goal) {
+      return goal?.pmSessionKey || getPmSessionKey();
+    }
+
     /**
      * Switch between PM and Team chat modes
      * @param {string} mode - 'pm' or 'team'
@@ -3831,7 +4046,8 @@
       
       // Update chat content
       if (mode === 'pm') {
-        state.goalChatSessionKey = getPmSessionKey();
+        const goal = state.goals.find(g => g.id === state.currentGoalOpenId);
+        state.goalChatSessionKey = getGoalPmSessionKey(goal);
       } else {
         // Team mode: use latest task session or first session
         const goal = state.goals.find(g => g.id === state.currentGoalOpenId);
@@ -4317,10 +4533,11 @@
         });
       }
       
-      // Filter out PM session
+      // Filter out PM sessions (global and per-goal)
       const pmKey = getPmSessionKey();
       sessions.delete(pmKey);
-      
+      if (goal.pmSessionKey) sessions.delete(goal.pmSessionKey);
+
       return Array.from(sessions);
     }
     
@@ -4348,6 +4565,431 @@
       }
     }
     
+    // ═══════════════════════════════════════════════════════════════
+    // CONDO-LEVEL PM — Plan goals for an entire condo
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Open the condo PM panel
+     * @param {string} condoId - Condo ID
+     */
+    function openCondoPanel(condoId) {
+      const condo = state.condos.find(c => c.id === condoId);
+      if (!condo) return;
+
+      state.condoPmMode = true;
+      state.currentCondoOpenId = condoId;
+      state.currentGoalOpenId = null;
+      state.condoPmPendingResponse = false;
+      state.condoPmSession = null;
+      state.condoCascadeMode = null;
+      state.condoCascadePending = new Set();
+      state.currentView = 'condo';
+
+      // Switch to condo view as main content (like goal view)
+      document.getElementById('overviewView').classList.remove('active');
+      document.getElementById('chatView').classList.remove('active');
+      document.getElementById('searchView').classList.remove('active');
+      document.getElementById('goalView').classList.remove('active');
+      document.getElementById('goalView').classList.remove('panel-mode');
+      document.querySelector('.main-content').classList.remove('split-view');
+      document.getElementById('condoView').classList.add('active');
+
+      document.getElementById('mainTitle').textContent = 'Condo';
+      document.getElementById('mainSubtitle').textContent = '';
+      document.getElementById('headerAction').style.display = 'none';
+      document.getElementById('headerStatusIndicator').style.display = 'none';
+
+      renderCondoPmView();
+      renderGoals();
+    }
+
+    /**
+     * Close the condo PM panel — returns to overview
+     */
+    function closeCondoPanel() {
+      state.condoPmMode = false;
+      state.currentCondoOpenId = null;
+      state.condoPmPendingResponse = false;
+      state.condoPmSession = null;
+      state.condoCascadeMode = null;
+      state.condoCascadePending = new Set();
+
+      document.getElementById('condoView').classList.remove('active');
+      document.querySelector('.main-content').classList.remove('split-view');
+      document.getElementById('overviewView').classList.add('active');
+      state.currentView = 'overview';
+      renderGoals();
+    }
+
+    /**
+     * Render the full condo PM view (chat + goals pane)
+     */
+    function renderCondoPmView() {
+      // Restore collapsed state
+      var condoShell = document.getElementById('condoShell');
+      if (condoShell) condoShell.classList.toggle('right-collapsed', !!state.condoRightCollapsed);
+
+      renderCondoPmChat();
+      renderCondoGoalsPane();
+    }
+
+    /**
+     * Render condo PM chat panel with history
+     */
+    async function renderCondoPmChat() {
+      const condoId = state.currentCondoOpenId;
+      if (!condoId) return;
+
+      const condo = state.condos.find(c => c.id === condoId);
+      const metaEl = document.getElementById('condoChatMeta');
+      if (metaEl && condo) {
+        metaEl.textContent = escapeHtml(condo.name || 'Unnamed condo');
+      }
+
+      const container = document.getElementById('condoChatMessages');
+      if (!container) return;
+
+      // Clear immediately to avoid showing stale messages from a previous condo
+      container.innerHTML = '';
+
+      try {
+        const result = await rpcCall('pm.condoGetHistory', { condoId }, 10000);
+        // Guard: if user switched condos during the async call, bail out
+        if (state.currentCondoOpenId !== condoId) return;
+
+        if (!result || !result.messages || result.messages.length === 0) {
+          container.innerHTML = '<div class="empty-state" style="padding:32px; text-align:center; color:var(--text-dim); font-size:0.9rem;">Describe your project and the Condo PM will break it into goals.</div>';
+          return;
+        }
+
+        var html = '';
+        for (var i = 0; i < result.messages.length; i++) {
+          var m = result.messages[i];
+          var rendered = m.role === 'assistant' ? formatMessage(m.content) : escapeHtml(m.content);
+          if (m.role === 'user') {
+            html += '<div class="message user"><div class="message-content">' + rendered + '</div></div>';
+          } else {
+            html += '<div class="message assistant"><div class="message-content">' + rendered + '</div></div>';
+          }
+        }
+
+        // Check if last message is assistant with a plan — add action buttons
+        var lastMsg = result.messages[result.messages.length - 1];
+        if (lastMsg && lastMsg.role === 'assistant') {
+          var hasPlanContent = detectCondoPlanInContent(lastMsg.content);
+          if (hasPlanContent) {
+            html += renderCondoPlanActionButtons();
+          }
+        }
+
+        container.innerHTML = html;
+        container.scrollTop = container.scrollHeight;
+      } catch (err) {
+        if (state.currentCondoOpenId !== condoId) return;
+        container.innerHTML = '<div class="empty-state" style="padding:32px; text-align:center; color:var(--text-dim);">Failed to load history: ' + escapeHtml(err.message || 'Unknown error') + '</div>';
+      }
+    }
+
+    /**
+     * Detect if content contains a condo-level plan (goals breakdown)
+     */
+    function detectCondoPlanInContent(content) {
+      if (!content || typeof content !== 'string') return false;
+      var lc = content.toLowerCase();
+
+      // Goal-level headers
+      var goalHeaders = [
+        '## goals', '### goals', '# goals',
+        '## milestones', '### milestones',
+        '## objectives', '### objectives',
+        '**goals:**', '**milestones:**',
+        '## proposed goals', '## goal breakdown',
+      ];
+      for (var i = 0; i < goalHeaders.length; i++) {
+        if (lc.includes(goalHeaders[i])) return true;
+      }
+
+      // Goal tables
+      var patterns = [
+        /\|\s*Goal\s*\|/i,
+        /\|\s*Milestone\s*\|/i,
+        /\|\s*Objective\s*\|/i,
+        /\|\s*#\s*\|\s*Goal/i,
+      ];
+      return patterns.some(function(p) { return p.test(content); });
+    }
+
+    /**
+     * Render action buttons for a condo plan
+     */
+    function renderCondoPlanActionButtons() {
+      var condoId = state.currentCondoOpenId;
+      if (!condoId) return '';
+
+      var condo = state.condos.find(function(c) { return c.id === condoId; });
+      var condoGoals = state.goals.filter(function(g) { return g.condoId === condoId; });
+      var hasGoals = condoGoals.length > 0;
+
+      if (hasGoals) {
+        return '<div class="pm-plan-actions" id="condoPlanActions">' +
+          '<button class="pm-action-btn primary" onclick="startCondoCascade(\'plan\')" title="Auto-plan tasks for each goal">📋 Plan All Goals</button>' +
+          '<button class="pm-action-btn success" onclick="startCondoCascade(\'full\')" title="Plan tasks and auto-start agents">🚀 Full Auto</button>' +
+        '</div>';
+      }
+
+      return '<div class="pm-plan-actions" id="condoPlanActions">' +
+        '<button class="pm-action-btn primary" onclick="createGoalsFromCondoPlan()" title="Create goals from this plan">📋 Create Goals</button>' +
+      '</div>';
+    }
+
+    /**
+     * Append a message to condo PM chat (for streaming)
+     */
+    function appendCondoChatMessage(role, content, isThinking) {
+      var container = document.getElementById('condoChatMessages');
+      if (!container) return;
+
+      // Remove empty-state placeholder if present
+      var emptyState = container.querySelector('.empty-state');
+      if (emptyState) emptyState.remove();
+
+      var timeHtml = formatMessageTime(new Date());
+      var messageId = 'condo-msg-' + Date.now();
+
+      var html = '';
+      if (isThinking) {
+        html = '<div class="message assistant thinking-indicator" id="' + messageId + '">' +
+          '<div class="message-content"><span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span> Thinking...</div>' +
+        '</div>';
+      } else if (role === 'user') {
+        html = '<div class="message user" id="' + messageId + '">' +
+          '<div class="message-content">' + formatMessage(content) + '</div>' +
+          '<div class="message-time">' + timeHtml + '</div>' +
+        '</div>';
+      } else if (role === 'error') {
+        html = '<div class="message system error" id="' + messageId + '" style="color: var(--red);">' +
+          '<div class="message-content">⚠️ ' + escapeHtml(content || '') + '</div>' +
+        '</div>';
+      } else {
+        html = '<div class="message assistant" id="' + messageId + '">' +
+          '<div class="message-content">' + formatMessage(content) + '</div>' +
+          '<div class="message-time">' + timeHtml + '</div>' +
+        '</div>';
+      }
+
+      container.insertAdjacentHTML('beforeend', html);
+      container.scrollTop = container.scrollHeight;
+
+      return messageId;
+    }
+
+    /**
+     * Remove thinking indicator from condo chat
+     */
+    function removeCondoChatThinking() {
+      var container = document.getElementById('condoChatMessages');
+      if (!container) return;
+      var thinking = container.querySelector('.thinking-indicator');
+      if (thinking) thinking.remove();
+    }
+
+    /**
+     * Send a message to the condo PM (two-step flow)
+     */
+    async function sendCondoPmMessage() {
+      var input = document.getElementById('condoChatInput');
+      if (!input) return;
+
+      var message = input.value.trim();
+      if (!message || state.condoPmPendingResponse) return;
+
+      var condoId = state.currentCondoOpenId;
+      if (!condoId) return;
+
+      input.value = '';
+      input.style.height = 'auto';
+      state.condoPmPendingResponse = true;
+
+      // Show user message and thinking indicator
+      appendCondoChatMessage('user', message);
+      appendCondoChatMessage(null, null, true);
+
+      try {
+        // Step 1: Prepare context-enriched message and save user message to history
+        var prepResult = await rpcCall('pm.condoChat', {
+          condoId: condoId,
+          message: message,
+        }, 30000);
+
+        var pmSession = prepResult && prepResult.pmSession;
+        var enrichedMessage = prepResult && prepResult.enrichedMessage;
+
+        if (!enrichedMessage) {
+          throw new Error('Failed to prepare condo PM message');
+        }
+
+        // Track that we're waiting for a condo PM response
+        state.condoPmSession = pmSession;
+
+        console.log('[CondoPM] Sending chat.send to session:', pmSession, 'message length:', enrichedMessage.length);
+
+        // Step 2: Send to PM session — response streams back through handleChatEvent
+        await rpcCall('chat.send', {
+          sessionKey: pmSession,
+          message: enrichedMessage,
+          idempotencyKey: 'condo-pm-chat-' + Date.now()
+        }, 120000);
+
+        console.log('[CondoPM] chat.send completed for session:', pmSession);
+      } catch (e) {
+        removeCondoChatThinking();
+        appendCondoChatMessage('error', 'Failed to send to Condo PM: ' + (e.message || 'Unknown error'));
+        console.error('Condo PM chat error:', e);
+        state.condoPmPendingResponse = false;
+        state.condoPmSession = null;
+      }
+    }
+
+    /**
+     * Create goals from the condo PM's plan
+     */
+    async function createGoalsFromCondoPlan() {
+      var condoId = state.currentCondoOpenId;
+      if (!condoId) {
+        showToast('No condo selected', 'error');
+        return;
+      }
+
+      // Disable button
+      var btn = document.querySelector('#condoPlanActions .pm-action-btn[onclick*="createGoals"]');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="btn-spinner"></span> Creating...';
+      }
+
+      try {
+        var result = await rpcCall('pm.condoCreateGoals', {
+          condoId: condoId,
+        }, 30000);
+
+        if (result && result.ok) {
+          showToast('Created ' + result.goalsCreated + ' goals', 'success');
+
+          // Refresh data and re-render
+          await loadGoals();
+          renderCondoPmView();
+        } else {
+          throw new Error('Failed to create goals');
+        }
+      } catch (err) {
+        showToast('Failed to create goals: ' + (err.message || 'Unknown error'), 'error');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '📋 Create Goals';
+        }
+      }
+    }
+
+    /**
+     * Start cascade planning/execution for condo goals
+     * @param {string} mode - 'plan' or 'full'
+     */
+    async function startCondoCascade(mode) {
+      var condoId = state.currentCondoOpenId;
+      if (!condoId) {
+        showToast('No condo selected', 'error');
+        return;
+      }
+
+      // Disable buttons
+      var btns = document.querySelectorAll('#condoPlanActions .pm-action-btn');
+      btns.forEach(function(btn) { btn.disabled = true; });
+
+      try {
+        var result = await rpcCall('pm.condoCascade', {
+          condoId: condoId,
+          mode: mode,
+        }, 30000);
+
+        if (!result || !result.goals || result.goals.length === 0) {
+          showToast('No goals need planning', 'warning');
+          btns.forEach(function(btn) { btn.disabled = false; });
+          return;
+        }
+
+        state.condoCascadeMode = mode;
+        state.condoCascadePending = new Set(result.goals.map(function(g) { return g.goalId; }));
+
+        showToast('Planning ' + result.goals.length + ' goals...', 'info');
+
+        // Send chat.send to each goal PM in parallel
+        var promises = result.goals.map(function(g) {
+          return rpcCall('chat.send', {
+            sessionKey: g.pmSessionKey,
+            message: g.prompt,
+            idempotencyKey: 'cascade-' + g.goalId + '-' + Date.now()
+          }, 120000).catch(function(err) {
+            console.error('Cascade chat.send failed for goal', g.goalId, err);
+            state.condoCascadePending.delete(g.goalId);
+          });
+        });
+
+        await Promise.all(promises);
+
+        // Cascade responses will be handled by handleChatEvent
+        if (state.condoCascadePending.size === 0) {
+          showToast('All cascade messages sent', 'success');
+        }
+      } catch (err) {
+        showToast('Failed to start cascade: ' + (err.message || 'Unknown error'), 'error');
+        btns.forEach(function(btn) { btn.disabled = false; });
+      }
+    }
+
+    /**
+     * Render the condo goals pane (right side of condo view)
+     */
+    function renderCondoGoalsPane() {
+      var condoId = state.currentCondoOpenId;
+      var container = document.getElementById('condoGoalsList');
+      if (!container || !condoId) return;
+
+      var condoGoals = state.goals.filter(function(g) { return g.condoId === condoId; });
+
+      if (condoGoals.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding:24px; text-align:center; color:var(--text-dim); font-size:0.9rem;">No goals yet. Chat with the Condo PM to create a plan.</div>';
+        return;
+      }
+
+      var html = '';
+      for (var i = 0; i < condoGoals.length; i++) {
+        var g = condoGoals[i];
+        var taskStats = goalTaskStats(g);
+        var pct = taskStats.total ? Math.round((taskStats.done / taskStats.total) * 100) : 0;
+        var statusClass = g.status === 'done' ? 'done' : (taskStats.total > 0 ? 'active' : 'pending');
+        var cascading = state.condoCascadePending.has(g.id);
+
+        html += '<div class="goal-status-row" style="cursor:pointer;" onclick="closeCondoPanel(); openGoalPanel(\'' + escapeHtml(g.id) + '\')">' +
+          '<div class="goal-row-left">' +
+            '<div class="agent-status ' + (cascading ? 'thinking' : statusClass) + '" style="width:8px; height:8px; flex-shrink:0;"></div>' +
+            '<div class="goal-row-info">' +
+              '<div class="goal-row-title">' + escapeHtml(g.title || 'Untitled goal') +
+                (g.priority ? ' <span class="goal-pill pr">' + escapeHtml(g.priority) + '</span>' : '') +
+                (cascading ? ' <span class="btn-spinner" style="margin-left:4px;"></span>' : '') +
+              '</div>' +
+              '<div class="goal-row-meta">' +
+                (taskStats.total > 0 ? '<span>' + taskStats.done + '/' + taskStats.total + ' tasks</span>' : '<span>No tasks</span>') +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          (taskStats.total > 0 ? '<div class="goal-row-progress"><div class="goal-row-progress-bar" style="width:' + pct + '%;"></div></div>' : '') +
+        '</div>';
+      }
+
+      container.innerHTML = html;
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // KICKOFF FLOW — Approve & spawn agents for a goal
     // ═══════════════════════════════════════════════════════════════
@@ -4781,6 +5423,10 @@
       const goal = state.goals.find(g => g.id === state.currentGoalOpenId);
       if (!goal) return;
 
+      // Restore collapsed state
+      var goalShell = document.getElementById('goalShell');
+      if (goalShell) goalShell.classList.toggle('right-collapsed', !!state.goalRightCollapsed);
+
       const completed = (goal.status === 'done');
       const { done, total } = goalTaskStats(goal);
 
@@ -4831,7 +5477,7 @@
         setGoalChatLocked(teamSessions.length === 0);
       } else {
         // PM mode - never locked (PM session always available)
-        state.goalChatSessionKey = getPmSessionKey();
+        state.goalChatSessionKey = getGoalPmSessionKey(goal);
         setGoalChatLocked(false);
       }
 
@@ -4882,6 +5528,22 @@
       if (!goal) return;
       const next = goal.status === 'done' ? 'active' : 'done';
       await updateGoal(goal.id, { status: next });
+    }
+
+    function toggleGoalRightPanel() {
+      var shell = document.getElementById('goalShell');
+      if (!shell) return;
+      var collapsed = shell.classList.toggle('right-collapsed');
+      state.goalRightCollapsed = collapsed;
+      localStorage.setItem('sharp_goal_right_collapsed', collapsed ? '1' : '0');
+    }
+
+    function toggleCondoRightPanel() {
+      var shell = document.getElementById('condoShell');
+      if (!shell) return;
+      var collapsed = shell.classList.toggle('right-collapsed');
+      state.condoRightCollapsed = collapsed;
+      localStorage.setItem('sharp_condo_right_collapsed', collapsed ? '1' : '0');
     }
 
     async function updateGoal(goalId, patch) {
@@ -7109,9 +7771,8 @@ Response format:
       // Auto-trigger title generation for sessions with messages
       if (triggerAutoGen && !state.attemptedTitles.has(s.key)) {
         // Only auto-generate for sessions that have messages and aren't special
-        const pmKey = getPmSessionKey();
-        const isSpecial = s.key === pmKey || 
-                         s.key.includes(':subagent:') || 
+        const isSpecial = isPmSessionKey(s.key) ||
+                         s.key.includes(':subagent:') ||
                          s.key.includes(':app:') ||
                          s.key.startsWith('cron:');
         if (!isSpecial && s.totalTokens > 0) {
@@ -7124,9 +7785,27 @@ Response format:
     
     function getDefaultSessionName(s) {
       if (!s) return 'Unknown';
-      // Check if this is the PM session
+      // Check if this is the global PM session
       const pmKey = getPmSessionKey();
       if (s.key === pmKey) return 'Main';
+      // Check if this is a condo PM session
+      if (s.key.includes(':pm-condo-')) {
+        const condoIdMatch = s.key.match(/:pm-condo-(.+)$/);
+        if (condoIdMatch) {
+          const condo = state.condos?.find(c => c.id === condoIdMatch[1]);
+          if (condo) return 'Condo PM: ' + condo.name;
+        }
+        return 'Condo PM';
+      }
+      // Check if this is a per-goal PM session (webchat or legacy subagent format)
+      if (s.key.includes(':webchat:pm-') || s.key.includes(':subagent:pm-')) {
+        const goalIdMatch = s.key.match(/:(?:webchat|subagent):pm-(.+)$/);
+        if (goalIdMatch) {
+          const goal = state.goals?.find(g => g.id === goalIdMatch[1]);
+          if (goal) return 'PM: ' + goal.title;
+        }
+        return 'PM Session';
+      }
       if (s.key.includes(':subagent:')) return s.label || 'Sub-agent';
       if (s.key.includes(':app:')) return `App: ${s.key.split(':app:')[1]}`;
       if (s.key.startsWith('cron:')) return s.key.replace('cron:', 'Cron: ');
