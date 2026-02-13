@@ -62,15 +62,22 @@ export function createPmHandlers(store, options = {}) {
   handlers['pm.chat'] = async ({ params, respond }) => {
     const { condoId, goalId, message, pmSession: overrideSession } = params || {};
 
+    if (logger) {
+      logger.debug(`pm.chat called with: condoId=${condoId}, goalId=${goalId}, messageLen=${message?.length || 0}`);
+    }
+
     if (!condoId) {
+      if (logger) logger.warn('pm.chat: missing condoId');
       return respond(false, null, 'condoId is required');
     }
 
     if (!goalId) {
+      if (logger) logger.warn('pm.chat: missing goalId');
       return respond(false, null, 'goalId is required');
     }
 
     if (!message || typeof message !== 'string' || !message.trim()) {
+      if (logger) logger.warn('pm.chat: missing or empty message');
       return respond(false, null, 'message is required');
     }
 
@@ -133,13 +140,25 @@ export function createPmHandlers(store, options = {}) {
       const fullMessage = `${contextPrefix}\n${userMessage}`;
 
       // Send to PM session and wait for response
-      const response = await sendToSession(targetSession, {
-        type: 'pm_chat',
-        condoId,
-        goalId,
-        message: fullMessage,
-        expectResponse: true,
-      });
+      if (logger) {
+        logger.debug(`pm.chat: sending to session ${targetSession}`);
+      }
+      
+      let response;
+      try {
+        response = await sendToSession(targetSession, {
+          type: 'pm_chat',
+          condoId,
+          goalId,
+          message: fullMessage,
+          expectResponse: true,
+        });
+      } catch (sendErr) {
+        if (logger) {
+          logger.error(`pm.chat: sendToSession failed: ${sendErr.message}`);
+        }
+        throw new Error(`Failed to reach PM session: ${sendErr.message}`);
+      }
 
       const responseText = response?.text || response?.message || 'No response received';
 

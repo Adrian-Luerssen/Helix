@@ -1460,6 +1460,19 @@
         handlePlanLog(msg.payload);
         return;
       }
+      
+      // Goal deleted events (cleanup PM chat state)
+      if (msg.type === 'event' && msg.event === 'goal.deleted') {
+        const deletedGoalId = msg.payload?.goalId;
+        if (deletedGoalId && state.currentGoalOpenId === deletedGoalId) {
+          // Close the goal pane if we're viewing the deleted goal
+          closeGoalPane();
+          showToast('Goal was deleted', 'info');
+        }
+        // Refresh goals list
+        loadGoals();
+        return;
+      }
     }
     
     function sendConnect() {
@@ -4038,6 +4051,7 @@
           try {
             const result = await rpcCall('pm.chat', {
               condoId: state.goals.find(g => g.id === state.currentGoalOpenId)?.condoId,
+              goalId: state.currentGoalOpenId,
               message: message,
             }, 120000);
             

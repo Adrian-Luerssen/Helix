@@ -60,8 +60,31 @@ export default function register(api) {
   };
 
   for (const [method, handler] of Object.entries(handlers)) {
+    // Wrap goals.delete to add broadcast support (for PM chat cleanup)
+    if (method === 'goals.delete') {
+      api.registerGatewayMethod(method, (msg) => {
+        const goalId = msg.params?.id;
+        const originalRespond = msg.respond;
+        msg.respond = (success, data, error) => {
+          // Broadcast on success so frontend can cleanup (e.g., PM chat state)
+          if (success && goalId) {
+            if (api.broadcast) {
+              api.broadcast({
+                type: 'event',
+                event: 'goal.deleted',
+                payload: {
+                  goalId,
+                  timestamp: Date.now(),
+                },
+              });
+            }
+          }
+          originalRespond(success, data, error);
+        };
+        handler(msg);
+      });
     // Wrap goals.updatePlan to add broadcast support
-    if (method === 'goals.updatePlan') {
+    } else if (method === 'goals.updatePlan') {
       api.registerGatewayMethod(method, (msg) => {
         const originalRespond = msg.respond;
         msg.respond = (success, data, error) => {
