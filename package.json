@@ -36,14 +36,14 @@
     "helix",
     "orchestration"
   ],
-  "author": "Albert Castellana",
+  "author": "Adrian Luerssen Medina",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/acastellana/clawcondos"
+    "url": "https://github.com/Adrian-Luerssen/Helix"
   },
-  "homepage": "https://github.com/acastellana/clawcondos#readme",
+  "homepage": "https://github.com/Adrian-Luerssen/Helix#readme",
   "bugs": {
-    "url": "https://github.com/acastellana/clawcondos/issues"
+    "url": "https://github.com/Adrian-Luerssen/Helix/issues"
   }
 }

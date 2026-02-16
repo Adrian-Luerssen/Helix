@@ -77,8 +77,8 @@
 }
 
 .agent-card.active {
-  background: rgba(10, 132, 255, 0.06);
-  border-color: rgba(10, 132, 255, 0.2);
+  background: rgba(129, 140, 248, 0.06);
+  border-color: rgba(129, 140, 248, 0.2);
 }
 
 .agent-card-title {
@@ -304,7 +304,7 @@
 }
 
 .agent-file-search:focus {
-  border-color: rgba(10, 132, 255, 0.3);
+  border-color: rgba(129, 140, 248, 0.3);
 }
 
 .agent-file-sort {
@@ -448,7 +448,7 @@
 /* ── Active file highlight in list ── */
 
 .agent-file-item.active {
-  background: rgba(10, 132, 255, 0.08);
+  background: rgba(129, 140, 248, 0.08);
   color: var(--text-primary);
 }
 
@@ -478,7 +478,7 @@
 }
 
 .agent-file-ctx-item:hover {
-  background: rgba(10, 132, 255, 0.1);
+  background: rgba(129, 140, 248, 0.1);
   color: var(--text-primary);
 }
 
@@ -722,8 +722,8 @@
 }
 
 #agentsMainBody .grid-card.active {
-  border-color: rgba(10, 132, 255, 0.3);
-  background: rgba(10, 132, 255, 0.04);
+  border-color: rgba(129, 140, 248, 0.3);
+  background: rgba(129, 140, 248, 0.04);
 }
 
 /* ── Cron status badges ── */
@@ -785,13 +785,13 @@
 }
 
 .cron-trigger-btn {
-  border-color: rgba(10, 132, 255, 0.2);
+  border-color: rgba(129, 140, 248, 0.2);
   color: var(--neon-cyan, #00e5cc);
 }
 
 .cron-trigger-btn:hover:not(:disabled) {
-  background: rgba(10, 132, 255, 0.08);
-  border-color: rgba(10, 132, 255, 0.4);
+  background: rgba(129, 140, 248, 0.08);
+  border-color: rgba(129, 140, 248, 0.4);
 }
 
 .cron-detail-rows {
@@ -1013,8 +1013,8 @@
 }
 
 #recurringGrid .grid-card.active {
-  border-color: rgba(10, 132, 255, 0.3);
-  background: rgba(10, 132, 255, 0.04);
+  border-color: rgba(129, 140, 248, 0.3);
+  background: rgba(129, 140, 248, 0.04);
 }
 
 /* ── Status group dividers ── */
@@ -1080,8 +1080,8 @@
 }
 
 .cron-runs-show-more:hover {
-  background: rgba(10, 132, 255, 0.06);
-  border-color: rgba(10, 132, 255, 0.3);
+  background: rgba(129, 140, 248, 0.06);
+  border-color: rgba(129, 140, 248, 0.3);
 }
 
 /* ── Responsive ── */

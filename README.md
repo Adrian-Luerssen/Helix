@@ -35,11 +35,23 @@ No build step. No framework. Vanilla HTML/JS/CSS. Edit and refresh.
 - **Organize Wizard** - AI-assisted session triage and goal assignment
 - **Voice & Media** - Voice recording with Whisper transcription, image uploads
 
+## Screenshots
+
+| Dashboard Overview | Condo Context View |
+|---|---|
+| ![Dashboard overview with stat cards and condo board](public/media/screenshots/dashboard-overview.png) | ![Condo context view with goals, tasks, and tracked files](public/media/screenshots/condo-context.png) |
+
+| Agents Overview | Settings & Services |
+|---|---|
+| ![Agents overview panel with file browser](public/media/screenshots/agents-overview.png) | ![Settings and services configuration](public/media/screenshots/settings-services.png) |
+
+> **Note:** To add screenshots, capture them and place in `public/media/screenshots/`.
+
 ## Quick Start
 
 ```bash
-git clone https://github.com/acastellana/clawcondos.git
-cd clawcondos
+git clone https://github.com/Adrian-Luerssen/Helix.git
+cd Helix
 npm install
 cp config.example.json config.json   # edit with your gateway URL
 node serve.js                         # http://localhost:9000
@@ -179,4 +191,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-[MIT](LICENSE) &copy; 2024-2026 Albert Castellana
+[MIT](LICENSE) &copy; 2024-2026 Adrian Luerssen Medina
