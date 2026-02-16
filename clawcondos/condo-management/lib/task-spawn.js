@@ -19,6 +19,56 @@ export function buildPlanFilePath(agentId, goalId, taskId) {
   return join(workspaceDir, 'plans', goalId, taskId, 'PLAN.md');
 }
 
+/**
+ * Deep-merge global + condo service configs. Tokens are NOT included — only
+ * service names and non-secret metadata (org, team, model, etc.) are returned.
+ */
+export function resolveEffectiveServices(data, condoId) {
+  const globalServices = data.config?.services || {};
+  if (!condoId) return { ...globalServices };
+  const condo = data.condos.find(c => c.id === condoId);
+  if (!condo) return { ...globalServices };
+  const condoOverrides = condo.services || {};
+  const merged = { ...globalServices };
+  for (const [name, overrideCfg] of Object.entries(condoOverrides)) {
+    merged[name] = { ...(merged[name] || {}), ...overrideCfg };
+  }
+  return merged;
+}
+
+/**
+ * Build an agent-friendly context block listing configured services.
+ * Security: Only service names and non-secret metadata are included — tokens/keys are stripped.
+ */
+export function buildServiceContextBlock(services) {
+  if (!services || Object.keys(services).length === 0) return null;
+
+  const sensitiveKeys = new Set(['token', 'apiKey', 'secret', 'password', 'accessToken', 'agentToken']);
+  const lines = ['## Available Services', ''];
+  for (const [name, cfg] of Object.entries(services)) {
+    if (name === 'github' && cfg?.authMode === 'account') {
+      // GitHub account mode — give the agent rich context about its permissions
+      lines.push(`- **GitHub** (Agent Account mode)`);
+      if (cfg.agentUsername) lines.push(`  - Agent username: ${cfg.agentUsername}`);
+      if (cfg.org) lines.push(`  - Organization: ${cfg.org}`);
+      if (cfg.managerUsername) {
+        lines.push(`  - Manager username: ${cfg.managerUsername}`);
+        if (cfg.autoCollaborator) lines.push(`  - Auto-add manager as collaborator on new repos: YES`);
+        if (cfg.autoTransfer) lines.push(`  - Auto-transfer repo ownership to manager when done: YES`);
+      }
+      lines.push(`  - You can create repositories, branches, and PRs using the agent account credentials.`);
+    } else {
+      const meta = Object.entries(cfg || {})
+        .filter(([k]) => !sensitiveKeys.has(k))
+        .filter(([k]) => k !== 'authMode')
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ');
+      lines.push(`- **${name}**${meta ? ` (${meta})` : ''}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 export function createTaskSpawnHandler(store) {
   return function handler({ params, respond }) {
     try {
@@ -75,6 +125,10 @@ export function createTaskSpawnHandler(store) {
       // Resolve workspace path: goal worktree > condo workspace > null
       const workspacePath = goal.worktree?.path || condo?.workspace?.path || null;
 
+      // Resolve effective services (global + condo overrides) for agent context
+      const effectiveServices = resolveEffectiveServices(data, goal.condoId);
+      const serviceContextBlock = buildServiceContextBlock(effectiveServices);
+
       // Get worker skill context with task details
       const workerSkillContext = getWorkerSkillContext({
         goalId,
@@ -109,6 +163,9 @@ export function createTaskSpawnHandler(store) {
         '',
         // Working directory instruction
         workspacePath ? `**Working Directory:** \`${workspacePath}\`\nIMPORTANT: Start by running \`cd ${workspacePath}\` to work in the correct directory.` : null,
+        '',
+        // Available services
+        serviceContextBlock,
         '',
         autonomyDirective,
         '',

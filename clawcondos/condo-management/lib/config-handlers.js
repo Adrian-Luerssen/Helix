@@ -268,5 +268,174 @@ export function createConfigHandlers(store, options = {}) {
     }
   };
 
+  // ── Service configuration methods ──
+
+  /**
+   * Mask sensitive fields in a single service config object.
+   * Replaces token/apiKey/secret values with `first4****last4` and sets fieldConfigured: true.
+   */
+  function maskSingleService(svc) {
+    if (!svc || typeof svc !== 'object') return svc;
+    const masked = { ...svc };
+    const sensitiveKeys = ['token', 'apiKey', 'secret', 'password', 'accessToken', 'agentToken'];
+    for (const key of sensitiveKeys) {
+      if (masked[key] && typeof masked[key] === 'string') {
+        const val = masked[key];
+        if (val.length > 8) {
+          masked[key] = val.slice(0, 4) + '****' + val.slice(-4);
+        } else {
+          masked[key] = '****';
+        }
+        masked[key + 'Configured'] = true;
+      }
+    }
+    return masked;
+  }
+
+  /**
+   * Mask sensitive fields across all service configs.
+   */
+  function maskServiceTokens(services) {
+    if (!services || typeof services !== 'object') return {};
+    const masked = {};
+    for (const [name, svc] of Object.entries(services)) {
+      masked[name] = maskSingleService(svc);
+    }
+    return masked;
+  }
+
+  /**
+   * config.getServices - Returns masked service configs.
+   * Accepts optional condoId to deep-merge condo overrides onto global defaults.
+   * Params: { condoId?: string }
+   * Response: { services, overrides? }
+   */
+  handlers['config.getServices'] = ({ params, respond }) => {
+    try {
+      const data = store.load();
+      const globalServices = data.config?.services || {};
+
+      const condoId = params?.condoId;
+      if (condoId) {
+        const condo = data.condos.find(c => c.id === condoId);
+        if (!condo) {
+          return respond(false, null, 'Condo not found');
+        }
+        const condoOverrides = condo.services || {};
+
+        // Deep-merge: condo overrides on top of global defaults
+        const merged = { ...globalServices };
+        for (const [name, overrideCfg] of Object.entries(condoOverrides)) {
+          merged[name] = { ...(merged[name] || {}), ...overrideCfg };
+        }
+
+        respond(true, {
+          services: maskServiceTokens(merged),
+          overrides: maskServiceTokens(condoOverrides),
+        });
+      } else {
+        respond(true, {
+          services: maskServiceTokens(globalServices),
+        });
+      }
+    } catch (err) {
+      respond(false, null, err.message);
+    }
+  };
+
+  /**
+   * config.setService - Sets a single service config.
+   * Params: { service: string, config: object, condoId?: string }
+   * Response: { ok: boolean }
+   */
+  handlers['config.setService'] = ({ params, respond }) => {
+    try {
+      const { service, config: svcConfig, condoId } = params || {};
+      if (!service || typeof service !== 'string') {
+        return respond(false, null, 'service name is required');
+      }
+      if (!svcConfig || typeof svcConfig !== 'object') {
+        return respond(false, null, 'config object is required');
+      }
+
+      const data = store.load();
+
+      if (condoId) {
+        // Per-condo service override
+        const condo = data.condos.find(c => c.id === condoId);
+        if (!condo) {
+          return respond(false, null, 'Condo not found');
+        }
+        if (!condo.services) condo.services = {};
+        condo.services[service] = { ...(condo.services[service] || {}), ...svcConfig };
+        condo.updatedAtMs = Date.now();
+      } else {
+        // Global service config
+        if (!data.config) data.config = {};
+        if (!data.config.services) data.config.services = {};
+        data.config.services[service] = { ...(data.config.services[service] || {}), ...svcConfig };
+        data.config.updatedAtMs = Date.now();
+      }
+
+      store.save(data);
+
+      if (logger) {
+        logger.info(`config.setService: ${service}${condoId ? ` (condo: ${condoId})` : ' (global)'}`);
+      }
+
+      respond(true, { ok: true });
+    } catch (err) {
+      respond(false, null, err.message);
+    }
+  };
+
+  /**
+   * config.deleteService - Removes a service config.
+   * Params: { service: string, condoId?: string }
+   * Response: { ok: boolean }
+   */
+  handlers['config.deleteService'] = ({ params, respond }) => {
+    try {
+      const { service, condoId } = params || {};
+      if (!service || typeof service !== 'string') {
+        return respond(false, null, 'service name is required');
+      }
+
+      const data = store.load();
+
+      if (condoId) {
+        const condo = data.condos.find(c => c.id === condoId);
+        if (!condo) {
+          return respond(false, null, 'Condo not found');
+        }
+        if (condo.services) {
+          delete condo.services[service];
+          if (Object.keys(condo.services).length === 0) {
+            delete condo.services;
+          }
+        }
+        condo.updatedAtMs = Date.now();
+      } else {
+        if (data.config?.services) {
+          delete data.config.services[service];
+          if (Object.keys(data.config.services).length === 0) {
+            delete data.config.services;
+          }
+        }
+        if (data.config) data.config.updatedAtMs = Date.now();
+      }
+
+      store.save(data);
+
+      if (logger) {
+        logger.info(`config.deleteService: ${service}${condoId ? ` (condo: ${condoId})` : ' (global)'}`);
+      }
+
+      respond(true, { ok: true });
+    } catch (err) {
+      respond(false, null, err.message);
+    }
+  };
+
   return handlers;
 }

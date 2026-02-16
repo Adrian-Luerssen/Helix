@@ -34,6 +34,7 @@ import {
 import { createClassificationLog } from './lib/classification-log.js';
 import { analyzeCorrections, applyLearning } from './lib/learning.js';
 import { createSessionLifecycleHandlers } from './lib/session-lifecycle.js';
+import { pushBranch } from './lib/github.js';
 
 export default function register(api) {
   const dataDir = api.pluginConfig?.dataDir
@@ -915,6 +916,21 @@ export default function register(api) {
                     });
 
                     api.logger.info(`clawcondos-goals: auto-merge ${mergeGoal.worktree.branch} → ${mergeGoal.mergeStatus}`);
+
+                    // Auto-push main to GitHub after successful merge
+                    if (mergeResult.ok && mergeCondo.workspace.repoUrl) {
+                      try {
+                        const mainBranch = wsOps.getMainBranch(mergeCondo.workspace.path);
+                        const pushResult = pushBranch(mergeCondo.workspace.path, mainBranch);
+                        if (pushResult.ok) {
+                          api.logger.info(`clawcondos-goals: auto-pushed ${mainBranch} to GitHub for condo ${mergeCondo.id}`);
+                        } else {
+                          api.logger.error(`clawcondos-goals: auto-push failed for condo ${mergeCondo.id}: ${pushResult.error}`);
+                        }
+                      } catch (pushErr) {
+                        api.logger.error(`clawcondos-goals: auto-push error for condo ${mergeCondo.id}: ${pushErr.message}`);
+                      }
+                    }
                   }
                 }
               } catch (mergeErr) {

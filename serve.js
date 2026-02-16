@@ -1053,6 +1053,127 @@ const server = createServer(async (req, res) => {
   serveFile(res, filePath);
 });
 
+// ── Local service config RPC handler ──
+// Handles config.getServices, config.setService, config.deleteService locally
+// so they work even if the gateway plugin hasn't been restarted.
+function tryHandleLocalServiceRpc(raw, clientWs) {
+  let frame;
+  try { frame = JSON.parse(raw); } catch { return false; }
+  if (!frame || frame.type !== 'req') return false;
+
+  const LOCAL_METHODS = ['config.getServices', 'config.setService', 'config.deleteService'];
+  if (!LOCAL_METHODS.includes(frame.method)) return false;
+
+  const respond = (ok, payload, error) => {
+    const res = ok
+      ? { type: 'res', id: frame.id, ok: true, payload }
+      : { type: 'res', id: frame.id, ok: false, error: typeof error === 'string' ? { message: error } : error };
+    try { if (clientWs.readyState === WebSocket.OPEN) clientWs.send(JSON.stringify(res)); } catch {}
+  };
+
+  try {
+    const goalsPath = GOALS_FILE;
+    const loadData = () => {
+      if (!existsSync(goalsPath)) return { config: {}, condos: [] };
+      return JSON.parse(readFileSync(goalsPath, 'utf-8'));
+    };
+    const persistData = (d) => {
+      const dir = join(__dirname, 'clawcondos/condo-management/.data');
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      writeFileSync(goalsPath, JSON.stringify(d, null, 2));
+    };
+
+    const params = frame.params || {};
+
+    // ── Token masking ──
+    const SENSITIVE = ['token', 'apiKey', 'secret', 'password', 'accessToken', 'agentToken'];
+    const maskSvc = (svc) => {
+      if (!svc || typeof svc !== 'object') return svc;
+      const m = { ...svc };
+      for (const k of SENSITIVE) {
+        if (m[k] && typeof m[k] === 'string') {
+          const v = m[k];
+          m[k] = v.length > 8 ? v.slice(0, 4) + '****' + v.slice(-4) : '****';
+          m[k + 'Configured'] = true;
+        }
+      }
+      return m;
+    };
+    const maskAll = (svcs) => {
+      const r = {};
+      for (const [n, s] of Object.entries(svcs || {})) r[n] = maskSvc(s);
+      return r;
+    };
+
+    if (frame.method === 'config.getServices') {
+      const data = loadData();
+      const globalSvcs = data.config?.services || {};
+      if (params.condoId) {
+        const condo = (data.condos || []).find(c => c.id === params.condoId);
+        if (!condo) return respond(false, null, 'Condo not found'), true;
+        const overrides = condo.services || {};
+        const merged = { ...globalSvcs };
+        for (const [n, o] of Object.entries(overrides)) merged[n] = { ...(merged[n] || {}), ...o };
+        respond(true, { services: maskAll(merged), overrides: maskAll(overrides) });
+      } else {
+        respond(true, { services: maskAll(globalSvcs) });
+      }
+      return true;
+    }
+
+    if (frame.method === 'config.setService') {
+      const { service, config: svcCfg, condoId } = params;
+      if (!service || typeof service !== 'string') return respond(false, null, 'service name is required'), true;
+      if (!svcCfg || typeof svcCfg !== 'object') return respond(false, null, 'config object is required'), true;
+      const data = loadData();
+      if (condoId) {
+        const condo = (data.condos || []).find(c => c.id === condoId);
+        if (!condo) return respond(false, null, 'Condo not found'), true;
+        if (!condo.services) condo.services = {};
+        condo.services[service] = { ...(condo.services[service] || {}), ...svcCfg };
+        condo.updatedAtMs = Date.now();
+      } else {
+        if (!data.config) data.config = {};
+        if (!data.config.services) data.config.services = {};
+        data.config.services[service] = { ...(data.config.services[service] || {}), ...svcCfg };
+        data.config.updatedAtMs = Date.now();
+      }
+      persistData(data);
+      respond(true, { ok: true });
+      return true;
+    }
+
+    if (frame.method === 'config.deleteService') {
+      const { service, condoId } = params;
+      if (!service || typeof service !== 'string') return respond(false, null, 'service name is required'), true;
+      const data = loadData();
+      if (condoId) {
+        const condo = (data.condos || []).find(c => c.id === condoId);
+        if (!condo) return respond(false, null, 'Condo not found'), true;
+        if (condo.services) {
+          delete condo.services[service];
+          if (Object.keys(condo.services).length === 0) delete condo.services;
+        }
+        condo.updatedAtMs = Date.now();
+      } else {
+        if (data.config?.services) {
+          delete data.config.services[service];
+          if (Object.keys(data.config.services).length === 0) delete data.config.services;
+        }
+        if (data.config) data.config.updatedAtMs = Date.now();
+      }
+      persistData(data);
+      respond(true, { ok: true });
+      return true;
+    }
+  } catch (err) {
+    respond(false, null, err.message);
+    return true;
+  }
+
+  return false;
+}
+
 server.on('upgrade', (req, socket, head) => {
   try {
     const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -1140,6 +1261,12 @@ server.on('upgrade', (req, socket, head) => {
         const raw = isBinary
           ? (Buffer.isBuffer(data) ? data.toString('utf-8') : String(data))
           : (typeof data === 'string' ? data : (Buffer.isBuffer(data) ? data.toString('utf-8') : String(data)));
+
+        // ── Local intercept for service config RPC ──
+        // These methods may not yet be registered on the gateway (requires restart),
+        // so handle them locally against the same goals.json store.
+        const localResult = tryHandleLocalServiceRpc(raw, clientWs);
+        if (localResult) return; // Handled locally, don't forward
 
         const rewritten = rewriteConnectFrame(raw, gatewayAuth);
         try {

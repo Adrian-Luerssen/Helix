@@ -1,3 +1,5 @@
+import { pushBranch } from './github.js';
+
 export function createGoalHandlers(store, options = {}) {
   const { wsOps, logger, rpcCall } = options;
   function loadData() { return store.load(); }
@@ -49,6 +51,13 @@ export function createGoalHandlers(store, options = {}) {
             const wtResult = wsOps.createGoalWorktree(condo.workspace.path, goalId, title.trim());
             if (wtResult.ok) {
               goal.worktree = { path: wtResult.path, branch: wtResult.branch, createdAtMs: now };
+
+              // Auto-push new branch to GitHub if remote is configured (best-effort)
+              if (condo.workspace.repoUrl) {
+                try {
+                  pushBranch(condo.workspace.path, wtResult.branch, { setUpstream: true });
+                } catch { /* best-effort */ }
+              }
             } else if (logger) {
               logger.error(`clawcondos-goals: worktree creation failed for goal ${goalId}: ${wtResult.error}`);
             }

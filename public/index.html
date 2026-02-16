@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   
-  <link rel="stylesheet" href="/styles/main.css?v=9">
+  <link rel="stylesheet" href="/styles/main.css?v=11">
   <link rel="stylesheet" href="/styles/media-upload.css">
   <link rel="stylesheet" href="/styles/voice-recorder.css">
   <link rel="stylesheet" href="/styles/plans.css">
@@ -442,6 +442,9 @@
         <a href="/control/" class="control-ui-btn" title="Open Clawdbot Control UI">
           🤖 Clawdbot UI
         </a>
+        <button class="shortcut-hint-btn" onclick="showSettings()" title="Services configuration" style="font-size:1rem;">
+          ⚙
+        </button>
         <button class="shortcut-hint-btn" onclick="openShortcutsModal()" title="Keyboard shortcuts">
           <kbd>?</kbd>
         </button>
@@ -797,10 +800,46 @@
             <div class="condo-context-left">
               <div class="condo-info-panel" id="condoInfoPanel"></div>
               <div class="condo-workspace-panel" id="condoWorkspacePanel"></div>
+              <div class="condo-services-panel" id="condoServicesPanel"></div>
             </div>
             <div class="condo-context-right">
               <div class="condo-goals-graph" id="condoGoalsGraph"></div>
               <div class="condo-timeline" id="condoTimeline"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings View -->
+      <div class="view" id="settingsView">
+        <div class="settings-content">
+          <h2 class="settings-title">Services Configuration</h2>
+          <div class="settings-scope-toggle">
+            <button class="scope-btn active" onclick="setSettingsScope('global')">Global</button>
+            <button class="scope-btn" onclick="setSettingsScope('condo')">Per-Project</button>
+          </div>
+          <div class="settings-condo-picker" id="settingsCondoPicker">
+            <select id="settingsCondoSelect" onchange="loadServiceSettings()">
+              <option value="">Select a condo...</option>
+            </select>
+          </div>
+          <div class="services-grid" id="servicesGrid"></div>
+        </div>
+      </div>
+
+      <!-- Service Config Modal -->
+      <div class="modal-overlay" id="serviceConfigModal" style="display:none">
+        <div class="modal" style="max-width:480px">
+          <div class="modal-header">
+            <span class="modal-title" id="serviceConfigTitle">Configure Service</span>
+            <button class="ghost-btn" onclick="closeServiceConfigModal()" style="background:none;border:none;color:var(--text-dim);font-size:1.2rem;cursor:pointer;">&times;</button>
+          </div>
+          <div class="modal-body" id="serviceConfigFields"></div>
+          <div class="modal-footer" style="display:flex;gap:8px;justify-content:space-between;">
+            <button class="btn btn-ghost btn-sm" id="serviceDeleteBtn" onclick="deleteServiceConfig()" style="color:var(--red);">Remove</button>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-secondary btn-sm" onclick="closeServiceConfigModal()">Cancel</button>
+              <button class="btn btn-primary btn-sm" onclick="saveServiceConfig()">Save</button>
             </div>
           </div>
         </div>
@@ -2890,6 +2929,7 @@
       }
 
       container.innerHTML = html.join('');
+      applyStaggerAnimation(container, '.goal-item');
       updateUncategorizedLink();
     }
 
@@ -2909,7 +2949,7 @@
         const sessionCount = Array.isArray(g.sessions) ? g.sessions.length : 0;
         const nextTask = (g.nextTask || '').trim();
 
-        const classes = ['goal-item'];
+        const classes = ['goal-item', 'animate-in'];
         if (nested) classes.push('condo-nested');
         if (isActive) classes.push('active');
         if (isDone) classes.push('goal-done');
@@ -9600,10 +9640,11 @@ Response format:
       }, 0);
 
       summaryGrid.innerHTML =
-        '<div class="agent-summary-card accent-blue"><div class="agent-summary-label">Total Agents</div><div class="agent-summary-value">' + totalAgents + '</div></div>' +
-        '<div class="agent-summary-card accent-green"><div class="agent-summary-label">Active Sessions</div><div class="agent-summary-value">' + activeSessions + '</div></div>' +
-        '<div class="agent-summary-card accent-yellow"><div class="agent-summary-label">Tasks In Progress</div><div class="agent-summary-value">' + tasksInProgress + '</div></div>' +
-        '<div class="agent-summary-card accent-purple"><div class="agent-summary-label">Completion Rate</div><div class="agent-summary-value">' + (totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0) + '%</div></div>';
+        '<div class="agent-summary-card accent-blue animate-in"><div class="agent-summary-label">Total Agents</div><div class="agent-summary-value">' + totalAgents + '</div></div>' +
+        '<div class="agent-summary-card accent-green animate-in"><div class="agent-summary-label">Active Sessions</div><div class="agent-summary-value">' + activeSessions + '</div></div>' +
+        '<div class="agent-summary-card accent-yellow animate-in"><div class="agent-summary-label">Tasks In Progress</div><div class="agent-summary-value">' + tasksInProgress + '</div></div>' +
+        '<div class="agent-summary-card accent-purple animate-in"><div class="agent-summary-label">Completion Rate</div><div class="agent-summary-value">' + (totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0) + '%</div></div>';
+      applyStaggerAnimation(summaryGrid, '.agent-summary-card');
 
       // Active work list
       var activityList = document.getElementById('agentsActivityList');
@@ -9764,6 +9805,9 @@ Response format:
       } else {
         wsPanel.innerHTML = '<div class="condo-info-title">Workspace</div><div class="condo-workspace-none">No workspace configured</div>';
       }
+
+      // Services panel
+      renderCondoServicesPanel(condoId);
 
       // Goals graph (task dependency visualization)
       renderTaskGraph(goals);
@@ -9957,6 +10001,7 @@ Response format:
       }
 
       container.innerHTML = cards.join('');
+      applyStaggerAnimation(container, '.condo-status-card');
     }
 
     function renderCondoCard(condo, goals, attention, activeSessions, totalSessions) {
@@ -10010,7 +10055,7 @@ Response format:
           '</div>'
         : '';
 
-      return '<div class="condo-status-card' + attentionBorder + '">' +
+      return '<div class="condo-status-card animate-in' + attentionBorder + '">' +
         '<div class="condo-status-header">' +
           '<div class="condo-status-header-left">' +
             '<span class="condo-status-name"' + (isRealCondo ? ' onclick="event.stopPropagation(); showCondoContext(\'' + escapeHtml(condoId) + '\')" style="cursor:pointer;"' : '') + '>' + escapeHtml(condoName) + '</span>' +
@@ -10950,6 +10995,446 @@ Response format:
       handleRoute();
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // STAGGER ANIMATION UTILITY
+    // ═══════════════════════════════════════════════════════════════
+
+    function applyStaggerAnimation(container, selector) {
+      if (!container) return;
+      var items = container.querySelectorAll(selector);
+      for (var i = 0; i < items.length; i++) {
+        items[i].style.setProperty('--stagger-index', i);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SERVICES CONFIGURATION
+    // ═══════════════════════════════════════════════════════════════
+
+    var SERVICE_DEFS = [
+      {
+        id: 'github',
+        name: 'GitHub',
+        icon: '🐙',
+        description: 'Repository access & PR management',
+        authModes: [
+          {
+            id: 'token',
+            label: 'Personal Access Token',
+            description: 'Use your own PAT for repo access',
+            fields: [
+              { key: 'token', label: 'Personal Access Token', type: 'password', placeholder: 'ghp_...' },
+              { key: 'org', label: 'Organization (optional)', type: 'text', placeholder: 'my-org' },
+            ],
+          },
+          {
+            id: 'account',
+            label: 'Agent Account',
+            description: 'Dedicated GitHub account for agents to create & manage repos autonomously',
+            fields: [
+              { key: 'agentUsername', label: 'Agent GitHub Username', type: 'text', placeholder: 'my-bot-agent' },
+              { key: 'agentToken', label: 'Agent Account PAT', type: 'password', placeholder: 'ghp_... (token for the agent account)' },
+              { key: 'org', label: 'Organization (optional)', type: 'text', placeholder: 'my-org' },
+              { key: 'managerUsername', label: 'Manager GitHub Username', type: 'text', placeholder: 'your-username', hint: 'Agent will add this user as collaborator and can transfer repo ownership' },
+              { key: 'autoCollaborator', label: 'Auto-add manager as collaborator', type: 'checkbox', hint: 'Automatically invite the manager to every repo the agent creates' },
+              { key: 'autoTransfer', label: 'Auto-transfer ownership to manager', type: 'checkbox', hint: 'Transfer repo ownership to the manager once the agent finishes' },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'vercel',
+        name: 'Vercel',
+        icon: '▲',
+        description: 'Deployment & preview environments',
+        fields: [
+          { key: 'token', label: 'API Token', type: 'password', placeholder: 'vercel_...' },
+          { key: 'team', label: 'Team Slug', type: 'text', placeholder: 'my-team' },
+        ],
+      },
+      {
+        id: 'claude',
+        name: 'Claude API',
+        icon: '🤖',
+        description: 'Anthropic Claude API access',
+        fields: [
+          { key: 'apiKey', label: 'API Key', type: 'password', placeholder: 'sk-ant-...' },
+          { key: 'model', label: 'Default Model', type: 'text', placeholder: 'claude-sonnet-4-5-20250929' },
+        ],
+      },
+      {
+        id: 'docker',
+        name: 'Docker Hub',
+        icon: '🐳',
+        description: 'Container registry & image builds',
+        fields: [
+          { key: 'token', label: 'Access Token', type: 'password', placeholder: 'dckr_pat_...' },
+          { key: 'namespace', label: 'Namespace', type: 'text', placeholder: 'my-namespace' },
+        ],
+      },
+      {
+        id: 'webhook',
+        name: 'Webhooks',
+        icon: '🔗',
+        description: 'Custom webhook integrations',
+        fields: [
+          { key: 'url', label: 'Webhook URL', type: 'text', placeholder: 'https://hooks.example.com/...' },
+          { key: 'secret', label: 'Signing Secret', type: 'password', placeholder: 'whsec_...' },
+        ],
+      },
+    ];
+
+    var settingsScope = 'global';
+    var settingsCondoId = null;
+    var currentServiceId = null;
+
+    function showSettings(opts) {
+      if (!(opts && opts.fromRouter)) {
+        navigateTo('settings');
+        return;
+      }
+      state.currentView = 'settings';
+      deactivateAllViews();
+      document.getElementById('settingsView').classList.add('active');
+      document.getElementById('mainTitle').textContent = 'Settings';
+      document.getElementById('mainSubtitle').textContent = '';
+      document.getElementById('headerAction').style.display = 'none';
+      document.getElementById('headerStatusIndicator').style.display = 'none';
+      loadServiceSettings();
+      closeSidebar();
+    }
+
+    function setSettingsScope(scope) {
+      settingsScope = scope;
+      var btns = document.querySelectorAll('.scope-btn');
+      btns.forEach(function(b) { b.classList.remove('active'); });
+      if (scope === 'global') {
+        btns[0].classList.add('active');
+      } else {
+        btns[1].classList.add('active');
+      }
+
+      var picker = document.getElementById('settingsCondoPicker');
+      if (scope === 'condo') {
+        picker.classList.add('visible');
+        // Populate condo picker
+        var select = document.getElementById('settingsCondoSelect');
+        var currentVal = select.value;
+        select.innerHTML = '<option value="">Select a condo...</option>';
+        (state.condos || []).forEach(function(c) {
+          select.innerHTML += '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name || c.id) + '</option>';
+        });
+        if (currentVal) select.value = currentVal;
+      } else {
+        picker.classList.remove('visible');
+        settingsCondoId = null;
+      }
+
+      loadServiceSettings();
+    }
+
+    async function loadServiceSettings() {
+      var grid = document.getElementById('servicesGrid');
+      if (!grid) return;
+
+      settingsCondoId = settingsScope === 'condo' ? document.getElementById('settingsCondoSelect').value : null;
+
+      var params = {};
+      if (settingsCondoId) params.condoId = settingsCondoId;
+
+      try {
+        var result = await rpcCall('config.getServices', params);
+        renderServiceCards(result.services || {}, result.overrides || null);
+      } catch (err) {
+        // If RPC not available, render empty
+        renderServiceCards({}, null);
+      }
+    }
+
+    function renderServiceCards(services, overrides) {
+      var grid = document.getElementById('servicesGrid');
+      if (!grid) return;
+
+      var html = '';
+      for (var i = 0; i < SERVICE_DEFS.length; i++) {
+        var def = SERVICE_DEFS[i];
+        var svc = services[def.id];
+        var isConfigured = !!svc;
+        var hasOverride = overrides && overrides[def.id];
+        var statusClass = isConfigured ? 'connected' : 'not-configured';
+        var statusText = isConfigured ? 'Connected' : 'Not configured';
+
+        // Show auth mode detail for services with multiple modes
+        var modeLabel = '';
+        if (isConfigured && svc.authMode && def.authModes) {
+          var modeMatch = def.authModes.find(function(m) { return m.id === svc.authMode; });
+          if (modeMatch) modeLabel = ' <span style="font-size:0.65rem;color:var(--text-dim);font-weight:400;">(' + escapeHtml(modeMatch.label) + ')</span>';
+        }
+
+        html += '<div class="service-card animate-in" onclick="openServiceConfig(\'' + escapeHtml(def.id) + '\')">' +
+          '<div class="service-card-icon">' + def.icon + '</div>' +
+          '<div class="service-card-info">' +
+            '<div class="service-card-name">' + escapeHtml(def.name) + modeLabel +
+              (hasOverride ? '<span class="service-override-badge">Override</span>' : '') +
+            '</div>' +
+            '<div class="service-card-desc">' + escapeHtml(def.description) + '</div>' +
+          '</div>' +
+          '<div class="service-card-status ' + statusClass + '">' + statusText + '</div>' +
+        '</div>';
+      }
+
+      grid.innerHTML = html;
+      applyStaggerAnimation(grid, '.service-card');
+    }
+
+    var currentAuthMode = null; // For services with authModes (e.g. github)
+
+    /**
+     * Get the active fields for a service def — either from the selected authMode
+     * or from the flat fields array.
+     */
+    function getActiveFields(def) {
+      if (def.authModes && currentAuthMode) {
+        var mode = def.authModes.find(function(m) { return m.id === currentAuthMode; });
+        return mode ? mode.fields : [];
+      }
+      return def.fields || [];
+    }
+
+    /**
+     * Render fields for a given field array into the modal container.
+     */
+    function renderServiceFields(fields) {
+      var html = '';
+      var inputStyle = 'width:100%;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);font-family:var(--font-mono);font-size:0.85rem;';
+
+      for (var i = 0; i < fields.length; i++) {
+        var f = fields[i];
+        if (f.type === 'checkbox') {
+          html += '<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">' +
+            '<input type="checkbox" id="svcField_' + escapeHtml(f.key) + '" style="width:16px;height:16px;accent-color:var(--accent);">' +
+            '<label for="svcField_' + escapeHtml(f.key) + '" style="font-size:0.82rem;font-weight:600;color:var(--text-secondary);cursor:pointer;">' + escapeHtml(f.label) + '</label>' +
+          '</div>';
+          if (f.hint) {
+            html += '<div style="margin-top:-8px;margin-bottom:12px;font-size:0.75rem;color:var(--text-dim);padding-left:24px;">' + escapeHtml(f.hint) + '</div>';
+          }
+        } else {
+          html += '<div style="margin-bottom:12px;">' +
+            '<label style="display:block;font-size:0.82rem;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">' + escapeHtml(f.label) + '</label>' +
+            (f.hint ? '<div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:6px;">' + escapeHtml(f.hint) + '</div>' : '') +
+            '<input type="' + f.type + '" id="svcField_' + escapeHtml(f.key) + '" class="form-input" ' +
+              'placeholder="' + escapeHtml(f.placeholder || '') + '" ' +
+              'style="' + inputStyle + '">' +
+          '</div>';
+        }
+      }
+      return html;
+    }
+
+    function openServiceConfig(serviceId) {
+      currentServiceId = serviceId;
+      currentAuthMode = null;
+      var def = SERVICE_DEFS.find(function(d) { return d.id === serviceId; });
+      if (!def) return;
+
+      document.getElementById('serviceConfigTitle').textContent = def.icon + ' ' + def.name;
+      var fieldsContainer = document.getElementById('serviceConfigFields');
+
+      var html = '';
+
+      // If service has auth modes, show mode toggle
+      if (def.authModes) {
+        currentAuthMode = def.authModes[0].id; // default to first mode
+        html += '<div style="margin-bottom:16px;">' +
+          '<label style="display:block;font-size:0.82rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Auth Mode</label>' +
+          '<div class="settings-scope-toggle" style="margin-bottom:0;">';
+        for (var mi = 0; mi < def.authModes.length; mi++) {
+          var m = def.authModes[mi];
+          html += '<button class="scope-btn' + (mi === 0 ? ' active' : '') + '" onclick="switchAuthMode(\'' + escapeHtml(m.id) + '\')">' + escapeHtml(m.label) + '</button>';
+        }
+        html += '</div>';
+        // Mode description
+        html += '<div id="authModeDescription" style="font-size:0.78rem;color:var(--text-dim);margin-top:6px;">' + escapeHtml(def.authModes[0].description) + '</div>';
+        html += '</div>';
+        // Fields for active mode
+        html += '<div id="authModeFields">' + renderServiceFields(def.authModes[0].fields) + '</div>';
+      } else {
+        html += renderServiceFields(def.fields || []);
+      }
+
+      fieldsContainer.innerHTML = html;
+
+      // Load existing values
+      loadExistingServiceValues(serviceId, def);
+
+      document.getElementById('serviceConfigModal').style.display = 'flex';
+    }
+
+    function switchAuthMode(modeId) {
+      var def = SERVICE_DEFS.find(function(d) { return d.id === currentServiceId; });
+      if (!def || !def.authModes) return;
+
+      currentAuthMode = modeId;
+      var mode = def.authModes.find(function(m) { return m.id === modeId; });
+      if (!mode) return;
+
+      // Update toggle buttons
+      var btns = document.getElementById('serviceConfigFields').querySelectorAll('.scope-btn');
+      btns.forEach(function(b) { b.classList.remove('active'); });
+      for (var i = 0; i < btns.length; i++) {
+        if (btns[i].textContent.trim() === mode.label) {
+          btns[i].classList.add('active');
+          break;
+        }
+      }
+
+      // Update description
+      var descEl = document.getElementById('authModeDescription');
+      if (descEl) descEl.textContent = mode.description;
+
+      // Re-render fields
+      var fieldsEl = document.getElementById('authModeFields');
+      if (fieldsEl) {
+        fieldsEl.innerHTML = renderServiceFields(mode.fields);
+        // Re-load existing values for this mode
+        loadExistingServiceValues(currentServiceId, def);
+      }
+    }
+
+    async function loadExistingServiceValues(serviceId, def) {
+      try {
+        var params = {};
+        if (settingsCondoId) params.condoId = settingsCondoId;
+        var result = await rpcCall('config.getServices', params);
+        var svc = (result.services || {})[serviceId];
+        if (!svc) return;
+
+        // Restore auth mode from saved config if applicable
+        if (def.authModes && svc.authMode && svc.authMode !== currentAuthMode) {
+          switchAuthMode(svc.authMode);
+        }
+
+        var fields = getActiveFields(def);
+        for (var i = 0; i < fields.length; i++) {
+          var f = fields[i];
+          var el = document.getElementById('svcField_' + f.key);
+          if (!el) continue;
+          if (f.type === 'checkbox') {
+            if (svc[f.key] === true || svc[f.key] === 'true') {
+              el.checked = true;
+            }
+          } else if (svc[f.key]) {
+            el.placeholder = svc[f.key]; // Show masked value as placeholder
+          }
+        }
+      } catch (err) {
+        // Ignore
+      }
+    }
+
+    function closeServiceConfigModal() {
+      document.getElementById('serviceConfigModal').style.display = 'none';
+      currentServiceId = null;
+      currentAuthMode = null;
+    }
+
+    async function saveServiceConfig() {
+      if (!currentServiceId) return;
+      var def = SERVICE_DEFS.find(function(d) { return d.id === currentServiceId; });
+      if (!def) return;
+
+      var svcConfig = {};
+      var fields = getActiveFields(def);
+
+      // Store which auth mode was selected (so we can restore it)
+      if (def.authModes && currentAuthMode) {
+        svcConfig.authMode = currentAuthMode;
+      }
+
+      for (var i = 0; i < fields.length; i++) {
+        var f = fields[i];
+        var el = document.getElementById('svcField_' + f.key);
+        if (!el) continue;
+        if (f.type === 'checkbox') {
+          svcConfig[f.key] = el.checked;
+        } else if (el.value.trim()) {
+          svcConfig[f.key] = el.value.trim();
+        }
+      }
+
+      // Require at least one substantive field (skip authMode and booleans)
+      var hasValue = Object.keys(svcConfig).some(function(k) {
+        return k !== 'authMode' && typeof svcConfig[k] === 'string' && svcConfig[k].length > 0;
+      });
+      if (!hasValue) {
+        showToast('Enter at least one field', 'warning');
+        return;
+      }
+
+      try {
+        var params = { service: currentServiceId, config: svcConfig };
+        if (settingsCondoId) params.condoId = settingsCondoId;
+        await rpcCall('config.setService', params);
+        showToast(def.name + ' configured', 'success');
+        closeServiceConfigModal();
+        loadServiceSettings();
+      } catch (err) {
+        showToast('Failed to save: ' + err.message, 'warning');
+      }
+    }
+
+    async function deleteServiceConfig() {
+      if (!currentServiceId) return;
+      var def = SERVICE_DEFS.find(function(d) { return d.id === currentServiceId; });
+
+      try {
+        var params = { service: currentServiceId };
+        if (settingsCondoId) params.condoId = settingsCondoId;
+        await rpcCall('config.deleteService', params);
+        showToast((def ? def.name : currentServiceId) + ' removed', 'success');
+        closeServiceConfigModal();
+        loadServiceSettings();
+      } catch (err) {
+        showToast('Failed to remove: ' + err.message, 'warning');
+      }
+    }
+
+    async function renderCondoServicesPanel(condoId) {
+      var panel = document.getElementById('condoServicesPanel');
+      if (!panel) return;
+
+      try {
+        var result = await rpcCall('config.getServices', { condoId: condoId });
+        var services = result.services || {};
+        var serviceNames = Object.keys(services);
+
+        if (serviceNames.length === 0) {
+          panel.innerHTML =
+            '<div class="condo-services-title">Services</div>' +
+            '<div style="font-size:0.82rem;color:var(--text-dim);">No services configured. ' +
+            '<a href="#" onclick="event.preventDefault();showSettings();" style="color:var(--accent);text-decoration:none;">Manage</a></div>';
+          return;
+        }
+
+        var chips = '';
+        for (var i = 0; i < serviceNames.length; i++) {
+          var name = serviceNames[i];
+          var def = SERVICE_DEFS.find(function(d) { return d.id === name; });
+          var icon = def ? def.icon : '🔌';
+          var label = def ? def.name : name;
+          chips += '<span class="condo-service-chip active">' + icon + ' ' + escapeHtml(label) + '</span>';
+        }
+
+        panel.innerHTML =
+          '<div class="condo-services-title">Services ' +
+            '<a href="#" onclick="event.preventDefault();showSettings();" style="color:var(--accent);text-decoration:none;font-size:0.78rem;">Manage</a>' +
+          '</div>' +
+          '<div class="condo-services-list">' + chips + '</div>';
+      } catch (err) {
+        panel.innerHTML = '';
+      }
+    }
+
     function handleRoute() {
       var raw = (window.location.hash || '').replace('#/', '');
       var slashIdx = raw.indexOf('/');
@@ -11011,6 +11496,10 @@ Response format:
           } else {
             showOverview({ fromRouter: true });
           }
+          break;
+        case 'settings':
+          closeDetailPanel({ fromRouter: true });
+          showSettings({ fromRouter: true });
           break;
         case 'dashboard':
         default:

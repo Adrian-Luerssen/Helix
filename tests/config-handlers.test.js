@@ -251,4 +251,196 @@ describe('config-handlers', () => {
       expect(result.roles.pm.description).toBeNull();  // No description set
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════
+  // SERVICE CONFIGURATION
+  // ═══════════════════════════════════════════════════════════════
+
+  describe('config.getServices', () => {
+    it('returns empty services by default', async () => {
+      const { success, result } = await callHandler('config.getServices', {});
+      expect(success).toBe(true);
+      expect(result.services).toEqual({});
+    });
+
+    it('returns masked tokens for configured services', async () => {
+      data.config.services = {
+        github: { token: 'ghp_abcdefghij1234567890', org: 'my-org' },
+      };
+
+      const { success, result } = await callHandler('config.getServices', {});
+      expect(success).toBe(true);
+      expect(result.services.github.org).toBe('my-org');
+      // Token should be masked: first4****last4
+      expect(result.services.github.token).toBe('ghp_****7890');
+      expect(result.services.github.tokenConfigured).toBe(true);
+    });
+
+    it('deep-merges condo overrides onto global defaults', async () => {
+      data.config.services = {
+        github: { token: 'ghp_globaltoken1234567890', org: 'global-org' },
+        vercel: { token: 'vercel_token1234567890', team: 'global-team' },
+      };
+      data.condos = [{
+        id: 'condo_1',
+        name: 'Test Condo',
+        services: {
+          github: { org: 'condo-org' },  // Override org only
+        },
+        createdAtMs: Date.now(),
+        updatedAtMs: Date.now(),
+      }];
+
+      const { success, result } = await callHandler('config.getServices', { condoId: 'condo_1' });
+      expect(success).toBe(true);
+      // GitHub: org overridden, token from global
+      expect(result.services.github.org).toBe('condo-org');
+      expect(result.services.github.tokenConfigured).toBe(true);
+      // Vercel: untouched from global
+      expect(result.services.vercel.team).toBe('global-team');
+      // Overrides should only contain the condo-level config
+      expect(result.overrides.github.org).toBe('condo-org');
+      expect(result.overrides.vercel).toBeUndefined();
+    });
+
+    it('returns error for non-existent condo', async () => {
+      const { success, error } = await callHandler('config.getServices', { condoId: 'condo_nonexistent' });
+      expect(success).toBe(false);
+      expect(error).toContain('Condo not found');
+    });
+  });
+
+  describe('config.setService', () => {
+    it('sets a global service config', async () => {
+      const { success, result } = await callHandler('config.setService', {
+        service: 'github',
+        config: { token: 'ghp_mytoken123456789012', org: 'my-org' },
+      });
+
+      expect(success).toBe(true);
+      expect(result.ok).toBe(true);
+      expect(data.config.services.github.token).toBe('ghp_mytoken123456789012');
+      expect(data.config.services.github.org).toBe('my-org');
+    });
+
+    it('sets a per-condo service config', async () => {
+      data.condos = [{
+        id: 'condo_1',
+        name: 'Test Condo',
+        createdAtMs: Date.now(),
+        updatedAtMs: Date.now(),
+      }];
+
+      const { success } = await callHandler('config.setService', {
+        service: 'vercel',
+        config: { team: 'condo-team' },
+        condoId: 'condo_1',
+      });
+
+      expect(success).toBe(true);
+      expect(data.condos[0].services.vercel.team).toBe('condo-team');
+    });
+
+    it('returns error for missing service name', async () => {
+      const { success, error } = await callHandler('config.setService', {
+        config: { token: 'abc' },
+      });
+
+      expect(success).toBe(false);
+      expect(error).toContain('service name is required');
+    });
+
+    it('returns error for missing config object', async () => {
+      const { success, error } = await callHandler('config.setService', {
+        service: 'github',
+      });
+
+      expect(success).toBe(false);
+      expect(error).toContain('config object is required');
+    });
+
+    it('merges into existing service config', async () => {
+      data.config.services = {
+        github: { token: 'old_token_1234567890', org: 'old-org' },
+      };
+
+      await callHandler('config.setService', {
+        service: 'github',
+        config: { org: 'new-org' },
+      });
+
+      // Token preserved, org updated
+      expect(data.config.services.github.token).toBe('old_token_1234567890');
+      expect(data.config.services.github.org).toBe('new-org');
+    });
+  });
+
+  describe('config.deleteService', () => {
+    it('deletes a global service config', async () => {
+      data.config.services = {
+        github: { token: 'abc', org: 'my-org' },
+        vercel: { token: 'xyz' },
+      };
+
+      const { success } = await callHandler('config.deleteService', {
+        service: 'github',
+      });
+
+      expect(success).toBe(true);
+      expect(data.config.services.github).toBeUndefined();
+      expect(data.config.services.vercel).toBeDefined();
+    });
+
+    it('cleans up empty services object', async () => {
+      data.config.services = {
+        github: { token: 'abc' },
+      };
+
+      await callHandler('config.deleteService', { service: 'github' });
+
+      expect(data.config.services).toBeUndefined();
+    });
+
+    it('deletes a per-condo service override', async () => {
+      data.condos = [{
+        id: 'condo_1',
+        name: 'Test Condo',
+        services: { github: { org: 'condo-org' }, vercel: { team: 'condo-team' } },
+        createdAtMs: Date.now(),
+        updatedAtMs: Date.now(),
+      }];
+
+      const { success } = await callHandler('config.deleteService', {
+        service: 'github',
+        condoId: 'condo_1',
+      });
+
+      expect(success).toBe(true);
+      expect(data.condos[0].services.github).toBeUndefined();
+      expect(data.condos[0].services.vercel).toBeDefined();
+    });
+
+    it('cleans up empty condo services object', async () => {
+      data.condos = [{
+        id: 'condo_1',
+        name: 'Test Condo',
+        services: { github: { org: 'condo-org' } },
+        createdAtMs: Date.now(),
+        updatedAtMs: Date.now(),
+      }];
+
+      await callHandler('config.deleteService', {
+        service: 'github',
+        condoId: 'condo_1',
+      });
+
+      expect(data.condos[0].services).toBeUndefined();
+    });
+
+    it('returns error for missing service name', async () => {
+      const { success, error } = await callHandler('config.deleteService', {});
+      expect(success).toBe(false);
+      expect(error).toContain('service name is required');
+    });
+  });
 });

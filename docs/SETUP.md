@@ -293,6 +293,105 @@ docker run -p 9000:9000 \
 
 ---
 
+## Services Configuration
+
+ClawCondos lets you configure external service integrations that agents can use autonomously. Configure these from the dashboard at **Settings** (gear icon in sidebar), or pre-configure them in the environment/store.
+
+### GitHub
+
+GitHub supports two auth modes:
+
+#### Mode 1: Personal Access Token (simple)
+
+Use your own GitHub PAT. Agents will use it for repo access, PRs, etc.
+
+| Field | Description |
+|-------|-------------|
+| `token` | Your GitHub Personal Access Token (`ghp_...`) |
+| `org` | Organization (optional) |
+
+#### Mode 2: Agent Account (recommended for autonomous teams)
+
+Give each agent (or a shared bot account) its own GitHub identity. The agent can create repos, branches, and PRs under its own account. You stay in control via the manager relationship.
+
+| Field | Description |
+|-------|-------------|
+| `agentUsername` | GitHub username for the agent's account |
+| `agentToken` | PAT for the agent's account (`ghp_...`) |
+| `org` | Organization (optional) |
+| `managerUsername` | Your GitHub username — the agent will share repos with you |
+| `autoCollaborator` | If enabled, the agent auto-invites the manager as collaborator on every repo it creates |
+| `autoTransfer` | If enabled, the agent transfers repo ownership to the manager when the work is done |
+
+**How it works:**
+1. Create a GitHub account for your agent (e.g. `clawdia-agent`)
+2. Generate a PAT for that account with `repo`, `admin:org` scopes
+3. In Settings, choose "Agent Account" mode and fill in both usernames
+4. Enable auto-collaborator so you always have access
+5. Optionally enable auto-transfer for final ownership handoff
+
+This way agents can work fully autonomously — creating repos, pushing code, opening PRs — while you retain oversight and ownership.
+
+### Vercel
+
+| Field | Description |
+|-------|-------------|
+| `token` | Vercel API token |
+| `team` | Team slug (optional) |
+
+### Claude API
+
+| Field | Description |
+|-------|-------------|
+| `apiKey` | Anthropic API key (`sk-ant-...`) |
+| `model` | Default model name |
+
+### Docker Hub
+
+| Field | Description |
+|-------|-------------|
+| `token` | Docker Hub access token |
+| `namespace` | Docker Hub namespace |
+
+### Webhooks
+
+| Field | Description |
+|-------|-------------|
+| `url` | Webhook endpoint URL |
+| `secret` | Signing secret for verification |
+
+### Per-Condo Overrides
+
+Each condo (project) can override global service settings. Use this when different projects need different GitHub orgs, Vercel teams, or API keys. Set overrides from Settings > Per-Project tab, or in the condo context view.
+
+### Pre-configuring Services
+
+Services are stored in the goals data file. You can also set them via the `config.setService` RPC method programmatically:
+
+```javascript
+// Set global GitHub with agent account mode
+rpcCall('config.setService', {
+  service: 'github',
+  config: {
+    authMode: 'account',
+    agentUsername: 'clawdia-agent',
+    agentToken: 'ghp_...',
+    managerUsername: 'your-username',
+    autoCollaborator: true,
+    autoTransfer: false,
+  }
+});
+
+// Set per-condo override
+rpcCall('config.setService', {
+  service: 'github',
+  config: { org: 'project-specific-org' },
+  condoId: 'condo_abc123',
+});
+```
+
+---
+
 ## Security Notes
 
 - **Never commit** config files with real tokens to git

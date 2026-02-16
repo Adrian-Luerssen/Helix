@@ -32,8 +32,8 @@
 
 /* Role colors */
 .agent-role-badge.role-pm {
-  background: rgba(147, 51, 234, 0.15);
-  border-color: rgba(147, 51, 234, 0.3);
+  background: rgba(191, 90, 242, 0.15);
+  border-color: rgba(191, 90, 242, 0.3);
   color: #c084fc;
 }
 
@@ -108,12 +108,12 @@
 }
 
 .role-dropdown-item:hover {
-  background: rgba(96, 165, 250, 0.12);
+  background: rgba(10, 132, 255, 0.12);
   color: var(--text);
 }
 
 .role-dropdown-item.active {
-  background: rgba(96, 165, 250, 0.18);
+  background: rgba(10, 132, 255, 0.18);
   color: var(--text);
 }
 
@@ -155,7 +155,7 @@
 }
 
 .role-dropdown-custom input:focus {
-  border-color: rgba(96, 165, 250, 0.4);
+  border-color: rgba(10, 132, 255, 0.4);
 }
 
 .role-dropdown-custom input::placeholder {
@@ -257,7 +257,7 @@
 }
 
 .agent-panel-item.active {
-  background: rgba(96, 165, 250, 0.08);
+  background: rgba(10, 132, 255, 0.08);
 }
 
 .agent-panel-emoji {
@@ -334,14 +334,14 @@
   align-items: center;
   gap: 8px;
   white-space: nowrap;
-  background: linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(79, 70, 229, 0.2));
-  border: 1px solid rgba(147, 51, 234, 0.4);
+  background: linear-gradient(135deg, rgba(191, 90, 242, 0.2), rgba(94, 92, 230, 0.2));
+  border: 1px solid rgba(191, 90, 242, 0.4);
   color: #c084fc;
 }
 
 .auto-detect-btn:hover {
-  background: linear-gradient(135deg, rgba(147, 51, 234, 0.3), rgba(79, 70, 229, 0.3));
-  border-color: rgba(147, 51, 234, 0.6);
+  background: linear-gradient(135deg, rgba(191, 90, 242, 0.3), rgba(94, 92, 230, 0.3));
+  border-color: rgba(191, 90, 242, 0.6);
 }
 
 .auto-detect-icon {
@@ -350,8 +350,8 @@
 
 /* --- Auto-detect Preview --- */
 .auto-detect-preview {
-  background: rgba(147, 51, 234, 0.08);
-  border: 1px solid rgba(147, 51, 234, 0.25);
+  background: rgba(191, 90, 242, 0.08);
+  border: 1px solid rgba(191, 90, 242, 0.25);
   border-radius: 10px;
   padding: 12px;
   margin-bottom: 16px;
@@ -552,7 +552,7 @@
 }
 
 .role-config-row-input:focus {
-  border-color: rgba(96, 165, 250, 0.4);
+  border-color: rgba(10, 132, 255, 0.4);
 }
 
 .role-config-row-input::placeholder {
@@ -576,7 +576,7 @@
 }
 
 .role-config-row-desc:focus {
-  border-color: rgba(96, 165, 250, 0.4);
+  border-color: rgba(10, 132, 255, 0.4);
   color: var(--text);
 }
 

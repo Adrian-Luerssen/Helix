@@ -1,12 +1,28 @@
 import { AUTONOMY_MODES } from './autonomy.js';
+import { initGitHubRepo, pushBranch } from './github.js';
 
 export function createCondoHandlers(store, options = {}) {
   const { wsOps, logger, rpcCall } = options;
   function loadData() { return store.load(); }
   function saveData(data) { store.save(data); }
 
+  /**
+   * Resolve GitHub config from store (global services).
+   * Returns the config if authMode === 'account' and agentToken is set, else null.
+   */
+  function getGitHubAgentConfig() {
+    try {
+      const data = loadData();
+      const gh = data.config?.services?.github;
+      if (gh?.authMode === 'account' && gh?.agentToken && gh?.agentUsername) {
+        return gh;
+      }
+    } catch { /* ignore */ }
+    return null;
+  }
+
   return {
-    'condos.create': ({ params, respond }) => {
+    'condos.create': async ({ params, respond }) => {
       try {
         const { name, description, color, repoUrl, autonomyMode } = params;
         if (!name || typeof name !== 'string' || !name.trim()) {
@@ -40,6 +56,35 @@ export function createCondoHandlers(store, options = {}) {
             condo.workspace = { path: wsResult.path, repoUrl: repoUrl || null, createdAtMs: now };
           } else if (logger) {
             logger.error(`clawcondos-goals: workspace creation failed for condo ${condoId}: ${wsResult.error}`);
+          }
+        }
+
+        // Auto-create GitHub repo if agent account is configured and workspace exists
+        if (condo.workspace?.path && !repoUrl) {
+          const ghConfig = getGitHubAgentConfig();
+          if (ghConfig) {
+            try {
+              const ghResult = await initGitHubRepo(
+                condo.workspace.path,
+                ghConfig,
+                name.trim(),
+                typeof description === 'string' ? description : '',
+              );
+              if (ghResult.ok) {
+                condo.workspace.repoUrl = ghResult.repoUrl;
+                condo.workspace.githubFullName = ghResult.fullName;
+                condo.workspace.githubRepoName = ghResult.repoName;
+                if (logger) {
+                  logger.info(`clawcondos-goals: GitHub repo created: ${ghResult.fullName} for condo ${condoId}`);
+                }
+              } else if (logger) {
+                logger.error(`clawcondos-goals: GitHub repo creation failed for condo ${condoId}: ${ghResult.error}`);
+              }
+            } catch (ghErr) {
+              if (logger) {
+                logger.error(`clawcondos-goals: GitHub repo creation error for condo ${condoId}: ${ghErr.message}`);
+              }
+            }
           }
         }
 
@@ -102,7 +147,7 @@ export function createCondoHandlers(store, options = {}) {
           return;
         }
 
-        const allowed = ['name', 'description', 'color', 'keywords', 'telegramTopicIds', 'autonomyMode'];
+        const allowed = ['name', 'description', 'color', 'keywords', 'telegramTopicIds', 'autonomyMode', 'services'];
         for (const f of allowed) {
           if (f in params) {
             // Validate array fields

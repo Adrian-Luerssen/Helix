@@ -68,6 +68,7 @@ describe('Plugin index.js', () => {
         'pm.condoCreateGoals', 'pm.condoCascade',
         // Config handlers
         'config.get', 'config.set', 'config.setRole', 'config.getRole', 'config.listRoles',
+        'config.getServices', 'config.setService', 'config.deleteService',
         // Team handlers
         'team.getMessages', 'team.send', 'team.notify', 'team.status',
         // Roles handlers
