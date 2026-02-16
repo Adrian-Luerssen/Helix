@@ -1,4 +1,4 @@
-# ClawCondos Goals Plugin (`clawcondos-goals`)
+# Helix Goals Plugin (`clawcondos-goals`)
 
 An [OpenClaw](https://github.com/acastellana/openclaw) plugin for managing goals, tasks, and condos (projects). Provides 26 gateway RPC methods, 2 lifecycle hooks, and 5 agent tools.
 

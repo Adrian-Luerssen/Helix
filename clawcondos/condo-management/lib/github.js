@@ -24,7 +24,7 @@ function githubRequest(method, path, token, body) {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/vnd.github+json',
-        'User-Agent': 'ClawCondos/1.0',
+        'User-Agent': 'Helix/1.0',
         'X-GitHub-Api-Version': '2022-11-28',
       },
     };
@@ -195,14 +195,14 @@ export async function initGitHubRepo(repoPath, githubConfig, condoName, descript
     try {
       repo = await createRepo(agentToken, repoName, {
         org,
-        description: description || `${condoName} — managed by ClawCondos`,
+        description: description || `${condoName} — managed by Helix`,
       });
     } catch (err) {
       if (err.status === 422) {
         const suffix = Math.random().toString(36).slice(2, 8);
         repo = await createRepo(agentToken, `${repoName}-${suffix}`, {
           org,
-          description: description || `${condoName} — managed by ClawCondos`,
+          description: description || `${condoName} — managed by Helix`,
         });
       } else {
         throw err;

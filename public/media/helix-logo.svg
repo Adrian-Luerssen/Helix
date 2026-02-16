@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 64" width="48" height="64">
+  <defs>
+    <linearGradient id="strand1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="strand2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <!-- Connecting rungs -->
+  <line x1="18" y1="10" x2="30" y2="10" stroke="#4b5563" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <line x1="14" y1="21" x2="34" y2="21" stroke="#4b5563" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <line x1="14" y1="43" x2="34" y2="43" stroke="#4b5563" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <line x1="18" y1="54" x2="30" y2="54" stroke="#4b5563" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <!-- Strand 1 - indigo/purple -->
+  <path d="M12,4 C36,14 36,22 12,32 S-12,50 12,60"
+        stroke="url(#strand1)" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <!-- Strand 2 - cyan -->
+  <path d="M36,4 C12,14 12,22 36,32 S60,50 36,60"
+        stroke="url(#strand2)" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+</svg>

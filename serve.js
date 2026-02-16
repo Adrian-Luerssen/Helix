@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ClawCondos Development Server
+ * Helix Development Server
  * 
  * Serves static files + /api/apps + proxies to registered apps
  * Usage: node serve.js [port]
@@ -362,7 +362,7 @@ function proxyToApp(req, res, app, path) {
   req.pipe(proxyReq, { end: true });
 }
 
-// Proxy to ClawCondos media-upload service (apps/media-upload) which has robust multipart parsing.
+// Proxy to Helix media-upload service (apps/media-upload) which has robust multipart parsing.
 function proxyToMediaUpload(req, res, pathname, search) {
   // Map /media-upload/* → service paths
   let targetPath = pathname;
@@ -395,7 +395,7 @@ function proxyToMediaUpload(req, res, pathname, search) {
 }
 
 // WebSocket proxy to OpenClaw gateway
-// Goal: browser connects to ClawCondos (/ws); ClawCondos proxies to gateway and injects auth from env.
+// Goal: browser connects to Helix (/ws); Helix proxies to gateway and injects auth from env.
 // This keeps the gateway token out of the browser and works for both localhost + Tailscale HTTPS.
 const wss = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024 });
 const MAX_WS_CONNECTIONS = 50;
@@ -625,7 +625,7 @@ const server = createServer(async (req, res) => {
   
   const apps = loadApps();
 
-  // API: Agent summaries (ClawCondos)
+  // API: Agent summaries (Helix)
   // GET /api/agents/summary?agentId=<id>&refresh=1
   if (pathname === '/api/agents/summary' && req.method === 'GET') {
     const agentId = url.searchParams.get('agentId') || '';
@@ -635,7 +635,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // API: Skills index/resolve (ClawCondos)
+  // API: Skills index/resolve (Helix)
   // GET /api/skills/resolve?ids=a,b,c
   if (pathname === '/api/skills/resolve' && req.method === 'GET') {
     const idsRaw = url.searchParams.get('ids') || '';
@@ -668,7 +668,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // API: Search goals and sessions (ClawCondos)
+  // API: Search goals and sessions (Helix)
   // GET /api/search?q=<query>&limit=<max>&mode=fast|deep|auto
   if (pathname === '/api/search' && req.method === 'GET') {
     const q = (url.searchParams.get('q') || '').trim();
@@ -806,7 +806,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // API: Agent file browser (ClawCondos)
+  // API: Agent file browser (Helix)
   // GET /api/agents/files?agentId=<id>
   if (pathname === '/api/agents/files' && req.method === 'GET') {
     const agentId = url.searchParams.get('agentId') || '';
@@ -986,7 +986,7 @@ const server = createServer(async (req, res) => {
   
   // Static files
   //
-  // Serve ClawCondos's config module without colliding with Apps Gateway /lib/* handler
+  // Serve Helix's config module without colliding with Apps Gateway /lib/* handler
   if (pathname === '/clawcondos-lib/config.js') {
     const filePath = join(__dirname, 'lib', 'config.js');
     serveFile(res, filePath);
@@ -1294,7 +1294,7 @@ server.on('upgrade', (req, socket, head) => {
 server.listen(PORT, () => {
   const apps = loadApps();
   console.log(`
-🎯 ClawCondos Dashboard
+🎯 Helix Dashboard
    http://localhost:${PORT}
 
 📱 Registered Apps:`);

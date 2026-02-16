@@ -1,5 +1,5 @@
 /**
- * ClawCondos Media Upload Module
+ * Helix Media Upload Module
  * Handles image and audio uploads for chat
  *
  * Architecture:

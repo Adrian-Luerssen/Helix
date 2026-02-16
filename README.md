@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="media/clawcondos-logo.png" alt="ClawCondos" width="200">
+  <img src="media/helix-logo.svg" alt="Helix" width="200">
 </p>
 
-<h1 align="center">ClawCondos</h1>
+<h1 align="center">Helix</h1>
 
 <p align="center">
   A goals-first multi-agent dashboard with an embedded apps platform
@@ -18,7 +18,7 @@
 
 ---
 
-ClawCondos is a web dashboard for managing AI agent sessions organized into "Condos" (goals). It connects to any WebSocket backend implementing the [Clawdbot protocol](docs/BACKEND-API.md), and provides a platform for embedding your own web apps with AI assistant sidebars.
+Helix is a web dashboard for managing AI agent sessions organized into "Condos" (goals). It connects to any WebSocket backend implementing the [Clawdbot protocol](docs/BACKEND-API.md), and provides a platform for embedding your own web apps with AI assistant sidebars.
 
 No build step. No framework. Vanilla HTML/JS/CSS. Edit and refresh.
 
@@ -62,7 +62,7 @@ Copy `config.example.json` to `config.json`:
 |--------|---------|-------------|
 | `gatewayWsUrl` | Auto-detect | WebSocket URL for backend |
 | `gatewayHttpUrl` | Auto-detect | HTTP URL for REST API |
-| `branding.name` | `"ClawCondos"` | Dashboard title |
+| `branding.name` | `"Helix"` | Dashboard title |
 | `branding.logo` | `"🏙️"` | Logo emoji or image URL |
 | `features.showApps` | `true` | Show apps section |
 | `features.showSubagents` | `true` | Show sub-agents section |
@@ -71,11 +71,11 @@ See [docs/SETUP.md](docs/SETUP.md) for all options and environment variables.
 
 ## Apps Platform
 
-ClawCondos can embed any web application - Node.js, Python, React, anything that runs on a port. Each app gets:
+Helix can embed any web application - Node.js, Python, React, anything that runs on a port. Each app gets:
 
 - An **iframe** in the dashboard with a dedicated page
 - An **AI assistant sidebar** that knows about your app's code, logs, and stack
-- **Automatic proxy routing** through the ClawCondos server
+- **Automatic proxy routing** through the Helix server
 
 Register apps in `.registry/apps.json`:
 
@@ -100,7 +100,7 @@ See [docs/BUILDING-APPS.md](docs/BUILDING-APPS.md) for the full guide including 
 
 ## Goals & Condos Plugin
 
-ClawCondos includes an [OpenClaw](https://github.com/acastellana/openclaw) plugin for goals and task management. When installed in your gateway, it provides:
+Helix includes an [OpenClaw](https://github.com/acastellana/openclaw) plugin for goals and task management. When installed in your gateway, it provides:
 
 - **26+ RPC methods** for goals, tasks, condos, PM coordination, and session management
 - **Context injection** — agents automatically receive their goal/project context (including workspace paths)
@@ -148,7 +148,7 @@ clawcondos/
 
 ## Backend API
 
-ClawCondos connects via WebSocket to a backend implementing JSON-RPC style messaging:
+Helix connects via WebSocket to a backend implementing JSON-RPC style messaging:
 
 | Method | Description |
 |--------|-------------|

@@ -1,5 +1,5 @@
 /**
- * ClawCondos Configuration Loader
+ * Helix Configuration Loader
  * Loads config.json and provides defaults for all settings.
  */
 (function(window) {

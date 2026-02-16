@@ -28,9 +28,9 @@ const store = createGoalsStore(DATA_DIR);
 
 const GIT_ENV = {
   ...process.env,
-  GIT_AUTHOR_NAME: 'ClawCondos E2E',
+  GIT_AUTHOR_NAME: 'Helix E2E',
   GIT_AUTHOR_EMAIL: 'e2e@clawcondos.test',
-  GIT_COMMITTER_NAME: 'ClawCondos E2E',
+  GIT_COMMITTER_NAME: 'Helix E2E',
   GIT_COMMITTER_EMAIL: 'e2e@clawcondos.test',
 };
 

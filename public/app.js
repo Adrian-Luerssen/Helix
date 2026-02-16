@@ -353,7 +353,7 @@
           body: JSON.stringify({
             model: 'gpt-4o-mini',
             messages: [
-              { role: 'system', content: 'Write a 5-8 word status of what is currently happening. Be specific. No punctuation. Examples: "Adding unread indicators to ClawCondos sidebar", "Debugging Catastro API rate limits", "Waiting for user feedback on design"' },
+              { role: 'system', content: 'Write a 5-8 word status of what is currently happening. Be specific. No punctuation. Examples: "Adding unread indicators to Helix sidebar", "Debugging Catastro API rate limits", "Waiting for user feedback on design"' },
               { role: 'user', content: context.slice(0, 1500) }
             ],
             max_tokens: 30,
@@ -966,7 +966,7 @@
     function handleWsMessage(msg) {
       // Debug: log all incoming messages
       if (msg.type === 'event') {
-        console.log('[ClawCondos] WS Event:', msg.event, msg.payload ? JSON.stringify(msg.payload).slice(0, 200) : '');
+        console.log('[Helix] WS Event:', msg.event, msg.payload ? JSON.stringify(msg.payload).slice(0, 200) : '');
       }
       
       // Challenge for auth (comes as event type)
@@ -1007,7 +1007,7 @@
       
       // Goals changed event (real-time sync from serve.js file watcher)
       if (msg.type === 'event' && msg.event === 'goals.changed') {
-        console.log('[ClawCondos] goals.changed event received, refetching goals...');
+        console.log('[Helix] goals.changed event received, refetching goals...');
         loadGoals();
         return;
       }
@@ -1025,7 +1025,7 @@
         client: {
           // Must be one of OpenClaw's allowed client IDs (see gateway protocol client-info)
           id: 'webchat-ui',
-          displayName: 'ClawCondos Dashboard',
+          displayName: 'Helix Dashboard',
           mode: 'ui',
           version: '2.0.0',
           platform: 'browser'
@@ -1355,7 +1355,7 @@
     async function handleChatEvent(data) {
       const { sessionKey, runId, state: runState, message } = data;
       
-      console.log('[ClawCondos] Chat event:', runState, 'for', sessionKey, 'runId:', runId);
+      console.log('[Helix] Chat event:', runState, 'for', sessionKey, 'runId:', runId);
       
       // Server sends: 'delta' (streaming), 'final' (done), 'error'
       // Track active runs and update agent status (with persistence)
@@ -1768,12 +1768,12 @@
           // Stale run - remove it
           delete store[key];
           changed = true;
-          console.log(`[ClawCondos] Cleaned stale run for ${key} (${Math.round(age/1000)}s old)`);
+          console.log(`[Helix] Cleaned stale run for ${key} (${Math.round(age/1000)}s old)`);
         } else {
           // Valid run - restore to activeRuns Map
           state.activeRuns.set(key, data.runId);
           state.sessionAgentStatus[key] = 'thinking';
-          console.log(`[ClawCondos] Restored active run for ${key}`);
+          console.log(`[Helix] Restored active run for ${key}`);
         }
       }
       
@@ -1990,15 +1990,15 @@
     // DATA LOADING
     // ═══════════════════════════════════════════════════════════════
     async function loadInitialData() {
-      console.log('[ClawCondos] loadInitialData starting');
+      console.log('[Helix] loadInitialData starting');
       try {
         // Load persisted session->condo mappings (doesn't require gateway connection)
         await loadSessionCondos();
 
         // Fetch active runs from server first (authoritative source)
-        console.log('[ClawCondos] About to call syncActiveRunsFromServer...');
+        console.log('[Helix] About to call syncActiveRunsFromServer...');
         await syncActiveRunsFromServer();
-        console.log('[ClawCondos] syncActiveRunsFromServer completed');
+        console.log('[Helix] syncActiveRunsFromServer completed');
 
         await Promise.all([loadGoals(), loadSessions(), loadApps(), loadAgents()]);
         updateOverview();
@@ -2011,7 +2011,7 @@
           if (savedSessionKey) {
             const session = state.sessions.find(s => s.key === savedSessionKey);
             if (session) {
-              console.log('[ClawCondos] Restoring session from localStorage:', savedSessionKey);
+              console.log('[Helix] Restoring session from localStorage:', savedSessionKey);
               openSession(savedSessionKey);
             }
           }
@@ -2023,18 +2023,18 @@
     
     async function syncActiveRunsFromServer() {
       try {
-        console.log('[ClawCondos] Calling chat.activeRuns...');
+        console.log('[Helix] Calling chat.activeRuns...');
         const result = await rpcCall('chat.activeRuns', {});
-        console.log('[ClawCondos] chat.activeRuns response:', JSON.stringify(result));
+        console.log('[Helix] chat.activeRuns response:', JSON.stringify(result));
         if (result?.activeRuns) {
-          console.log('[ClawCondos] Synced active runs from server:', result.activeRuns.length);
+          console.log('[Helix] Synced active runs from server:', result.activeRuns.length);
           
           // Clear old state and sync with server
           state.activeRuns.clear();
           state.activeRunsStore = {};
           
           for (const run of result.activeRuns) {
-            console.log('[ClawCondos] Setting thinking for:', run.sessionKey);
+            console.log('[Helix] Setting thinking for:', run.sessionKey);
             state.activeRuns.set(run.sessionKey, run.runId);
             state.activeRunsStore[run.sessionKey] = {
               runId: run.runId,
@@ -2047,10 +2047,10 @@
           renderSessions();
           renderSessionsGrid();
         } else {
-          console.log('[ClawCondos] No activeRuns in response, result:', result);
+          console.log('[Helix] No activeRuns in response, result:', result);
         }
       } catch (err) {
-        console.warn('[ClawCondos] chat.activeRuns not available, using localStorage fallback');
+        console.warn('[Helix] chat.activeRuns not available, using localStorage fallback');
         // Fallback to localStorage restore (for older Clawdbot versions)
         restoreActiveRuns();
       }
@@ -2061,7 +2061,7 @@
         const data = await rpcCall('goals.listSessionCondos', {});
         state.sessionCondoIndex = data.sessionCondoIndex || {};
       } catch (err) {
-        console.warn('[ClawCondos] Failed to load session condos:', err);
+        console.warn('[Helix] Failed to load session condos:', err);
       }
     }
 
@@ -2134,7 +2134,7 @@
           showNewGoalView({ fromRouter: true });
         }
       } catch (err) {
-        console.error('[ClawCondos] Failed to load goals:', err);
+        console.error('[Helix] Failed to load goals:', err);
       }
     }
     
@@ -4876,7 +4876,7 @@ Response format:
       for (const [key, data] of Object.entries(state.activeRunsStore)) {
         const age = now - (data.startedAt || 0);
         if (age > ACTIVE_RUN_STALE_MS) {
-          console.log(`[ClawCondos] Cleaning stale run for ${key} (${Math.round(age/1000)}s old)`);
+          console.log(`[Helix] Cleaning stale run for ${key} (${Math.round(age/1000)}s old)`);
           state.activeRuns.delete(key);
           delete state.activeRunsStore[key];
           // Reset status to idle if it was thinking
@@ -4896,9 +4896,9 @@ Response format:
     
     async function loadSessions() {
       try {
-        console.log('[ClawCondos] Loading sessions...');
+        console.log('[Helix] Loading sessions...');
         const result = await rpcCall('sessions.list', { limit: 50 });
-        console.log('[ClawCondos] Sessions result:', result);
+        console.log('[Helix] Sessions result:', result);
         if (result?.sessions) {
           state.sessions = result.sessions;
 
@@ -4942,7 +4942,7 @@ Response format:
           if (state.agents?.length) renderAgents();
         }
       } catch (err) {
-        console.error('[ClawCondos] Failed to load sessions:', err);
+        console.error('[Helix] Failed to load sessions:', err);
       }
     }
     
@@ -6601,7 +6601,7 @@ Response format:
       } else {
         menuBtn.style.display = 'flex';
         backBtn.style.display = 'none';
-        mobileTitle.textContent = 'ClawCondos';
+        mobileTitle.textContent = 'Helix';
       }
     }
     
@@ -9540,5 +9540,5 @@ Response format:
     window.exportChatAsMarkdown = exportChatAsMarkdown;
     window.copyChatAsMarkdown = copyChatAsMarkdown;
     
-    try { console.log('[ClawCondos] build', window.__build); } catch {}
+    try { console.log('[Helix] build', window.__build); } catch {}
     init().catch((e) => console.error('[init] failed', e));

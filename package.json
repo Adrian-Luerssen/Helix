@@ -1,7 +1,7 @@
 {
-  "name": "clawcondos",
+  "name": "helix",
   "version": "1.0.0",
-  "description": "A goals-first multi-agent dashboard for the Clawdbot ecosystem",
+  "description": "A goals-first multi-agent orchestration platform",
   "type": "module",
   "main": "serve.js",
   "scripts": {
@@ -33,8 +33,8 @@
     "agent",
     "multi-agent",
     "websocket",
-    "clawdbot",
-    "clawcondos"
+    "helix",
+    "orchestration"
   ],
   "author": "Albert Castellana",
   "license": "MIT",

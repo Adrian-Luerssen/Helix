@@ -1,5 +1,5 @@
 /**
- * ClawCondos Voice Recorder (in-browser)
+ * Helix Voice Recorder (in-browser)
  * 
  * Uses MediaRecorder + getUserMedia.
  * Output format: audio/webm;codecs=opus (preferred), falls back to audio/webm.

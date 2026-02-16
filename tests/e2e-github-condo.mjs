@@ -24,7 +24,7 @@ function githubGet(path, token) {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/vnd.github+json',
-        'User-Agent': 'ClawCondos-E2E',
+        'User-Agent': 'Helix-E2E',
       },
     }, (res) => {
       let data = '';

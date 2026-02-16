@@ -1,4 +1,4 @@
-# Contributing to ClawCondos
+# Contributing to Helix
 
 Thanks for your interest in contributing!
 
@@ -16,7 +16,7 @@ Open `http://localhost:9000` to see the dashboard.
 
 ## Development
 
-No build step. ClawCondos is vanilla HTML/CSS/JS - edit files and refresh the browser.
+No build step. Helix is vanilla HTML/CSS/JS - edit files and refresh the browser.
 
 - **`index.html`** - Main dashboard (HTML, CSS, and JS inline)
 - **`app.html`** - App viewer with assistant panel
@@ -51,7 +51,7 @@ Tests use [Vitest](https://vitest.dev/) and live in `tests/`. The test setup (`t
 
 ## Building Apps
 
-Want to build an app that runs inside ClawCondos? See [docs/BUILDING-APPS.md](docs/BUILDING-APPS.md).
+Want to build an app that runs inside Helix? See [docs/BUILDING-APPS.md](docs/BUILDING-APPS.md).
 
 ## Reporting Issues
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This feature adds visibility into Claude Code's plan mode within the ClawCondos task UI. When a task's spawned subagent runs Claude Code and enters plan mode, the dashboard will:
+This feature adds visibility into Claude Code's plan mode within the Helix task UI. When a task's spawned subagent runs Claude Code and enters plan mode, the dashboard will:
 
 1. **Detect Claude Code availability** — verify the `claude` CLI is installed; guide the user through installation if missing
 2. **Display the plan.md** — render the generated plan inline within the task's detail view

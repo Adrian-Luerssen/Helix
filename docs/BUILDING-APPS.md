@@ -1,16 +1,16 @@
-# Building Apps for ClawCondos
+# Building Apps for Helix
 
-ClawCondos can embed any web application and pair it with an AI assistant sidebar. This guide covers how to build, register, and deploy apps.
+Helix can embed any web application and pair it with an AI assistant sidebar. This guide covers how to build, register, and deploy apps.
 
-## What is a ClawCondos App?
+## What is a Helix App?
 
-A ClawCondos app is any web application that:
+A Helix app is any web application that:
 
 1. Runs on a local port (e.g., `localhost:8080`)
 2. Is registered in `.registry/apps.json`
 3. Gets displayed in an iframe at `/app?id=your-app-id`
 
-The app itself can use any technology - Node.js, Python, React, plain HTML, anything. ClawCondos doesn't care about your stack. It just proxies HTTP requests to your app's port and wraps it in a page with an AI assistant panel.
+The app itself can use any technology - Node.js, Python, React, plain HTML, anything. Helix doesn't care about your stack. It just proxies HTTP requests to your app's port and wraps it in a page with an AI assistant panel.
 
 ## Quick Start
 
@@ -33,7 +33,7 @@ createServer((req, res) => {
     <head><title>My App</title></head>
     <body>
       <h1>Hello from My App</h1>
-      <p>This is embedded in ClawCondos.</p>
+      <p>This is embedded in Helix.</p>
     </body>
     </html>
   `);
@@ -60,14 +60,14 @@ Copy `.registry/apps.example.json` to `.registry/apps.json` (if you haven't alre
 }
 ```
 
-### 3. Start your app and ClawCondos
+### 3. Start your app and Helix
 
 ```bash
 # Terminal 1: start your app
 cd /path/to/my-app
 node index.js
 
-# Terminal 2: start ClawCondos
+# Terminal 2: start Helix
 node serve.js
 ```
 
@@ -125,7 +125,7 @@ The assistant uses these as starting points when reading your app's code. The ro
 
 ### Development (serve.js)
 
-The ClawCondos dev server automatically proxies requests:
+The Helix dev server automatically proxies requests:
 
 ```
 GET /my-app/          → localhost:8080/
@@ -154,7 +154,7 @@ See [SETUP.md](SETUP.md) for full production deployment instructions.
 
 ## The AI Assistant
 
-When a user opens your app in ClawCondos (`/app?id=my-app`), they see a split view:
+When a user opens your app in Helix (`/app?id=my-app`), they see a split view:
 
 - **Left**: Your app in an iframe
 - **Right**: An AI assistant sidebar
@@ -211,7 +211,7 @@ Make sure your app responds to `HEAD /` requests. Most web frameworks handle thi
 
 - **Pick unique ports** - Each app needs its own port. Use high ports (3000+) to avoid conflicts.
 - **Use absolute paths** - The `path` field must be an absolute filesystem path, not relative.
-- **Keep apps independent** - Each app should be a standalone project that works on its own. ClawCondos is just a wrapper.
+- **Keep apps independent** - Each app should be a standalone project that works on its own. Helix is just a wrapper.
 - **Log to a file** - If you set the `logs` field, pipe your app's output to that file so the assistant can read it:
   ```bash
   node server.js > /tmp/my-app.log 2>&1

@@ -96,7 +96,7 @@ export function createCondoWorkspace(baseDir, condoId, condoName, repoUrl) {
       execSync('git commit --allow-empty -m "Initial commit"', {
         cwd: wsPath,
         stdio: 'pipe',
-        env: { ...process.env, GIT_AUTHOR_NAME: 'ClawCondos', GIT_AUTHOR_EMAIL: 'clawcondos@localhost', GIT_COMMITTER_NAME: 'ClawCondos', GIT_COMMITTER_EMAIL: 'clawcondos@localhost' },
+        env: { ...process.env, GIT_AUTHOR_NAME: 'Helix', GIT_AUTHOR_EMAIL: 'clawcondos@localhost', GIT_COMMITTER_NAME: 'Helix', GIT_COMMITTER_EMAIL: 'clawcondos@localhost' },
       });
     }
 
@@ -260,9 +260,9 @@ export function mergeGoalBranch(condoWs, branch) {
       stdio: 'pipe',
       env: {
         ...process.env,
-        GIT_AUTHOR_NAME: 'ClawCondos',
+        GIT_AUTHOR_NAME: 'Helix',
         GIT_AUTHOR_EMAIL: 'clawcondos@localhost',
-        GIT_COMMITTER_NAME: 'ClawCondos',
+        GIT_COMMITTER_NAME: 'Helix',
         GIT_COMMITTER_EMAIL: 'clawcondos@localhost',
       },
     });

@@ -1,6 +1,6 @@
-# ClawCondos Skill
+# Helix Skill
 
-Goals-first dashboard for AI agents. Use this skill when setting up ClawCondos or working with goals and multi-agent teams.
+Goals-first dashboard for AI agents. Use this skill when setting up Helix or working with goals and multi-agent teams.
 
 ## Quick Setup
 
@@ -19,7 +19,7 @@ chmod 600 ~/.config/clawcondos.env
 # 3. Create systemd service
 cat > ~/.config/systemd/user/clawcondos.service << 'EOF'
 [Unit]
-Description=ClawCondos Dashboard
+Description=Helix Dashboard
 After=network-online.target
 
 [Service]
@@ -40,16 +40,16 @@ systemctl --user enable --now clawcondos
 
 ## Auto-Configure Roles (First Run)
 
-ClawCondos can automatically detect your agents and suggest role assignments:
+Helix can automatically detect your agents and suggest role assignments:
 
 1. **Set agent workspaces** in `~/.config/clawcondos.env`:
    ```bash
    CLAWCONDOS_AGENT_WORKSPACES={"main":"/home/user/.openclaw/workspace","felix":"/home/user/.openclaw/workspace-felix","blake":"/home/user/.openclaw/workspace-blake"}
    ```
 
-2. **Open ClawCondos** and go to Settings → Roles
+2. **Open Helix** and go to Settings → Roles
 
-3. **Click "Auto-detect Roles"** - ClawCondos will:
+3. **Click "Auto-detect Roles"** - Helix will:
    - Read each agent's `SOUL.md` or `IDENTITY.md`
    - Analyze keywords to suggest appropriate roles
    - Show suggestions with confidence levels
@@ -97,7 +97,7 @@ You can create custom roles for any specialty (marketing, devops, security, etc.
 
 ### Creating a Plan
 
-1. Create a goal in ClawCondos
+1. Create a goal in Helix
 2. Click "💬 PM" to chat with the Project Manager
 3. Describe what you want to build
 4. PM creates a plan with tasks assigned to roles

@@ -1,5 +1,5 @@
 {
-  "_note": "ClawCondos configuration. Keep secrets out of this file - use server-side auth.",
+  "_note": "Helix configuration. Keep secrets out of this file - use server-side auth.",
   "gatewayWsUrl": null,
   "gatewayHttpUrl": null,
   

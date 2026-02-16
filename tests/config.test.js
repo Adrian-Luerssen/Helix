@@ -1,5 +1,5 @@
 /**
- * Tests for ClawCondos Configuration Module
+ * Tests for Helix Configuration Module
  *
  * Run with: npx vitest run tests/config.test.js
  */
@@ -39,9 +39,9 @@ describe('Config Module (actual lib/config.js)', () => {
       expect(typeof DEFAULT_CONFIG.features.showAgents).toBe('boolean');
     });
 
-    it('should have ClawCondos branding defaults', () => {
+    it('should have Helix branding defaults', () => {
       const { DEFAULT_CONFIG } = getConfigModule();
-      expect(DEFAULT_CONFIG.branding.name).toBe('ClawCondos');
+      expect(DEFAULT_CONFIG.branding.name).toBe('Helix');
       expect(DEFAULT_CONFIG.branding.logo).toBeTruthy();
     });
   });
@@ -103,10 +103,10 @@ describe('mergeConfig behavior', () => {
   });
 
   it('should deep merge nested objects', () => {
-    const base = { branding: { name: 'ClawCondos', logo: '🏙️' }, features: { showApps: true } };
+    const base = { branding: { name: 'Helix', logo: '🧬' }, features: { showApps: true } };
     const override = { branding: { name: 'Custom' }, features: { showAgents: false } };
     const result = mergeConfig(base, override);
-    expect(result.branding).toEqual({ name: 'Custom', logo: '🏙️' });
+    expect(result.branding).toEqual({ name: 'Custom', logo: '🧬' });
     expect(result.features).toEqual({ showApps: true, showAgents: false });
   });
 

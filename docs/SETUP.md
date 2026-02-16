@@ -1,11 +1,11 @@
-# ClawCondos Setup Guide
+# Helix Setup Guide
 
-This guide covers deploying ClawCondos from quick local testing to production.
+This guide covers deploying Helix from quick local testing to production.
 
 ## Prerequisites
 
 - **Node.js 18+** (for the server)
-- **OpenClaw Gateway** running (ClawCondos connects to it for sessions)
+- **OpenClaw Gateway** running (Helix connects to it for sessions)
 - **Caddy** (recommended for production) or nginx
 
 ## Quick Start (Try It Out)
@@ -52,9 +52,9 @@ For always-on deployment, use systemd + Caddy. This is what we actually run.
 ```bash
 mkdir -p ~/.config/systemd/user
 
-cat > ~/.config/systemd/user/clawcondos.service << 'EOF'
+cat > ~/.config/systemd/user/helix.service << 'EOF'
 [Unit]
-Description=ClawCondos Dashboard
+Description=Helix Dashboard
 After=network-online.target
 Wants=network-online.target
 
@@ -65,7 +65,7 @@ ExecStart=/usr/bin/node serve.js 9011
 Restart=always
 RestartSec=3
 Environment=NODE_ENV=production
-EnvironmentFile=%h/.config/clawcondos.env
+EnvironmentFile=%h/.config/helix.env
 
 [Install]
 WantedBy=default.target
@@ -77,34 +77,34 @@ Replace `/path/to/clawcondos` with your actual path.
 ### Step 2: Create the environment file
 
 ```bash
-cat > ~/.config/clawcondos.env << 'EOF'
-# ClawCondos runtime configuration
+cat > ~/.config/helix.env << 'EOF'
+# Helix runtime configuration
 GATEWAY_HTTP_HOST=127.0.0.1
 GATEWAY_WS_URL=ws://127.0.0.1:18789/ws
 GATEWAY_AUTH=your-gateway-token-here
 
 # Condo workspaces — git repos per condo, worktrees per goal
-# This MUST be set in BOTH the ClawCondos env AND the OpenClaw Gateway service
+# This MUST be set in BOTH the Helix env AND the OpenClaw Gateway service
 # for workspace/worktree features to work (the plugin runs inside the gateway).
 # Create the directory first: mkdir -p /home/youruser/clawcondos-workspaces
 CLAWCONDOS_WORKSPACES_DIR=/home/youruser/clawcondos-workspaces
 EOF
 
-chmod 600 ~/.config/clawcondos.env
+chmod 600 ~/.config/helix.env
 ```
 
 ### Step 3: Enable and start
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable clawcondos
-systemctl --user start clawcondos
+systemctl --user enable helix
+systemctl --user start helix
 
 # Check status
-systemctl --user status clawcondos
+systemctl --user status helix
 
 # View logs
-journalctl --user -u clawcondos -f
+journalctl --user -u helix -f
 ```
 
 ### Step 4: Set up Caddy (reverse proxy)
@@ -119,7 +119,7 @@ sudo apt install caddy  # Debian/Ubuntu
 # Create Caddyfile
 cat > ~/Caddyfile << 'EOF'
 :9000 {
-    # WebSocket to ClawCondos server
+    # WebSocket to Helix server
     handle /ws {
         reverse_proxy localhost:9011
     }
@@ -171,16 +171,16 @@ your-domain.com {
 
 ```bash
 # Restart after code changes
-systemctl --user restart clawcondos
+systemctl --user restart helix
 
 # Stop
-systemctl --user stop clawcondos
+systemctl --user stop helix
 
 # View logs
-journalctl --user -u clawcondos -f
+journalctl --user -u helix -f
 
 # Disable auto-start
-systemctl --user disable clawcondos
+systemctl --user disable helix
 ```
 
 ---
@@ -194,8 +194,8 @@ systemctl --user disable clawcondos
   "gatewayWsUrl": "ws://localhost:18789/ws",
   "gatewayHttpUrl": "http://localhost:18789",
   "branding": {
-    "name": "ClawCondos",
-    "logo": "/media/clawcondos-logo.png"
+    "name": "Helix",
+    "logo": "/media/helix-logo.svg"
   },
   "features": {
     "showApps": true,
@@ -211,7 +211,7 @@ systemctl --user disable clawcondos
 |--------|---------|-------------|
 | `gatewayWsUrl` | Auto-detect | WebSocket URL for backend |
 | `gatewayHttpUrl` | Auto-detect | HTTP URL for REST API |
-| `branding.name` | `"ClawCondos"` | Dashboard title |
+| `branding.name` | `"Helix"` | Dashboard title |
 | `branding.logo` | Crab logo | Logo image URL or emoji |
 | `features.showApps` | `true` | Show apps section |
 | `features.showSubagents` | `true` | Show sub-agents section |
@@ -262,10 +262,10 @@ These override config.json:
 node --check serve.js
 
 # Check env file exists and is readable
-cat ~/.config/clawcondos.env
+cat ~/.config/helix.env
 
 # Check permissions
-ls -la ~/.config/clawcondos.env
+ls -la ~/.config/helix.env
 ```
 
 ---
@@ -285,17 +285,17 @@ CMD ["node", "serve.js"]
 ```
 
 ```bash
-docker build -t clawcondos .
+docker build -t helix .
 docker run -p 9000:9000 \
   -e GATEWAY_WS_URL=ws://host.docker.internal:18789/ws \
-  clawcondos
+  helix
 ```
 
 ---
 
 ## Services Configuration
 
-ClawCondos lets you configure external service integrations that agents can use autonomously. Configure these from the dashboard at **Settings** (gear icon in sidebar), or pre-configure them in the environment/store.
+Helix lets you configure external service integrations that agents can use autonomously. Configure these from the dashboard at **Settings** (gear icon in sidebar), or pre-configure them in the environment/store.
 
 ### GitHub
 
@@ -398,4 +398,4 @@ rpcCall('config.setService', {
 - Use environment variables or `.env` files for secrets
 - The `.gitignore` excludes `config.json` and `.env` by default
 - Consider Tailscale or VPN for secure remote access
-- ClawCondos blocks external media embeds by default (see `features.allowExternalMedia`)
+- Helix blocks external media embeds by default (see `features.allowExternalMedia`)

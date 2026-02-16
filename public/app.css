@@ -45,7 +45,7 @@
   --purple: #a78bfa;
   --purple-dim: rgba(167, 139, 250, 0.15);
   
-  /* Brand accents - ClawCondos signature gradient */
+  /* Brand accents - Helix signature gradient */
   --accent-purple: #9333ea;
   --accent-teal: #2dd4bf;
   --gradient-brand: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-teal) 100%);
@@ -100,7 +100,7 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   UNIFIED COMPONENT LIBRARY - ClawCondos Design System
+   UNIFIED COMPONENT LIBRARY - Helix Design System
    ═══════════════════════════════════════════════════════════════ */
 
 /* --- Buttons --- */
@@ -4810,7 +4810,7 @@ a:focus-visible {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   GOALS (ClawCondos) - compact chips list
+   GOALS (Helix) - compact chips list
    ═══════════════════════════════════════════════════════════════ */
 
 #goalsList {
@@ -5285,7 +5285,7 @@ a:focus-visible {
 
 
 /* ═══════════════════════════════════════════════════════════════
-   GOALS (ClawCondos) - overview cards + detail view
+   GOALS (Helix) - overview cards + detail view
    Distinctive 'condo lobby' aesthetic
    ═══════════════════════════════════════════════════════════════ */
 

@@ -3,8 +3,8 @@ import { test, expect } from '@playwright/test';
 test.describe('Dashboard', () => {
   test('loads the main page', async ({ page }) => {
     await page.goto('/');
-    // The page should have the ClawCondos title
-    await expect(page).toHaveTitle(/ClawCondos/i);
+    // The page should have the Helix title
+    await expect(page).toHaveTitle(/Helix/i);
   });
 
   test('shows connection status indicator', async ({ page }) => {

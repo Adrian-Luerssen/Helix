@@ -1,7 +1,7 @@
 {
   "id": "clawcondos-goals",
-  "name": "ClawCondos Goals",
-  "description": "Goals, tasks, and condos management for ClawCondos",
+  "name": "Helix Goals",
+  "description": "Goals, tasks, and condos management for Helix",
   "version": "0.1.0",
   "configSchema": {
     "type": "object",

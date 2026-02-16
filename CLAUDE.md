@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ClawCondos is a goals-first multi-agent dashboard for the Clawdbot ecosystem. It's a web UI for managing AI agent sessions organized into "Condos" (goals), connecting to an OpenClaw gateway via WebSocket.
+Helix is a goals-first multi-agent orchestration platform. It's a web UI for managing AI agent sessions organized into projects ("Condos") with goals and tasks, connecting to an OpenClaw gateway via WebSocket.
 
 ## Commands
 

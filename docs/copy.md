@@ -1,4 +1,4 @@
-# ClawCondos Landing Page Copy
+# Helix Landing Page Copy
 
 ---
 
@@ -8,7 +8,7 @@
 **Your AI Agents Need a Home Base**
 
 ### Subhead
-Stop managing AI chaos in chat threads. ClawCondos gives your agents structured workspaces, clear objectives, and session continuity—so work actually gets done.
+Stop managing AI chaos in chat threads. Helix gives your agents structured workspaces, clear objectives, and session continuity—so work actually gets done.
 
 ---
 

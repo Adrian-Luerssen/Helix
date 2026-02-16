@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Migrate goals data from ClawCondos .registry/goals.json to plugin data dir.
+ * Migrate goals data from Helix .registry/goals.json to plugin data dir.
  * Usage: node clawcondos/condo-management/migrate.js [source] [dest]
  *   source: path to .registry/goals.json (default: .registry/goals.json)
  *   dest: path to plugin data dir (default: clawcondos/condo-management/.data)

@@ -32,7 +32,7 @@ describe('rewriteConnectFrame', () => {
     expect(result.params.client.displayName).toBe('MyUI');
   });
 
-  it('should set default displayName to ClawCondos when not provided', () => {
+  it('should set default displayName to Helix when not provided', () => {
     const frame = {
       type: 'req',
       id: 'r1',
@@ -40,7 +40,7 @@ describe('rewriteConnectFrame', () => {
       params: {}
     };
     const result = JSON.parse(rewriteConnectFrame(JSON.stringify(frame), null));
-    expect(result.params.client.displayName).toBe('ClawCondos');
+    expect(result.params.client.displayName).toBe('Helix');
   });
 
   it('should not clobber existing auth.password', () => {

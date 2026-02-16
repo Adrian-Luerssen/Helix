@@ -1,5 +1,5 @@
 /**
- * Notification Manager - Handles in-app notifications for ClawCondos
+ * Notification Manager - Handles in-app notifications for Helix
  */
 
 import crypto from 'crypto';

@@ -1,12 +1,12 @@
-# ClawCondos Goals Plugin (`clawcondos-goals`)
+# Helix Goals Plugin (`clawcondos-goals`)
 
-An OpenClaw plugin that manages goals, tasks, condos, and session-goal mappings for the ClawCondos dashboard. Provides native gateway RPC methods, lifecycle hooks, and agent tools for autonomous goal-driven orchestration.
+An OpenClaw plugin that manages goals, tasks, condos, and session-goal mappings for the Helix dashboard. Provides native gateway RPC methods, lifecycle hooks, and agent tools for autonomous goal-driven orchestration.
 
 ## Architecture
 
 ```
 ┌──────────────────────────┐
-│  ClawCondos Frontend     │
+│  Helix Frontend          │
 │  (index.html)            │
 │  WebSocket RPC calls     │
 └──────────┬───────────────┘
@@ -356,7 +356,7 @@ Tests across 15+ test files. Run with `npm test`.
 
 ## Installation
 
-The plugin lives in the ClawCondos repo at `clawcondos/condo-management/`. Install it into OpenClaw using the link flag (recommended for development — edits take effect on gateway restart):
+The plugin lives in the Helix repo at `clawcondos/condo-management/`. Install it into OpenClaw using the link flag (recommended for development — edits take effect on gateway restart):
 
 ```bash
 cd /path/to/clawcondos
