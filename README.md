@@ -37,15 +37,9 @@ No build step. No framework. Vanilla HTML/JS/CSS. Edit and refresh.
 
 ## Screenshots
 
-| Dashboard Overview | Condo Context View |
+| Dashboard | Login |
 |---|---|
-| ![Dashboard overview with stat cards and condo board](public/media/screenshots/dashboard-overview.png) | ![Condo context view with goals, tasks, and tracked files](public/media/screenshots/condo-context.png) |
-
-| Agents Overview | Settings & Services |
-|---|---|
-| ![Agents overview panel with file browser](public/media/screenshots/agents-overview.png) | ![Settings and services configuration](public/media/screenshots/settings-services.png) |
-
-> **Note:** To add screenshots, capture them and place in `public/media/screenshots/`.
+| ![Dashboard with stat cards, sidebar, and condo board](public/media/screenshots/dashboard-overview.png) | ![Login modal with gradient border and brand styling](public/media/screenshots/login-modal.png) |
 
 ## Quick Start
 
