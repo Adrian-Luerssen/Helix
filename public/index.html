@@ -64,6 +64,16 @@
         <small style="color: var(--text-dim); font-size: 0.75rem;">Leave empty for a fresh git repo</small>
       </div>
       <div class="form-group">
+        <label class="form-label">Autonomy Mode</label>
+        <select class="form-input" id="createCondoAutonomy">
+          <option value="plan">Plan Approval (default)</option>
+          <option value="full">Full Auto</option>
+          <option value="step">Step-by-Step</option>
+          <option value="supervised">Supervised</option>
+        </select>
+        <small style="color: var(--text-dim); font-size: 0.75rem;">Controls how much approval agents need before acting</small>
+      </div>
+      <div class="form-group">
         <label class="form-label">Color (optional)</label>
         <input type="color" class="form-input" id="createCondoColor" value="#60a5fa" style="height: 40px; padding: 4px;">
       </div>
@@ -174,6 +184,16 @@
           <option value="claude-sonnet-4-5-20250929">sonnet-4-5</option>
           <option value="claude-opus-4-5-20251101">opus-4-5</option>
           <option value="claude-haiku-4-5-20251001">haiku-4-5</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Autonomy Mode</label>
+        <select class="form-input" id="spawnAutonomySelect">
+          <option value="">Inherit from Condo</option>
+          <option value="plan">Plan Approval</option>
+          <option value="full">Full Auto</option>
+          <option value="step">Step-by-Step</option>
+          <option value="supervised">Supervised</option>
         </select>
       </div>
       <div style="display:flex; gap:10px; margin-top: 10px;">
@@ -1753,6 +1773,50 @@
         return;
       }
 
+      // PM cascade: tasks auto-created by backend
+      if (msg.type === 'event' && msg.event === 'goal.cascade_tasks_created') {
+        var ctGoalId = msg.payload?.goalId;
+        if (ctGoalId) state.condoCascadePending.delete(ctGoalId);
+        loadGoals().then(function() {
+          renderCondoGoalsPane();
+          if (ctGoalId && state.currentGoalOpenId === ctGoalId) {
+            renderGoalView();
+          }
+        });
+        var ctTitle = state.goals.find(function(g) { return g.id === ctGoalId; });
+        showToast('Tasks created for "' + ((ctTitle && ctTitle.title) || ctGoalId) + '"', 'success');
+        return;
+      }
+
+      // PM cascade: plan ready (plan mode or no tasks parsed)
+      if (msg.type === 'event' && msg.event === 'goal.cascade_plan_ready') {
+        var prGoalId = msg.payload?.goalId;
+        if (prGoalId) state.condoCascadePending.delete(prGoalId);
+        loadGoals().then(function() {
+          renderCondoGoalsPane();
+          if (prGoalId && state.currentGoalOpenId === prGoalId && state.goalChatMode === 'pm') {
+            renderGoalChat();
+          }
+        });
+        if (msg.payload?.hasPlan) {
+          var prTitle = state.goals.find(function(g) { return g.id === prGoalId; });
+          showToast('Plan ready for "' + ((prTitle && prTitle.title) || prGoalId) + '"', 'info');
+        }
+        return;
+      }
+
+      // Condo cascade complete — all goal PMs finished
+      if (msg.type === 'event' && msg.event === 'condo.cascade_complete') {
+        state.condoCascadePending = new Set();
+        state.condoCascadeMode = null;
+        loadGoals().then(function() { renderCondoGoalsPane(); });
+        showToast('All goal planning complete', 'success');
+        // Re-enable cascade buttons
+        var cascadeBtns = document.querySelectorAll('#condoPlanActions .pm-action-btn');
+        cascadeBtns.forEach(function(btn) { btn.disabled = false; });
+        return;
+      }
+
       // Goals changed events (from serve.js file watcher)
       if (msg.type === 'event' && msg.event === 'goals.changed') {
         loadGoals().then(function() {
@@ -2162,15 +2226,13 @@
                 content: text,
               }, 10000).then(function(saveResult) {
                 // Add plan action buttons if a plan was detected
-                if (saveResult && saveResult.hasPlan) {
+                if ((saveResult && saveResult.hasPlan) || condoPlanDetected) {
                   var container = document.getElementById('condoChatMessages');
-                  if (container && !container.querySelector('.pm-plan-actions')) {
+                  if (container) {
+                    // Remove stale plan action buttons from previous messages
+                    var old = container.querySelectorAll('.pm-plan-actions');
+                    old.forEach(function(el) { el.remove(); });
                     container.insertAdjacentHTML('beforeend', renderCondoPlanActionButtons());
-                  }
-                } else if (condoPlanDetected) {
-                  var container2 = document.getElementById('condoChatMessages');
-                  if (container2 && !container2.querySelector('.pm-plan-actions')) {
-                    container2.insertAdjacentHTML('beforeend', renderCondoPlanActionButtons());
                   }
                 }
               }).catch(function(err) {
@@ -2198,6 +2260,18 @@
                 }
               }
               if (cascadeGoal) {
+                // Double-processing guard: if backend already handled this (tasks_created),
+                // skip frontend auto-processing — just refresh UI
+                if (cascadeGoal.cascadeState === 'tasks_created' || cascadeGoal.cascadeState === 'plan_ready' || cascadeGoal.cascadeState === 'response_saved') {
+                  console.log('[Helix] Cascade: backend already processed goal', cascadeGoal.id, '(state:', cascadeGoal.cascadeState, ')');
+                  state.condoCascadePending.delete(cascadeGoal.id);
+                  loadGoals().then(function() { renderCondoGoalsPane(); });
+                  if (state.condoCascadePending.size === 0) {
+                    state.condoCascadeMode = null;
+                    showToast('All goal planning complete', 'success');
+                  }
+                  return;
+                }
                 state.condoCascadePending.delete(cascadeGoal.id);
 
                 if (state.condoCascadeMode === 'full') {
@@ -3622,10 +3696,24 @@
           container.innerHTML = newHtml;
           // Scroll the parent .goal-chat-body (the actual overflow container)
           var scrollParent = container.parentElement;
-          setTimeout(function() {
-            container.scrollTop = container.scrollHeight;
-            if (scrollParent) scrollParent.scrollTop = scrollParent.scrollHeight;
-          }, 50);
+          if (isFirstRender) {
+            // Force scroll to bottom on first load
+            setTimeout(function() {
+              container.scrollTop = container.scrollHeight;
+              if (scrollParent) scrollParent.scrollTop = scrollParent.scrollHeight;
+            }, 50);
+          } else {
+            // Smart scroll: only auto-scroll if user is near bottom
+            var nearBottom = scrollParent
+              ? (scrollParent.scrollHeight - scrollParent.scrollTop - scrollParent.clientHeight < 150)
+              : (container.scrollHeight - container.scrollTop - container.clientHeight < 150);
+            if (nearBottom) {
+              setTimeout(function() {
+                container.scrollTop = container.scrollHeight;
+                if (scrollParent) scrollParent.scrollTop = scrollParent.scrollHeight;
+              }, 50);
+            }
+          }
         }
         container.dataset.loaded = '1';
       } catch (err) {
@@ -3946,14 +4034,15 @@
           '<div class="plan-steps-list">' +
           steps.map(function(step, idx) {
             const { emoji, cssClass } = getPlanStepStatusInfo(step.status);
-            const stepTitle = step.title || ('Step ' + (idx + 1));
-            const duration = step.completedAtMs && step.startedAtMs 
+            const fullTitle = step.title || ('Step ' + (idx + 1));
+            const stepTitle = fullTitle.length > 80 ? fullTitle.slice(0, 80) + '...' : fullTitle;
+            const duration = step.completedAtMs && step.startedAtMs
               ? ' · ' + formatDuration(step.completedAtMs - step.startedAtMs)
               : '';
             return '<div class="plan-step ' + escapeHtml(cssClass) + '">' +
               '<span class="plan-step-indicator">' + emoji + '</span>' +
               '<span class="plan-step-index">' + (idx + 1) + '.</span>' +
-              '<span class="plan-step-title">' + escapeHtml(stepTitle) + '</span>' +
+              '<span class="plan-step-title" title="' + escapeHtml(fullTitle) + '">' + escapeHtml(stepTitle) + '</span>' +
               '<span class="plan-step-duration">' + duration + '</span>' +
               '</div>';
           }).join('') +
@@ -5132,26 +5221,28 @@
     }
 
     /**
-     * Render action buttons for a condo plan
+     * Render action buttons for a condo plan.
+     * Always shows "Create Goals" when a plan is present (adds/replaces goals from latest plan).
+     * Also shows cascade buttons if goals exist that still need task planning.
      */
     function renderCondoPlanActionButtons() {
       var condoId = state.currentCondoOpenId;
       if (!condoId) return '';
 
-      var condo = state.condos.find(function(c) { return c.id === condoId; });
       var condoGoals = state.goals.filter(function(g) { return g.condoId === condoId; });
-      var hasGoals = condoGoals.length > 0;
+      var goalsNeedingPlanning = condoGoals.filter(function(g) {
+        return g.status !== 'done' && (!g.tasks || g.tasks.length === 0);
+      });
 
-      if (hasGoals) {
-        return '<div class="pm-plan-actions" id="condoPlanActions">' +
+      var buttons = '<button class="pm-action-btn primary" onclick="createGoalsFromCondoPlan()" title="Create goals from this plan">📋 Create Goals</button>';
+
+      if (goalsNeedingPlanning.length > 0) {
+        buttons +=
           '<button class="pm-action-btn primary" onclick="startCondoCascade(\'plan\')" title="Auto-plan tasks for each goal">📋 Plan All Goals</button>' +
-          '<button class="pm-action-btn success" onclick="startCondoCascade(\'full\')" title="Plan tasks and auto-start agents">🚀 Full Auto</button>' +
-        '</div>';
+          '<button class="pm-action-btn success" onclick="startCondoCascade(\'full\')" title="Plan tasks and auto-start agents">🚀 Full Auto</button>';
       }
 
-      return '<div class="pm-plan-actions" id="condoPlanActions">' +
-        '<button class="pm-action-btn primary" onclick="createGoalsFromCondoPlan()" title="Create goals from this plan">📋 Create Goals</button>' +
-      '</div>';
+      return '<div class="pm-plan-actions" id="condoPlanActions">' + buttons + '</div>';
     }
 
     /**
@@ -5340,23 +5431,44 @@
 
         await loadGoals(); // Refresh so state.goals has pmSessionKey set by backend
 
-        showToast('Planning ' + result.goals.length + ' goals...', 'info');
-
-        // Send chat.send to each goal PM in parallel
-        var promises = result.goals.map(function(g) {
-          return rpcCall('chat.send', {
-            sessionKey: g.pmSessionKey,
-            message: g.prompt,
-            idempotencyKey: 'cascade-' + g.goalId + '-' + Date.now()
-          }, 120000).catch(function(err) {
-            console.error('Cascade chat.send failed for goal', g.goalId, err);
-            state.condoCascadePending.delete(g.goalId);
+        if (result.backendSent) {
+          // Backend already sent chat.send — only retry goals that failed
+          var failedGoals = (result.sendResults || []).filter(function(r) { return !r.ok; });
+          if (failedGoals.length > 0) {
+            showToast('Backend sent ' + (result.goals.length - failedGoals.length) + ' goals, retrying ' + failedGoals.length + ' from frontend...', 'info');
+            var retryPromises = failedGoals.map(function(f) {
+              var g = result.goals.find(function(gg) { return gg.goalId === f.goalId; });
+              if (!g) return Promise.resolve();
+              return rpcCall('chat.send', {
+                sessionKey: g.pmSessionKey,
+                message: g.prompt,
+                idempotencyKey: 'cascade-retry-' + g.goalId + '-' + Date.now()
+              }, 120000).catch(function(err) {
+                console.error('Cascade retry chat.send failed for goal', g.goalId, err);
+                state.condoCascadePending.delete(g.goalId);
+              });
+            });
+            await Promise.all(retryPromises);
+          } else {
+            showToast('Planning ' + result.goals.length + ' goals (backend-driven)...', 'info');
+          }
+        } else {
+          // Fallback: send all from frontend (legacy path)
+          showToast('Planning ' + result.goals.length + ' goals...', 'info');
+          var promises = result.goals.map(function(g) {
+            return rpcCall('chat.send', {
+              sessionKey: g.pmSessionKey,
+              message: g.prompt,
+              idempotencyKey: 'cascade-' + g.goalId + '-' + Date.now()
+            }, 120000).catch(function(err) {
+              console.error('Cascade chat.send failed for goal', g.goalId, err);
+              state.condoCascadePending.delete(g.goalId);
+            });
           });
-        });
+          await Promise.all(promises);
+        }
 
-        await Promise.all(promises);
-
-        // Cascade responses will be handled by handleChatEvent
+        // Cascade responses will be handled by handleChatEvent (frontend) or agent_end hook (backend)
         if (state.condoCascadePending.size === 0) {
           showToast('All cascade messages sent', 'success');
         }
@@ -5795,6 +5907,8 @@
     function renderGoalPane() {
       var pane = document.getElementById('goalPane');
       if (!pane) return;
+      // Preserve scroll position across re-renders
+      var prevScrollTop = pane.scrollTop;
       var goal = state.goals.find(function(g) { return g.id === state.currentGoalOpenId; });
       if (!goal) { pane.innerHTML = ''; return; }
 
@@ -5820,13 +5934,30 @@
         }
         ctxHtml += '</div>';
 
-        // Merge status
-        if (goal.mergeStatus) {
-          ctxHtml += '<div class="goal-context-section"><div class="goal-context-section-title">Merge Status</div>' +
-            '<div class="goal-context-row"><span class="goal-context-label">Status</span>' + renderMergeBadge(goal) + '</div>';
+        // Merge status + PR section
+        if (goal.mergeStatus || goal.prUrl) {
+          ctxHtml += '<div class="goal-context-section"><div class="goal-context-section-title">Merge / PR Status</div>' +
+            '<div class="goal-context-row"><span class="goal-context-label">Merge</span>' + renderMergeBadge(goal) + '</div>';
           if (goal.mergedAtMs) ctxHtml += '<div class="goal-context-row"><span class="goal-context-label">Merged</span><span class="goal-context-value">' + timeAgo(goal.mergedAtMs) + '</span></div>';
           if (goal.mergeError) ctxHtml += '<div class="goal-context-row"><span class="goal-context-label">Error</span><span class="goal-context-value" style="color:var(--red);">' + escapeHtml(goal.mergeError.slice(0, 200)) + '</span></div>';
+          // PR link if exists
+          if (goal.prUrl) {
+            ctxHtml += '<div class="goal-context-row"><span class="goal-context-label">PR</span><span class="goal-context-value"><a href="' + escapeHtml(goal.prUrl) + '" target="_blank" rel="noopener" style="color:var(--cyan);">#' + (goal.prNumber || '?') + '</a></span></div>';
+          }
+          // Show Create PR button if: has worktree, condo has repoUrl, no PR yet
+          if (!goal.prUrl && wt && wt.branch && condo && condo.workspace && condo.workspace.repoUrl) {
+            ctxHtml += '<div style="margin-top:8px;"><button class="btn btn-ghost btn-sm" id="createPrBtn" onclick="createGoalPR(\'' + escapeHtml(goal.id) + '\')">Create Pull Request</button></div>';
+          }
           ctxHtml += '</div>';
+        }
+        // Show PR button even without merge status (e.g. all tasks done but not auto-merged)
+        if (!goal.mergeStatus && !goal.prUrl && wt && wt.branch && condo && condo.workspace && condo.workspace.repoUrl) {
+          var allDone = (goal.tasks || []).length > 0 && (goal.tasks || []).every(function(t) { return t.done || t.status === 'done'; });
+          if (allDone) {
+            ctxHtml += '<div class="goal-context-section"><div class="goal-context-section-title">Pull Request</div>' +
+              '<div style="margin-top:4px;"><button class="btn btn-ghost btn-sm" onclick="createGoalPR(\'' + escapeHtml(goal.id) + '\')">Create Pull Request</button></div>' +
+              '</div>';
+          }
         }
 
         // Sessions section
@@ -5848,10 +5979,18 @@
 
         // Condo section
         if (condo) {
+          var condoAutMode = condo.autonomyMode || 'plan';
           ctxHtml += '<div class="goal-context-section">' +
             '<div class="goal-context-section-title">Condo</div>' +
             '<div class="goal-context-row"><span class="goal-context-label">Name</span><span class="goal-context-value condo-clickable" onclick="showCondoContext(\'' + escapeHtml(condo.id) + '\')">' + escapeHtml(condo.name || 'Unnamed') + '</span></div>' +
             '<div class="goal-context-row"><span class="goal-context-label">ID</span><span class="goal-context-value mono" style="font-size:0.72rem;">' + escapeHtml(condo.id) + '</span></div>' +
+            '<div class="goal-context-row"><span class="goal-context-label">Autonomy</span><span class="goal-context-value">' +
+              '<select class="form-input" style="padding:2px 6px;font-size:0.78rem;height:auto;width:auto;" onchange="setCondoAutonomy(\'' + escapeHtml(condo.id) + '\',this.value)">' +
+                '<option value="plan"' + (condoAutMode === 'plan' ? ' selected' : '') + '>Plan Approval</option>' +
+                '<option value="full"' + (condoAutMode === 'full' ? ' selected' : '') + '>Full Auto</option>' +
+                '<option value="step"' + (condoAutMode === 'step' ? ' selected' : '') + '>Step-by-Step</option>' +
+                '<option value="supervised"' + (condoAutMode === 'supervised' ? ' selected' : '') + '>Supervised</option>' +
+              '</select></span></div>' +
           '</div>';
         }
 
@@ -5901,6 +6040,7 @@
               : '';
             var planBadge = renderPlanBadge(t.plan, taskId);
             var agentLabel = renderTaskAgentLabel(t);
+            var autonomyBadge = t.autonomyMode ? '<span class="autonomy-badge autonomy-' + escapeHtml(t.autonomyMode) + '" title="Autonomy: ' + escapeHtml(t.autonomyMode) + '">' + escapeHtml(t.autonomyMode) + '</span>' : '';
             var tooltipParts = [taskStatus];
             if (t.sessionKey) tooltipParts.push('session: ' + t.sessionKey);
             if (t.summary) tooltipParts.push(t.summary);
@@ -5917,6 +6057,7 @@
               ' title="' + tooltip + '"></div>' +
               '<span class="goal-task-text" onclick="toggleTaskDetail(\'' + id + '\')" style="cursor:pointer;">' + escapeHtml(t.text || '') + '</span>' +
               agentLabel +
+              autonomyBadge +
               planBadge +
               spawnBtn +
               '<button class="goal-task-del" onclick="event.stopPropagation(); deleteGoalTask(\'' + id + '\')" title="Delete">\u00d7</button>' +
@@ -5936,6 +6077,8 @@
           '<div class="goal-task-compose"><input class="chat-input" id="goalNewTaskInput" placeholder="Add a task\u2026" style="flex:1;" onkeypress="if(event.key===\'Enter\')addGoalTask()"><button class="ghost-btn" onclick="addGoalTask()">Add</button></div>';
         }
       }
+      // Restore scroll position after re-render
+      requestAnimationFrame(function() { pane.scrollTop = prevScrollTop; });
     }
 
     function renderGoalView() {
@@ -6294,8 +6437,18 @@
 
       const agentId = document.getElementById('spawnAgentSelect').value;
       const model = document.getElementById('spawnModelSelect').value;
+      const autonomyMode = document.getElementById('spawnAutonomySelect').value;
 
       try {
+        // Set task-level autonomy before spawning (if not inheriting from condo)
+        if (autonomyMode) {
+          await rpcCall('autonomy.setTask', {
+            goalId: state.spawnGoalId,
+            taskId: state.spawnTaskId,
+            mode: autonomyMode,
+          });
+        }
+
         const res = await rpcCall('goals.spawnTaskSession', {
           goalId: state.spawnGoalId,
           taskId: state.spawnTaskId,
@@ -6326,9 +6479,14 @@
 
     const GOAL_TOOL_NAMES = new Set(['goal_update', 'condo_bind', 'condo_create_goal', 'condo_add_task', 'condo_spawn_task']);
     let goalRefreshTimer = null;
+    // Track last refresh time to prevent overlapping refreshes
+    let lastGoalRefreshMs = 0;
     function debouncedGoalRefresh() {
+      // Skip if a refresh happened within the last 2s
+      if (Date.now() - lastGoalRefreshMs < 2000) return;
       clearTimeout(goalRefreshTimer);
       goalRefreshTimer = setTimeout(async () => {
+        lastGoalRefreshMs = Date.now();
         await Promise.all([loadCondos(), loadGoals()]);
         renderGoalView();
       }, 500);
@@ -7186,6 +7344,7 @@ Response format:
       document.getElementById('createCondoName').value = '';
       document.getElementById('createCondoDescription').value = '';
       document.getElementById('createCondoRepoUrl').value = '';
+      document.getElementById('createCondoAutonomy').value = 'plan';
       document.getElementById('createCondoColor').value = '#60a5fa';
       document.getElementById('createCondoError').style.display = 'none';
       setTimeout(() => document.getElementById('createCondoName')?.focus(), 0);
@@ -7199,6 +7358,7 @@ Response format:
       const name = document.getElementById('createCondoName').value.trim();
       const description = document.getElementById('createCondoDescription').value.trim();
       const repoUrl = document.getElementById('createCondoRepoUrl').value.trim();
+      const autonomyMode = document.getElementById('createCondoAutonomy').value;
       const color = document.getElementById('createCondoColor').value;
       const errEl = document.getElementById('createCondoError');
       if (!name) {
@@ -7210,6 +7370,7 @@ Response format:
         const params = { name };
         if (description) params.description = description;
         if (repoUrl) params.repoUrl = repoUrl;
+        if (autonomyMode && autonomyMode !== 'plan') params.autonomyMode = autonomyMode;
         if (color && color !== '#60a5fa') params.color = color;
         await rpcCall('condos.create', params);
         hideCreateCondoModal();
@@ -7219,6 +7380,16 @@ Response format:
       } catch (e) {
         errEl.textContent = 'Failed to create condo';
         errEl.style.display = 'block';
+      }
+    }
+
+    async function setCondoAutonomy(condoId, mode) {
+      try {
+        await rpcCall('autonomy.setCondo', { condoId: condoId, mode: mode });
+        await loadCondos();
+        showToast('Autonomy mode set to ' + mode, 'success');
+      } catch (e) {
+        showToast('Failed to set autonomy mode', 'error');
       }
     }
 
@@ -9212,10 +9383,12 @@ Response format:
       }
     }
     
-    function scrollChatToBottom() {
+    function scrollChatToBottom(force) {
       const container = document.getElementById('chatMessages');
-      if (container) {
-        // Use requestAnimationFrame for reliable scrolling after DOM update
+      if (!container) return;
+      // Only auto-scroll if user is near bottom (within 150px) or forced
+      const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+      if (nearBottom || force) {
         requestAnimationFrame(() => {
           container.scrollTop = container.scrollHeight;
         });
@@ -9836,6 +10009,24 @@ Response format:
       await loadGoals();
       await rpcCall('goals.kickoff', { goalId: goalId });
       renderGoalView();
+    }
+
+    async function createGoalPR(goalId) {
+      var btn = document.getElementById('createPrBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Creating PR...'; }
+      try {
+        var result = await rpcCall('goals.createPR', { goalId: goalId }, 60000);
+        if (result && result.prUrl) {
+          showToast('PR created: #' + result.prNumber, 'success');
+          await loadGoals();
+          renderGoalPane();
+        } else {
+          showToast('PR created but no URL returned', 'warning');
+        }
+      } catch (err) {
+        showToast('Failed to create PR: ' + (err.message || err), 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Create Pull Request'; }
+      }
     }
 
     async function killGoalSessions(goalId) {
@@ -11856,9 +12047,10 @@ Response format:
       // Hash router: back/forward navigation
       window.addEventListener('hashchange', function() { handleRoute(); });
 
-      // Auto-refresh sessions every 30s
+      // Auto-refresh sessions every 30s (skip if debounced goal refresh happened recently)
       setInterval(() => {
         if (state.connected) {
+          if (Date.now() - lastGoalRefreshMs < 5000) return; // Skip if recent goal refresh
           refresh();
         }
       }, 30000);

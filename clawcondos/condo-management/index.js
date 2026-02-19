@@ -34,7 +34,8 @@ import {
 import { createClassificationLog } from './lib/classification-log.js';
 import { analyzeCorrections, applyLearning } from './lib/learning.js';
 import { createSessionLifecycleHandlers } from './lib/session-lifecycle.js';
-import { pushBranch } from './lib/github.js';
+import { pushBranch, createPullRequest } from './lib/github.js';
+import { processPmCascadeResponse } from './lib/cascade-processor.js';
 
 export default function register(api) {
   const dataDir = api.pluginConfig?.dataDir
@@ -213,6 +214,7 @@ export default function register(api) {
     sendToSession: api.sendToSession,
     logger: api.logger,
     wsOps,
+    gatewayRpcCall,
   });
   for (const [method, handler] of Object.entries(pmHandlers)) {
     api.registerGatewayMethod(method, handler);
@@ -529,6 +531,104 @@ export default function register(api) {
     }
   });
 
+  // goals.branchStatus — Check branch status (ahead/behind/conflicts)
+  api.registerGatewayMethod('goals.branchStatus', async ({ params, respond }) => {
+    const { goalId } = params || {};
+    if (!goalId) return respond(false, null, 'goalId is required');
+
+    try {
+      const data = store.load();
+      const goal = data.goals.find(g => g.id === goalId);
+      if (!goal) return respond(false, null, 'Goal not found');
+      if (!goal.worktree?.branch) return respond(false, null, 'Goal has no worktree branch');
+
+      const condo = data.condos.find(c => c.id === goal.condoId);
+      if (!condo?.workspace?.path) return respond(false, null, 'Condo has no workspace');
+
+      if (!wsOps?.checkBranchStatus) {
+        return respond(true, { ahead: 0, behind: 0, conflictFiles: [], hasRemote: false });
+      }
+
+      const status = wsOps.checkBranchStatus(condo.workspace.path, goal.worktree.branch);
+      respond(true, {
+        ahead: status.ahead || 0,
+        behind: status.behind || 0,
+        conflictFiles: status.conflictFiles || [],
+        hasRemote: !!condo.workspace.repoUrl,
+      });
+    } catch (err) {
+      respond(false, null, err.message);
+    }
+  });
+
+  // goals.createPR — Create a GitHub pull request for a goal branch
+  api.registerGatewayMethod('goals.createPR', async ({ params, respond }) => {
+    const { goalId } = params || {};
+    if (!goalId) return respond(false, null, 'goalId is required');
+
+    try {
+      const data = store.load();
+      const goal = data.goals.find(g => g.id === goalId);
+      if (!goal) return respond(false, null, 'Goal not found');
+      if (!goal.worktree?.branch) return respond(false, null, 'Goal has no worktree branch');
+
+      const condo = data.condos.find(c => c.id === goal.condoId);
+      if (!condo?.workspace?.path) return respond(false, null, 'Condo has no workspace');
+      if (!condo.workspace.repoUrl) return respond(false, null, 'Condo has no remote repository URL');
+
+      // Resolve GitHub config
+      const ghConfig = (() => {
+        const globalServices = data.config?.services || {};
+        const condoServices = condo.services || {};
+        return condoServices.github || globalServices.github || null;
+      })();
+
+      if (!ghConfig?.agentToken) return respond(false, null, 'GitHub agent token not configured');
+
+      // Parse owner/repo from repoUrl
+      const repoMatch = condo.workspace.repoUrl.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
+      if (!repoMatch) return respond(false, null, 'Could not parse owner/repo from repository URL');
+      const [, owner, repo] = repoMatch;
+
+      // Push the goal branch to remote first
+      const pushResult = pushBranch(condo.workspace.path, goal.worktree.branch, { setUpstream: true });
+      if (!pushResult.ok) {
+        return respond(false, null, `Failed to push branch: ${pushResult.error}`);
+      }
+
+      // Determine base branch
+      const baseBranch = wsOps?.getMainBranch?.(condo.workspace.path) || 'main';
+
+      // Create the PR
+      const pr = await createPullRequest(ghConfig.agentToken, owner, repo, {
+        head: goal.worktree.branch,
+        base: baseBranch,
+        title: goal.title || `Goal: ${goalId}`,
+        body: `## Goal: ${goal.title}\n\n${goal.description || ''}\n\n---\nCreated by Helix`,
+      });
+
+      // Store PR URL on goal
+      goal.prUrl = pr.html_url;
+      goal.prNumber = pr.number;
+      goal.updatedAtMs = Date.now();
+      store.save(data);
+
+      // Broadcast event
+      if (api.broadcast) {
+        api.broadcast({
+          type: 'event',
+          event: 'goal.pr_created',
+          payload: { goalId, prUrl: pr.html_url, prNumber: pr.number, timestamp: Date.now() },
+        });
+      }
+
+      api.logger.info(`clawcondos-goals: PR #${pr.number} created for goal ${goalId}: ${pr.html_url}`);
+      respond(true, { ok: true, prUrl: pr.html_url, prNumber: pr.number });
+    } catch (err) {
+      respond(false, null, err.message);
+    }
+  });
+
   // ── Plan file watching ──
   const planLogBuffer = getPlanLogBuffer();
   const planFileWatchers = new Map(); // sessionKey -> { watcher, filePath, debounceTimer }
@@ -667,6 +767,11 @@ export default function register(api) {
   api.registerHook('before_agent_start', async (event) => {
     const sessionKey = event.context?.sessionKey;
     if (!sessionKey) return;
+
+    // PM sessions receive fully enriched prompts via pm.chat / pm.condoCascade —
+    // skip hook injection to avoid duplicate/conflicting context
+    if (isPmSession(sessionKey)) return;
+
     const data = store.load();
 
     // 1. Check sessionCondoIndex (condo orchestrator path)
@@ -747,6 +852,39 @@ export default function register(api) {
     }
   });
 
+  /**
+   * Update cascade tracking on a condo after a goal's PM completes.
+   * Removes goalId from cascadePendingGoals; broadcasts condo.cascade_complete when all done.
+   */
+  function updateCascadeTracking(condoId, goalId) {
+    if (!condoId) return;
+    try {
+      const data = store.load();
+      const condo = data.condos.find(c => c.id === condoId);
+      if (!condo || !Array.isArray(condo.cascadePendingGoals)) return;
+
+      condo.cascadePendingGoals = condo.cascadePendingGoals.filter(id => id !== goalId);
+
+      if (condo.cascadePendingGoals.length === 0) {
+        // All goals processed — clear cascade state
+        condo.cascadePendingGoals = null;
+        condo.updatedAtMs = Date.now();
+        store.save(data);
+
+        broadcastPlanUpdate({
+          event: 'condo.cascade_complete',
+          condoId,
+          timestamp: Date.now(),
+        });
+        api.logger.info(`clawcondos-goals: cascade complete for condo ${condoId}`);
+      } else {
+        store.save(data);
+      }
+    } catch (err) {
+      api.logger.error(`clawcondos-goals: updateCascadeTracking error: ${err.message}`);
+    }
+  }
+
   // Hook: track session activity on goals and condos + cleanup plan file watchers + error recovery
   api.registerHook('agent_end', async (event) => {
     const sessionKey = event.context?.sessionKey;
@@ -764,6 +902,135 @@ export default function register(api) {
           store.save(data);
           api.logger.info(`clawcondos-goals: agent_end for session ${sessionKey} (condo: ${condo.name})`);
           return;
+        }
+      }
+
+      // PM cascade auto-processing: detect PM sessions awaiting plan responses
+      if (isPmSession(sessionKey)) {
+        // Find which goal this PM session belongs to
+        const pmGoal = data.goals.find(g => g.pmSessionKey === sessionKey);
+        if (pmGoal && pmGoal.cascadeState === 'awaiting_plan') {
+          pmGoal.updatedAtMs = Date.now();
+
+          try {
+            // Fetch PM response from chat history
+            const historyResult = await gatewayRpcCall('chat.history', {
+              sessionKey,
+              limit: 10,
+            });
+
+            // Extract last assistant message
+            const messages = historyResult?.messages || historyResult || [];
+            let pmContent = null;
+            for (let i = messages.length - 1; i >= 0; i--) {
+              const msg = messages[i];
+              if (msg.role === 'assistant') {
+                // Handle content as string or structured array
+                pmContent = typeof msg.content === 'string'
+                  ? msg.content
+                  : Array.isArray(msg.content)
+                    ? msg.content.filter(c => c.type === 'text').map(c => c.text).join('\n')
+                    : null;
+                break;
+              }
+            }
+
+            if (pmContent) {
+              const cascadeResult = processPmCascadeResponse(store, pmGoal, pmContent, {
+                mode: pmGoal.cascadeMode,
+              });
+              store.save(data);
+
+              api.logger.info(`clawcondos-goals: agent_end PM cascade for goal "${pmGoal.title}": state=${cascadeResult.cascadeState}, tasks=${cascadeResult.tasksCreated}`);
+
+              if (cascadeResult.cascadeState === 'tasks_created' && pmGoal.cascadeMode === 'full') {
+                // Broadcast tasks created event
+                broadcastPlanUpdate({
+                  event: 'goal.cascade_tasks_created',
+                  goalId: pmGoal.id,
+                  condoId: pmGoal.condoId,
+                  tasksCreated: cascadeResult.tasksCreated,
+                  timestamp: Date.now(),
+                });
+
+                // Check goal-level dependencies before kickoff
+                let depsSatisfied = true;
+                if (pmGoal.dependsOn?.length > 0) {
+                  depsSatisfied = pmGoal.dependsOn.every(depGoalId => {
+                    const depGoal = data.goals.find(g => g.id === depGoalId);
+                    return depGoal && depGoal.status === 'done';
+                  });
+                }
+
+                if (depsSatisfied) {
+                  // Auto-kickoff after a short delay
+                  setTimeout(async () => {
+                    try {
+                      const kickoffResult = await internalKickoff(pmGoal.id);
+                      if (kickoffResult.spawnedSessions?.length > 0) {
+                        await startSpawnedSessions(kickoffResult.spawnedSessions);
+                        broadcastPlanUpdate({
+                          event: 'goal.kickoff',
+                          goalId: pmGoal.id,
+                          spawnedCount: kickoffResult.spawnedSessions.length,
+                          spawnedSessions: kickoffResult.spawnedSessions,
+                        });
+                        api.logger.info(`clawcondos-goals: PM cascade auto-kickoff started ${kickoffResult.spawnedSessions.length} session(s) for goal "${pmGoal.title}"`);
+                      }
+                    } catch (err) {
+                      api.logger.error(`clawcondos-goals: PM cascade auto-kickoff failed for goal ${pmGoal.id}: ${err.message}`);
+                    }
+                  }, 1000);
+                } else {
+                  api.logger.info(`clawcondos-goals: PM cascade: goal "${pmGoal.title}" has tasks but is blocked by dependencies`);
+                }
+              } else {
+                // Plan mode or no tasks — broadcast plan ready
+                broadcastPlanUpdate({
+                  event: 'goal.cascade_plan_ready',
+                  goalId: pmGoal.id,
+                  condoId: pmGoal.condoId,
+                  hasPlan: cascadeResult.hasPlan,
+                  cascadeState: cascadeResult.cascadeState,
+                  timestamp: Date.now(),
+                });
+              }
+
+              // Update cascade tracking on condo
+              updateCascadeTracking(pmGoal.condoId, pmGoal.id);
+            } else {
+              // No assistant message found
+              pmGoal.cascadeState = 'plan_fetch_failed';
+              store.save(data);
+              api.logger.warn(`clawcondos-goals: agent_end PM cascade: no assistant message found for ${sessionKey}`);
+
+              broadcastPlanUpdate({
+                event: 'goal.cascade_plan_ready',
+                goalId: pmGoal.id,
+                condoId: pmGoal.condoId,
+                hasPlan: false,
+                cascadeState: 'plan_fetch_failed',
+                timestamp: Date.now(),
+              });
+              updateCascadeTracking(pmGoal.condoId, pmGoal.id);
+            }
+          } catch (err) {
+            pmGoal.cascadeState = 'plan_fetch_failed';
+            store.save(data);
+            api.logger.error(`clawcondos-goals: agent_end PM cascade fetch failed for ${sessionKey}: ${err.message}`);
+
+            broadcastPlanUpdate({
+              event: 'goal.cascade_plan_ready',
+              goalId: pmGoal.id,
+              condoId: pmGoal.condoId,
+              hasPlan: false,
+              cascadeState: 'plan_fetch_failed',
+              timestamp: Date.now(),
+            });
+            updateCascadeTracking(pmGoal.condoId, pmGoal.id);
+          }
+
+          return; // PM sessions don't have tasks — skip task-level processing
         }
       }
 
@@ -1049,6 +1316,8 @@ export default function register(api) {
             },
             planFile: { type: 'string', description: 'Path to a plan markdown file to sync with the task (requires taskId)' },
             planStatus: { type: 'string', enum: ['none', 'draft', 'awaiting_approval', 'approved', 'rejected', 'executing', 'completed'], description: 'Update the plan status for the task (requires taskId)' },
+            stepIndex: { type: 'integer', description: 'Index of the plan step to update (0-based, requires taskId)' },
+            stepStatus: { type: 'string', enum: ['pending', 'in-progress', 'done', 'skipped'], description: 'New status for the plan step (use with stepIndex and taskId)' },
           },
         },
         async execute(toolCallId, params) {

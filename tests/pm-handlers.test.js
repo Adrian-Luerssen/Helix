@@ -80,6 +80,7 @@ describe('PM Handlers - Condo PM', () => {
     handlers = createPmHandlers(store, {
       sendToSession: vi.fn(),
       logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      gatewayRpcCall: vi.fn().mockResolvedValue({ ok: true }),
     });
   });
 
@@ -396,7 +397,7 @@ describe('PM Handlers - Condo PM', () => {
   });
 
   describe('pm.condoCascade', () => {
-    it('returns goal PM sessions with prompts in plan mode', async () => {
+    it('returns goal PM sessions with prompts and backendSent flag', async () => {
       const result = await callHandler(handlers['pm.condoCascade'], {
         condoId: 'condo_1',
         mode: 'plan',
@@ -408,10 +409,14 @@ describe('PM Handlers - Condo PM', () => {
       expect(result.goals[0].title).toBe('Build auth');
       expect(result.goals[0].pmSessionKey).toContain(':webchat:pm-goal_1');
       expect(result.goals[0].prompt).toContain('Build auth');
+      expect(result.goals[0].userPrompt).toContain('Build auth');
       expect(result.mode).toBe('plan');
+      expect(result.backendSent).toBe(true);
+      expect(result.sendResults).toHaveLength(1);
+      expect(result.sendResults[0].ok).toBe(true);
     });
 
-    it('stores cascade mode on condo', async () => {
+    it('stores cascade mode and cascadePendingGoals on condo', async () => {
       await callHandler(handlers['pm.condoCascade'], {
         condoId: 'condo_1',
         mode: 'full',
@@ -419,6 +424,54 @@ describe('PM Handlers - Condo PM', () => {
 
       const data = store.getData();
       expect(data.condos[0].cascadeMode).toBe('full');
+      expect(data.condos[0].cascadePendingGoals).toEqual(['goal_1']);
+    });
+
+    it('sets cascadeState and cascadeMode on goals', async () => {
+      await callHandler(handlers['pm.condoCascade'], {
+        condoId: 'condo_1',
+        mode: 'full',
+      });
+
+      const data = store.getData();
+      const goal = data.goals.find(g => g.id === 'goal_1');
+      expect(goal.cascadeState).toBe('awaiting_plan');
+      expect(goal.cascadeMode).toBe('full');
+    });
+
+    it('reports failed sends in sendResults', async () => {
+      // Re-create handlers with a failing gatewayRpcCall
+      const failingHandlers = createPmHandlers(store, {
+        sendToSession: vi.fn(),
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        gatewayRpcCall: vi.fn().mockRejectedValue(new Error('Gateway down')),
+      });
+
+      const result = await callHandler(failingHandlers['pm.condoCascade'], {
+        condoId: 'condo_1',
+        mode: 'plan',
+      });
+
+      expect(result.backendSent).toBe(true);
+      expect(result.sendResults).toHaveLength(1);
+      expect(result.sendResults[0].ok).toBe(false);
+      expect(result.sendResults[0].error).toBe('Gateway down');
+    });
+
+    it('persists pmSessionKey on goals after cascade save', async () => {
+      await callHandler(handlers['pm.condoCascade'], {
+        condoId: 'condo_1',
+        mode: 'plan',
+      });
+
+      // The final store.save() must not clobber pmSessionKey set by getOrCreatePmSessionForGoal
+      const data = store.getData();
+      const goal = data.goals.find(g => g.id === 'goal_1');
+      expect(goal.pmSessionKey).toBeTruthy();
+      expect(goal.pmSessionKey).toContain(':webchat:pm-goal_1');
+
+      // sessionIndex should also have the entry
+      expect(data.sessionIndex[goal.pmSessionKey]).toEqual({ goalId: 'goal_1' });
     });
 
     it('returns error when all goals already have tasks', async () => {
@@ -451,7 +504,28 @@ describe('PM Handlers - Condo PM', () => {
         mode: 'plan',
       });
 
+      // prompt = enriched (includes session identity + user prompt)
       expect(result.goals[0].prompt).toContain('Authentication system');
+      // userPrompt = clean display version
+      expect(result.goals[0].userPrompt).toContain('Authentication system');
+    });
+
+    it('sets backendSent false when no gatewayRpcCall available', async () => {
+      const noRpcHandlers = createPmHandlers(store, {
+        sendToSession: vi.fn(),
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        // No gatewayRpcCall
+      });
+
+      const result = await callHandler(noRpcHandlers['pm.condoCascade'], {
+        condoId: 'condo_1',
+        mode: 'plan',
+      });
+
+      expect(result.backendSent).toBe(false);
+      expect(result.sendResults).toHaveLength(0);
+      // Goals and prompts still returned so frontend can send
+      expect(result.goals).toHaveLength(1);
     });
   });
 });
