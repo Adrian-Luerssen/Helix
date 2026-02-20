@@ -144,7 +144,7 @@ clawcondos/
 │   ├── media-upload.css           # Upload UI styles
 │   └── voice-recorder.css         # Recorder UI styles
 ├── clawcondos/condo-management/   # OpenClaw goals plugin
-│   ├── index.js                   # Plugin entry (26+ methods, 2 hooks, 5 tools)
+│   ├── index.js                   # Plugin entry (26+ methods, 2 hooks, 9 tools)
 │   └── lib/                       # Handlers, storage, context, tools, workspace manager
 ├── .registry/
 │   ├── apps.json                  # Your registered apps (gitignored)

@@ -5,7 +5,7 @@ Thanks for your interest in contributing!
 ## Getting Started
 
 ```bash
-git clone https://github.com/acastellana/clawcondos.git
+git clone https://github.com/Adrian-Luerssen/Helix.git
 cd clawcondos
 npm install
 cp config.example.json config.json

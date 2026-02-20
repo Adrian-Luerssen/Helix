@@ -1,156 +1,121 @@
 # Helix Skill
 
-Goals-first dashboard for AI agents. Use this skill when setting up Helix or working with goals and multi-agent teams.
+Goals-first dashboard for AI agents. Use this skill when setting up Helix, operating it, or working with goals and multi-agent teams.
+
+## What Helix Is
+
+Helix is a self-hosted web UI for orchestrating AI agent sessions organized into projects ("Condos") with goals and tasks. It connects to an OpenClaw gateway via WebSocket and provides real-time dashboards, agent coordination, and an embedded apps platform.
 
 ## Quick Setup
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/acastellana/clawcondos.git
-cd clawcondos && npm install
+git clone https://github.com/Adrian-Luerssen/Helix.git
+cd Helix && npm install
 
-# 2. Create env file (~/.config/clawcondos.env)
-cat > ~/.config/clawcondos.env << 'EOF'
-GATEWAY_PASSWORD=your-gateway-token
-CLAWCONDOS_AGENT_WORKSPACES={"main":"/path/to/main/workspace","felix":"/path/to/felix/workspace"}
-EOF
-chmod 600 ~/.config/clawcondos.env
+# 2. Create config
+cp config.example.json config.json
+# Edit config.json with your gateway URL
 
-# 3. Create systemd service
-cat > ~/.config/systemd/user/clawcondos.service << 'EOF'
-[Unit]
-Description=Helix Dashboard
-After=network-online.target
-
-[Service]
-Type=simple
-WorkingDirectory=/path/to/clawcondos
-ExecStart=/usr/bin/node serve.js 9011
-Restart=always
-EnvironmentFile=%h/.config/clawcondos.env
-
-[Install]
-WantedBy=default.target
-EOF
-
-# 4. Enable and start
-systemctl --user daemon-reload
-systemctl --user enable --now clawcondos
+# 3. Start
+node serve.js
+# Open http://localhost:9000
 ```
 
-## Auto-Configure Roles (First Run)
+For production deployment with systemd and Caddy, see [SETUP.md](https://github.com/Adrian-Luerssen/Helix/blob/master/docs/SETUP.md).
 
-Helix can automatically detect your agents and suggest role assignments:
+## Configuration
 
-1. **Set agent workspaces** in `~/.config/clawcondos.env`:
-   ```bash
-   CLAWCONDOS_AGENT_WORKSPACES={"main":"/home/user/.openclaw/workspace","felix":"/home/user/.openclaw/workspace-felix","blake":"/home/user/.openclaw/workspace-blake"}
-   ```
+### config.json
 
-2. **Open Helix** and go to Settings → Roles
+```json
+{
+  "gatewayWsUrl": "ws://localhost:18789/ws",
+  "gatewayHttpUrl": "http://localhost:18789"
+}
+```
 
-3. **Click "Auto-detect Roles"** - Helix will:
-   - Read each agent's `SOUL.md` or `IDENTITY.md`
-   - Analyze keywords to suggest appropriate roles
-   - Show suggestions with confidence levels
+### Environment Variables
 
-4. **Review and apply** - adjust any suggestions that don't fit
+Set in your env file (e.g., `~/.config/helix.env`):
 
-The system looks for keywords like:
-- `frontend`, `UI`, `React`, `Flutter`, `CSS` → **frontend** role
-- `backend`, `API`, `database`, `server` → **backend** role  
-- `design`, `UX`, `Figma`, `visual` → **designer** role
-- `test`, `QA`, `quality` → **tester** role
-- `research`, `analysis` → **researcher** role
+| Variable | Description |
+|----------|-------------|
+| `GATEWAY_AUTH` | Bearer token for gateway auth |
+| `GATEWAY_WS_URL` | WebSocket URL for gateway |
+| `GATEWAY_HTTP_HOST` | HTTP host for gateway |
+| `CLAWCONDOS_WORKSPACES_DIR` | Base directory for condo git workspaces (disabled if not set) |
+| `CLAWCONDOS_AGENT_WORKSPACES` | JSON mapping agent IDs to workspace paths |
+| `CLAWCONDOS_SKILLS_DIRS` | Colon-separated skill directory paths |
+| `CLAWCONDOS_CLASSIFICATION` | Set to `off` to disable auto-classification |
+
+### Condo Workspaces
+
+Enable git workspace creation for condos and git worktrees for goals:
+
+```bash
+export CLAWCONDOS_WORKSPACES_DIR=/home/youruser/clawcondos-workspaces
+```
+
+Each condo gets a git-initialized workspace, and each goal gets a dedicated worktree (branch: `goal/<goalId>`).
 
 ## Role System
 
 ### How Roles Work
 
-1. **Configure roles** → map role names to agent IDs
-2. **PM creates plans** → assigns tasks to roles (not specific agents)
-3. **Kickoff** → system resolves roles to agents and spawns sessions
+1. **Configure roles** in Settings — map role names to agent IDs
+2. **PM creates plans** — assigns tasks to roles (not specific agents)
+3. **Kickoff** — system resolves roles to agents and spawns sessions
 
-### Role Descriptions
+### Auto-detect Roles
 
-Each role should have a description explaining capabilities:
-```
-frontend: "UI/UX specialist. React, Flutter, CSS, responsive design."
-backend: "API developer. Node.js, databases, authentication, performance."
-designer: "Visual design. Figma, branding, icons, color schemes."
-```
-
-The PM receives these descriptions when creating plans, so it can intelligently distribute work.
+1. Set agent workspaces in your env file
+2. Open Helix → Settings → Roles
+3. Click "Auto-detect Roles" — Helix reads each agent's identity file and suggests roles
 
 ### Built-in Roles
 
-- **pm** - Project Manager (always exists, coordinates the team)
-- **frontend** - UI/UX implementation
-- **backend** - APIs and server-side logic
-- **designer** - Visual design and UX
-- **tester** - QA and testing
-- **researcher** - Research and analysis
+- **pm** — Project Manager (always exists, coordinates the team)
+- **frontend** — UI/UX implementation
+- **backend** — APIs and server-side logic
+- **designer** — Visual design and UX
+- **tester** — QA and testing
+- **researcher** — Research and analysis
 
-You can create custom roles for any specialty (marketing, devops, security, etc.)
+You can create custom roles for any specialty.
 
 ## PM Workflow
 
 ### Creating a Plan
 
 1. Create a goal in Helix
-2. Click "💬 PM" to chat with the Project Manager
+2. Click "PM" to chat with the Project Manager
 3. Describe what you want to build
 4. PM creates a plan with tasks assigned to roles
 5. Review and approve the plan
-6. Click "🚀 Kickoff" to spawn agent sessions
+6. Click "Kickoff" to spawn agent sessions
 
-### PM Skills
+See `SKILL-PM.md` for the full PM skill.
 
-The PM automatically receives:
-- List of available roles and their descriptions
-- Instructions for creating actionable plans
-- Guidelines for task distribution
+## Agent Workflow
 
-See `docs/SKILL-PM.md` for the full PM skill.
+When agents are spawned via kickoff, they receive their task details, goal context, workspace path, and communication guidelines. Agents report progress via `goal_update` and coordinate through the PM cascade.
 
-## Worker Workflow
-
-When agents are spawned via kickoff, they receive:
-- Their assigned task details
-- Goal context
-- Instructions for status updates
-- Communication guidelines
-
-See `docs/SKILL-WORKER.md` for the full worker skill.
-
-## Working with Goals
-
-When goal context is injected (`# Goal:` in your prompt):
-
-```javascript
-// Start task
-goal_update({ taskId: "task_xxx", status: "in-progress" })
-
-// Complete task  
-goal_update({ taskId: "task_xxx", status: "done", summary: "What you did" })
-
-// Add tasks
-goal_update({ addTasks: [{ text: "New task" }] })
-
-// Complete goal
-goal_update({ goalStatus: "done" })
-```
+See [SKILL-AGENT.md](https://github.com/Adrian-Luerssen/Helix/blob/master/docs/SKILL-AGENT.md) for the full agent interaction guide (tools, workflows, session context).
 
 ## Operations
 
 ```bash
-systemctl --user restart clawcondos  # restart
-systemctl --user status clawcondos   # check status
-journalctl --user -u clawcondos -f   # view logs
+# systemd service management
+systemctl --user restart helix    # restart
+systemctl --user status helix     # check status
+journalctl --user -u helix -f     # view logs
 ```
 
-## Links
+## Reference Documentation
 
-- Setup Guide: https://github.com/acastellana/clawcondos/blob/master/docs/SETUP.md
-- API Reference: https://github.com/acastellana/clawcondos/blob/master/docs/BACKEND-API.md
-- GitHub: https://github.com/acastellana/clawcondos
+- [SETUP.md](https://github.com/Adrian-Luerssen/Helix/blob/master/docs/SETUP.md) — Full deployment and configuration guide
+- [BACKEND-API.md](https://github.com/Adrian-Luerssen/Helix/blob/master/docs/BACKEND-API.md) — WebSocket/RPC protocol specification
+- [GOALS-PLUGIN.md](https://github.com/Adrian-Luerssen/Helix/blob/master/docs/GOALS-PLUGIN.md) — Goals plugin data model, RPC methods, hooks, and tools
+- [BUILDING-APPS.md](https://github.com/Adrian-Luerssen/Helix/blob/master/docs/BUILDING-APPS.md) — Guide for building embedded apps
+- [GitHub](https://github.com/Adrian-Luerssen/Helix)

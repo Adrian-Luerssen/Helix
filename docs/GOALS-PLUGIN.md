@@ -22,7 +22,7 @@ An OpenClaw plugin that manages goals, tasks, condos, and session-goal mappings 
 │  │                    │  │
 │  │  26 RPC methods    │  │
 │  │  2 lifecycle hooks │  │
-│  │  5 agent tools     │  │
+│  │  9 agent tools     │  │
 │  └────────┬───────────┘  │
 │           │               │
 │  ┌────────▼───────────┐  │
@@ -241,6 +241,35 @@ Spawns a subagent session for a task in the bound condo.
 - `taskId` (string, required) — task to spawn for
 - `agentId` (string, optional) — agent to use (default: `main`)
 - `model` (string, optional) — model override
+
+### `condo_list`
+
+Lists all condos with IDs, descriptions, and goal counts. Available to any session.
+
+**Parameters:** *(none)*
+
+### `condo_status`
+
+Returns full project status for a condo: goals, tasks, assignments, and progress.
+
+**Parameters:**
+- `condoId` (string, required) — condo to get status for
+
+### `condo_pm_chat`
+
+Sends a work request to the PM for a condo. Blocks up to 3 minutes while the PM processes. Returns the PM's response (plan, questions, or created goals).
+
+**Parameters:**
+- `condoId` (string, required) — condo to send the request to
+- `message` (string, required) — the work request or follow-up message
+
+### `condo_pm_kickoff`
+
+Approves a goal and spawns worker agents. If the goal has no tasks yet, triggers PM goal cascade to plan tasks first, then auto-spawns workers.
+
+**Parameters:**
+- `condoId` (string, required) — condo containing the goal
+- `goalId` (string, required) — goal to kick off
 
 ## Condo Workspaces & Goal Worktrees
 

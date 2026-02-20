@@ -137,7 +137,7 @@ $CLAWCONDOS_WORKSPACES_DIR/
 Goals, tasks, and session-goal mappings are managed by an OpenClaw plugin at `clawcondos/condo-management/`. The plugin registers gateway RPC methods that the frontend calls over WebSocket.
 
 **Plugin files:**
-- `clawcondos/condo-management/index.js` - Plugin entry point, registers 26 gateway methods + 2 hooks + 5 tools
+- `clawcondos/condo-management/index.js` - Plugin entry point, registers 26 gateway methods + 2 hooks + 9 tools
 - `clawcondos/condo-management/lib/goals-store.js` - File-backed JSON storage for goals and condos
 - `clawcondos/condo-management/lib/goals-handlers.js` - Gateway method handlers for goals CRUD, tasks, and sessions
 - `clawcondos/condo-management/lib/condos-handlers.js` - Gateway method handlers for condos CRUD

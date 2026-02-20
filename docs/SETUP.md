@@ -14,7 +14,7 @@ Just want to see it? This takes 2 minutes:
 
 ```bash
 # Clone and install
-git clone https://github.com/acastellana/clawcondos.git
+git clone https://github.com/Adrian-Luerssen/Helix.git
 cd clawcondos
 npm install
 

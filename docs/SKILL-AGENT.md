@@ -216,3 +216,13 @@ User: "I need a React dashboard for our analytics data"
 - `condo_pm_kickoff` is idempotent for goals that already have running workers — it only spawns sessions for unassigned pending tasks.
 - When all tasks in a goal complete, the goal's git branch is auto-merged to main. No manual merge needed.
 - Workers auto-cascade: when a task completes, any dependent tasks that are now unblocked are automatically kicked off.
+
+---
+
+## Reference Documentation
+
+For deeper understanding of the system internals:
+
+- **[BACKEND-API.md](BACKEND-API.md)** — WebSocket/RPC protocol specification (message format, all gateway methods, event types)
+- **[GOALS-PLUGIN.md](GOALS-PLUGIN.md)** — Data model, all 26 RPC methods, lifecycle hooks, agent tools, workspace management
+- **[SETUP.md](SETUP.md)** — Deployment and configuration guide (systemd, Caddy, environment variables)

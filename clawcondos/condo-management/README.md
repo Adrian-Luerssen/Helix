@@ -1,6 +1,6 @@
 # Helix Goals Plugin (`clawcondos-goals`)
 
-An [OpenClaw](https://github.com/acastellana/openclaw) plugin for managing goals, tasks, and condos (projects). Provides 26 gateway RPC methods, 2 lifecycle hooks, and 5 agent tools.
+An [OpenClaw](https://github.com/acastellana/openclaw) plugin for managing goals, tasks, and condos (projects). Provides 26 gateway RPC methods, 2 lifecycle hooks, and 9 agent tools.
 
 ## Features
 
@@ -64,7 +64,7 @@ When enabled, each new condo gets a git-initialized workspace directory, and eac
 
 **Hooks:** `before_agent_start` (context injection), `agent_end` (activity tracking)
 
-**Agent Tools:** `goal_update`, `condo_bind`, `condo_create_goal`, `condo_add_task`, `condo_spawn_task`
+**Agent Tools:** `goal_update`, `condo_bind`, `condo_create_goal`, `condo_add_task`, `condo_spawn_task`, `condo_list`, `condo_status`, `condo_pm_chat`, `condo_pm_kickoff`
 
 ## Documentation
 

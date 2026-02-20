@@ -13,10 +13,10 @@
     "test": "node --test tests/"
   },
   "license": "MIT",
-  "author": "Albert Castellana",
+  "author": "Adrian Luerssen Medina",
   "repository": {
     "type": "git",
-    "url": "https://github.com/acastellana/clawcondos",
+    "url": "https://github.com/Adrian-Luerssen/Helix",
     "directory": "clawcondos/condo-management"
   },
   "keywords": [
