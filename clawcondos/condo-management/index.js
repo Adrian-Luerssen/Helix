@@ -21,6 +21,10 @@ import {
   createCondoCreateGoalExecutor,
   createCondoAddTaskExecutor,
   createCondoSpawnTaskExecutor,
+  createCondoListExecutor,
+  createCondoStatusExecutor,
+  createCondoPmChatExecutor,
+  createCondoPmKickoffExecutor,
 } from './lib/condo-tools.js';
 import * as workspaceManager from './lib/workspace-manager.js';
 import {
@@ -1567,6 +1571,7 @@ export default function register(api) {
             condoId: { type: 'string', description: 'ID of an existing condo to bind to' },
             name: { type: 'string', description: 'Name for a new condo to create and bind to' },
             description: { type: 'string', description: 'Description for the new condo (only used with name)' },
+            repoUrl: { type: 'string', description: 'Git repository URL to clone when creating a new condo (only used with name)' },
           },
         },
         async execute(toolCallId, params) {
@@ -1711,6 +1716,116 @@ export default function register(api) {
     { names: ['condo_spawn_task'] }
   );
 
+  // Tool: condo_list for agents to list all condos
+  const condoListExecute = createCondoListExecutor(store);
+
+  api.registerTool(
+    (ctx) => {
+      if (!ctx.sessionKey) return null;
+      return {
+        name: 'condo_list',
+        label: 'List Condos',
+        description: 'List all condos (projects) with their goal counts.',
+        parameters: { type: 'object', properties: {} },
+        async execute(toolCallId, params) {
+          return condoListExecute(toolCallId, params);
+        },
+      };
+    },
+    { names: ['condo_list'] }
+  );
+
+  // Tool: condo_status for agents to check condo progress
+  const condoStatusExecute = createCondoStatusExecutor(store);
+
+  api.registerTool(
+    (ctx) => {
+      if (!ctx.sessionKey) return null;
+      return {
+        name: 'condo_status',
+        label: 'Condo Status',
+        description: 'Get detailed status of a condo including all goals and tasks.',
+        parameters: {
+          type: 'object',
+          properties: {
+            condoId: { type: 'string', description: 'ID of the condo to check' },
+          },
+          required: ['condoId'],
+        },
+        async execute(toolCallId, params) {
+          return condoStatusExecute(toolCallId, params);
+        },
+      };
+    },
+    { names: ['condo_status'] }
+  );
+
+  // Tool: condo_pm_chat for agents to talk to a condo's PM
+  const condoPmChatExecute = createCondoPmChatExecutor(store, { gatewayRpcCall, logger: api.logger });
+
+  api.registerTool(
+    (ctx) => {
+      if (!ctx.sessionKey) return null;
+      if (isPmSession(ctx.sessionKey)) return null;
+      const data = store.load();
+      if (!data.sessionCondoIndex[ctx.sessionKey]) return null;
+
+      return {
+        name: 'condo_pm_chat',
+        label: 'Chat with PM',
+        description: 'Send a work request to the condo PM. The PM will plan goals and tasks. Returns the PM response.',
+        parameters: {
+          type: 'object',
+          properties: {
+            condoId: { type: 'string', description: 'ID of the condo whose PM to chat with' },
+            message: { type: 'string', description: 'Your work request or message to the PM' },
+          },
+          required: ['condoId', 'message'],
+        },
+        async execute(toolCallId, params) {
+          return condoPmChatExecute(toolCallId, params);
+        },
+      };
+    },
+    { names: ['condo_pm_chat'] }
+  );
+
+  // Tool: condo_pm_kickoff for agents to approve a plan and spawn workers
+  const condoPmKickoffExecute = createCondoPmKickoffExecutor(store, {
+    gatewayRpcCall,
+    internalKickoff,
+    startSpawnedSessions,
+    broadcastPlanUpdate,
+    logger: api.logger,
+  });
+
+  api.registerTool(
+    (ctx) => {
+      if (!ctx.sessionKey) return null;
+      if (isPmSession(ctx.sessionKey)) return null;
+      const data = store.load();
+      if (!data.sessionCondoIndex[ctx.sessionKey]) return null;
+
+      return {
+        name: 'condo_pm_kickoff',
+        label: 'Kickoff Goal',
+        description: 'Approve a PM plan and spawn worker agents for a goal. If the goal has no tasks, triggers the PM cascade to create them first.',
+        parameters: {
+          type: 'object',
+          properties: {
+            condoId: { type: 'string', description: 'ID of the condo' },
+            goalId: { type: 'string', description: 'ID of the goal to kick off' },
+          },
+          required: ['condoId', 'goalId'],
+        },
+        async execute(toolCallId, params) {
+          return condoPmKickoffExecute(toolCallId, params);
+        },
+      };
+    },
+    { names: ['condo_pm_kickoff'] }
+  );
+
   const totalMethods = Object.keys(handlers).length + Object.keys(condoHandlers).length + Object.keys(planHandlers).length + Object.keys(pmHandlers).length + Object.keys(configHandlers).length + Object.keys(teamHandlers).length + Object.keys(rolesHandlers).length + Object.keys(notificationHandlers).length + Object.keys(autonomyHandlers).length + Object.keys(sessionLifecycleHandlers).length + 11; // +11 directly: spawnTaskSession, kickoff, close, branchStatus, createPR, retryPush, retryMerge, pushMain, classification x3
-  api.logger.info(`clawcondos-goals: registered ${totalMethods} gateway methods, 5 tools, ${planFileWatchers.size} plan file watchers, data at ${dataDir}`);
+  api.logger.info(`clawcondos-goals: registered ${totalMethods} gateway methods, 9 tools, ${planFileWatchers.size} plan file watchers, data at ${dataDir}`);
 }

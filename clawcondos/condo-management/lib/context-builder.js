@@ -148,7 +148,7 @@ export function buildCondoContext(condo, goals, opts = {}) {
 
   // Tool usage instructions
   lines.push('');
-  lines.push('> You are the orchestrator for this condo. Use `condo_create_goal` to create new goals, `condo_add_task` to add tasks to goals, and `goal_update` to report task status.');
+  lines.push('> Use `condo_pm_chat` to send work requests to the PM — describe what you want built and the PM will create a plan with goals and tasks. Use `condo_pm_kickoff` to approve a plan and spawn workers. Use `condo_status` to check progress. Use `goal_update` only to report on tasks assigned to you (marked `← you` above).');
 
   return lines.join('\n');
 }

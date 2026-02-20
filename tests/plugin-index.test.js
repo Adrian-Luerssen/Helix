@@ -103,13 +103,17 @@ describe('Plugin index.js', () => {
       expect(api._hooks).toHaveProperty('agent_end');
     });
 
-    it('registers 5 tool factories', () => {
-      expect(api._toolFactories).toHaveLength(5);
+    it('registers 9 tool factories', () => {
+      expect(api._toolFactories).toHaveLength(9);
       expect(api._getToolFactory('goal_update')).toBeTypeOf('function');
       expect(api._getToolFactory('condo_bind')).toBeTypeOf('function');
       expect(api._getToolFactory('condo_create_goal')).toBeTypeOf('function');
       expect(api._getToolFactory('condo_add_task')).toBeTypeOf('function');
       expect(api._getToolFactory('condo_spawn_task')).toBeTypeOf('function');
+      expect(api._getToolFactory('condo_list')).toBeTypeOf('function');
+      expect(api._getToolFactory('condo_status')).toBeTypeOf('function');
+      expect(api._getToolFactory('condo_pm_chat')).toBeTypeOf('function');
+      expect(api._getToolFactory('condo_pm_kickoff')).toBeTypeOf('function');
     });
   });
 

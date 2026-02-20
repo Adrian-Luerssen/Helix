@@ -88,7 +88,7 @@ describe('Skill Injector', () => {
       expect(context).toContain('SKILL-WORKER');
       expect(context).toContain('Task Agent');
       expect(context).toContain('SKILL-AGENT');
-      expect(context).toContain('Execution Guide');
+      expect(context).toContain('Helix Interaction Guide');
     });
 
     it('includes task details', () => {
