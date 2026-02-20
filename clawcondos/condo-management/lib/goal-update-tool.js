@@ -4,7 +4,7 @@ export function createGoalUpdateExecutor(store) {
   const error = (text) => ({ content: [{ type: 'text', text: `Error: ${text}` }] });
 
   return async function execute(toolCallId, params) {
-    const { sessionKey, goalId, taskId, status, summary, addTasks, nextTask, goalStatus, notes, files, planFile, planStatus } = params;
+    const { sessionKey, goalId, taskId, status, summary, addTasks, nextTask, goalStatus, notes, files, planFile, planStatus, stepIndex, stepStatus } = params;
 
     // Require at least one actionable param.
     const hasTaskUpdate = taskId && status;
@@ -15,8 +15,9 @@ export function createGoalUpdateExecutor(store) {
     const hasFiles = Array.isArray(files) && files.length > 0;
     const hasPlanFile = typeof planFile === 'string' && planFile.trim();
     const hasPlanStatus = typeof planStatus === 'string' && planStatus.trim();
-    if (!hasTaskUpdate && !hasAddTasks && !hasNextTask && !hasGoalStatus && !hasNotes && !hasFiles && !hasPlanFile && !hasPlanStatus) {
-      return error('provide at least one of: taskId+status, addTasks, nextTask, goalStatus, notes, files, planFile, planStatus.');
+    const hasStepUpdate = typeof stepIndex === 'number' && typeof stepStatus === 'string';
+    if (!hasTaskUpdate && !hasAddTasks && !hasNextTask && !hasGoalStatus && !hasNotes && !hasFiles && !hasPlanFile && !hasPlanStatus && !hasStepUpdate) {
+      return error('provide at least one of: taskId+status, addTasks, nextTask, goalStatus, notes, files, planFile, planStatus, stepIndex+stepStatus.');
     }
 
     const data = store.load();
@@ -234,6 +235,33 @@ export function createGoalUpdateExecutor(store) {
         task.updatedAtMs = now;
         results.push(`plan status → ${planStatus}`);
       }
+    }
+
+    // ── Plan step update ──
+    if (hasStepUpdate && taskId) {
+      const validStepStatuses = ['pending', 'in-progress', 'done', 'skipped'];
+      if (!validStepStatuses.includes(stepStatus)) {
+        return error(`stepStatus must be one of: ${validStepStatuses.join(', ')}`);
+      }
+      const task = (goal.tasks || []).find(t => t.id === taskId);
+      if (!task) {
+        return error(`task ${taskId} not found in goal.`);
+      }
+      if (!task.plan || !task.plan.steps || !task.plan.steps[stepIndex]) {
+        return error(`step ${stepIndex} not found in task plan (${task.plan?.steps?.length || 0} steps available).`);
+      }
+      const step = task.plan.steps[stepIndex];
+      const now = Date.now();
+      step.status = stepStatus;
+      if (stepStatus === 'in-progress' && !step.startedAtMs) {
+        step.startedAtMs = now;
+      } else if (stepStatus === 'done' || stepStatus === 'skipped') {
+        step.completedAtMs = now;
+      }
+      task.plan.updatedAtMs = now;
+      task.plan.status = computePlanStatus(task.plan);
+      task.updatedAtMs = now;
+      results.push(`step ${stepIndex} → ${stepStatus}`);
     }
 
     goal.updatedAtMs = Date.now();

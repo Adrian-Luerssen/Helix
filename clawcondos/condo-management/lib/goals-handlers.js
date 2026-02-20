@@ -55,7 +55,14 @@ export function createGoalHandlers(store, options = {}) {
               // Auto-push new branch to GitHub if remote is configured (best-effort)
               if (condo.workspace.repoUrl) {
                 try {
-                  pushBranch(condo.workspace.path, wtResult.branch, { setUpstream: true });
+                  const pushResult = pushBranch(condo.workspace.path, wtResult.branch, { setUpstream: true });
+                  if (!pushResult.ok && logger) {
+                    logger.warn(`clawcondos-goals: goals.create: failed to push branch ${wtResult.branch}: ${pushResult.error}`);
+                    goal.pushError = pushResult.error;
+                    goal.pushStatus = 'failed';
+                  } else if (pushResult.ok) {
+                    goal.pushStatus = 'pushed';
+                  }
                 } catch { /* best-effort */ }
               }
             } else if (logger) {

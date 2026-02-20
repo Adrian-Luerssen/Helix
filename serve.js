@@ -7,6 +7,7 @@
  */
 
 import { createServer, request as httpRequest } from 'http';
+import https from 'https';
 import WebSocket, { WebSocketServer } from 'ws';
 import { readFileSync, writeFileSync, existsSync, statSync, mkdirSync, readdirSync } from 'fs';
 import { join, dirname, extname, resolve as resolvePath } from 'path';
@@ -1109,7 +1110,7 @@ function tryHandleLocalServiceRpc(raw, clientWs) {
   try { frame = JSON.parse(raw); } catch { return false; }
   if (!frame || frame.type !== 'req') return false;
 
-  const LOCAL_METHODS = ['config.getServices', 'config.setService', 'config.deleteService'];
+  const LOCAL_METHODS = ['config.getServices', 'config.setService', 'config.deleteService', 'config.verifyGitHub'];
   if (!LOCAL_METHODS.includes(frame.method)) return false;
 
   const respond = (ok, payload, error) => {
@@ -1212,6 +1213,98 @@ function tryHandleLocalServiceRpc(raw, clientWs) {
       }
       persistData(data);
       respond(true, { ok: true });
+      return true;
+    }
+
+    if (frame.method === 'config.verifyGitHub') {
+      const { token: rawToken, condoId, repoUrl } = params;
+
+      // Resolve token
+      let tokenToVerify = rawToken;
+      if (!tokenToVerify) {
+        const data = loadData();
+        if (condoId) {
+          const condo = (data.condos || []).find(c => c.id === condoId);
+          const condoGh = condo?.services?.github;
+          if (condoGh?.agentToken) tokenToVerify = condoGh.agentToken;
+          else if (condoGh?.token) tokenToVerify = condoGh.token;
+        }
+        if (!tokenToVerify) {
+          const gh = data.config?.services?.github;
+          if (gh?.agentToken) tokenToVerify = gh.agentToken;
+          else if (gh?.token) tokenToVerify = gh.token;
+        }
+      }
+
+      if (!tokenToVerify) {
+        respond(true, { valid: false, error: 'No GitHub token configured' });
+        return true;
+      }
+
+      // Async: make GitHub API calls and respond when done
+      const ghApiCall = (method, path) => new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: 'api.github.com', path, method,
+          headers: {
+            'Authorization': `Bearer ${tokenToVerify}`,
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': 'Helix/1.0',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+        }, (res) => {
+          let raw = '';
+          res.on('data', chunk => raw += chunk);
+          res.on('end', () => {
+            let data = null;
+            try { data = JSON.parse(raw); } catch {}
+            resolve({ data, headers: res.headers, statusCode: res.statusCode });
+          });
+        });
+        req.on('error', reject);
+        req.setTimeout(15000, () => { req.destroy(); reject(new Error('Timeout')); });
+        req.end();
+      });
+
+      (async () => {
+        try {
+          const { data, headers: hdrs, statusCode } = await ghApiCall('GET', '/user');
+          if (statusCode === 401 || statusCode === 403) {
+            return respond(true, { valid: false, error: `Authentication failed (${statusCode}): ${data?.message || 'Invalid token'}` });
+          }
+          if (statusCode < 200 || statusCode >= 300) {
+            return respond(true, { valid: false, error: `GitHub API returned ${statusCode}: ${data?.message || 'Unknown error'}` });
+          }
+
+          const scopesHeader = hdrs['x-oauth-scopes'];
+          const scopes = scopesHeader ? scopesHeader.split(',').map(s => s.trim()).filter(Boolean) : [];
+          const tokenType = scopesHeader !== undefined ? 'classic' : 'fine-grained';
+          const result = { valid: true, login: data.login, name: data.name || null, scopes, tokenType };
+
+          if (repoUrl && typeof repoUrl === 'string') {
+            const ghMatch = repoUrl.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
+            if (ghMatch) {
+              const [, owner, repo] = ghMatch;
+              try {
+                const repoResp = await ghApiCall('GET', `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`);
+                if (repoResp.statusCode >= 200 && repoResp.statusCode < 300) {
+                  result.repoAccess = { accessible: true, permissions: repoResp.data?.permissions || {} };
+                } else {
+                  result.repoAccess = { accessible: false, error: `${repoResp.statusCode}: ${repoResp.data?.message || 'Cannot access repo'}` };
+                }
+              } catch (repoErr) {
+                result.repoAccess = { accessible: false, error: repoErr.message };
+              }
+            } else {
+              result.repoAccess = { accessible: null, note: 'Non-GitHub URL' };
+            }
+          }
+
+          respond(true, result);
+        } catch (err) {
+          respond(true, { valid: false, error: err.message });
+        }
+      })();
+
       return true;
     }
   } catch (err) {

@@ -454,6 +454,13 @@ export default function register(api) {
             const branchPush = wsOps.pushGoalBranch(mergeGoal.worktree.path, mergeGoal.worktree.branch);
             if (branchPush.pushed) {
               api.logger.info(`clawcondos-goals: pushed goal branch ${mergeGoal.worktree.branch} to remote`);
+              mergeGoal.pushStatus = 'pushed';
+              mergeGoal.pushError = null;
+            } else if (!branchPush.ok) {
+              mergeGoal.pushStatus = 'failed';
+              mergeGoal.pushError = branchPush.error || 'Push failed';
+              store.save(mergeData);
+              broadcastPlanUpdate({ event: 'goal.push_failed', goalId, error: branchPush.error, branch: mergeGoal.worktree.branch, timestamp: Date.now() });
             }
           }
         } else if (!commitResult.ok) {
@@ -494,6 +501,10 @@ export default function register(api) {
             api.logger.info(`clawcondos-goals: auto-pushed ${mainBranch} to GitHub for condo ${mergeCondo.id}`);
           } else {
             api.logger.error(`clawcondos-goals: auto-push failed for condo ${mergeCondo.id}: ${pushResult.error}`);
+            mergeGoal.pushStatus = 'failed';
+            mergeGoal.pushError = pushResult.error || 'Main branch push failed';
+            store.save(mergeData);
+            broadcastPlanUpdate({ event: 'goal.push_failed', goalId: mergeGoal.id, error: pushResult.error, branch: mainBranch, timestamp: Date.now() });
           }
         } catch (pushErr) {
           api.logger.error(`clawcondos-goals: auto-push error for condo ${mergeCondo.id}: ${pushErr.message}`);
@@ -722,6 +733,65 @@ export default function register(api) {
 
       api.logger.info(`clawcondos-goals: PR #${pr.number} created for goal ${goalId}: ${pr.html_url}`);
       respond(true, { ok: true, prUrl: pr.html_url, prNumber: pr.number });
+    } catch (err) {
+      respond(false, null, err.message);
+    }
+  });
+
+  // goals.retryPush — Retry pushing a goal branch to remote
+  api.registerGatewayMethod('goals.retryPush', async ({ params, respond }) => {
+    const { goalId } = params || {};
+    if (!goalId) return respond(false, null, 'goalId is required');
+
+    try {
+      const data = store.load();
+      const goal = data.goals.find(g => g.id === goalId);
+      if (!goal?.worktree?.branch) return respond(false, null, 'Goal has no worktree branch');
+      const condo = data.condos.find(c => c.id === goal.condoId);
+      if (!condo?.workspace?.repoUrl) return respond(false, null, 'No remote configured');
+
+      if (!wsOps?.pushGoalBranch) return respond(false, null, 'Workspaces not enabled');
+
+      const pushResult = wsOps.pushGoalBranch(goal.worktree.path, goal.worktree.branch);
+      goal.pushStatus = (pushResult.pushed || pushResult.ok) ? 'pushed' : 'failed';
+      goal.pushError = (pushResult.pushed || pushResult.ok) ? null : (pushResult.error || 'Push failed');
+      goal.updatedAtMs = Date.now();
+      store.save(data);
+      return respond(true, { ok: pushResult.pushed || pushResult.ok, error: pushResult.error || null });
+    } catch (err) {
+      respond(false, null, err.message);
+    }
+  });
+
+  // goals.retryMerge — Retry merging goal branch to main
+  api.registerGatewayMethod('goals.retryMerge', async ({ params, respond }) => {
+    const { goalId } = params || {};
+    if (!goalId) return respond(false, null, 'goalId is required');
+
+    try {
+      await autoMergeGoal(goalId);
+      const data = store.load();
+      const goal = data.goals.find(g => g.id === goalId);
+      return respond(true, { mergeStatus: goal?.mergeStatus || null, mergeError: goal?.mergeError || null });
+    } catch (err) {
+      respond(false, null, err.message);
+    }
+  });
+
+  // goals.pushMain — Push main branch to remote
+  api.registerGatewayMethod('goals.pushMain', async ({ params, respond }) => {
+    const { condoId } = params || {};
+    if (!condoId) return respond(false, null, 'condoId is required');
+
+    try {
+      const data = store.load();
+      const condo = data.condos.find(c => c.id === condoId);
+      if (!condo?.workspace?.path || !condo?.workspace?.repoUrl) return respond(false, null, 'No workspace or remote');
+      if (!wsOps?.getMainBranch) return respond(false, null, 'Workspaces not enabled');
+
+      const mainBranch = wsOps.getMainBranch(condo.workspace.path);
+      const pushResult = pushBranch(condo.workspace.path, mainBranch);
+      return respond(true, { ok: pushResult.ok, error: pushResult.error || null });
     } catch (err) {
       respond(false, null, err.message);
     }
@@ -1641,6 +1711,6 @@ export default function register(api) {
     { names: ['condo_spawn_task'] }
   );
 
-  const totalMethods = Object.keys(handlers).length + Object.keys(condoHandlers).length + Object.keys(planHandlers).length + Object.keys(pmHandlers).length + Object.keys(configHandlers).length + Object.keys(teamHandlers).length + Object.keys(rolesHandlers).length + Object.keys(notificationHandlers).length + Object.keys(autonomyHandlers).length + 2 + 3; // +2 spawnTaskSession/kickoff, +3 classification RPC methods
+  const totalMethods = Object.keys(handlers).length + Object.keys(condoHandlers).length + Object.keys(planHandlers).length + Object.keys(pmHandlers).length + Object.keys(configHandlers).length + Object.keys(teamHandlers).length + Object.keys(rolesHandlers).length + Object.keys(notificationHandlers).length + Object.keys(autonomyHandlers).length + Object.keys(sessionLifecycleHandlers).length + 11; // +11 directly: spawnTaskSession, kickoff, close, branchStatus, createPR, retryPush, retryMerge, pushMain, classification x3
   api.logger.info(`clawcondos-goals: registered ${totalMethods} gateway methods, 5 tools, ${planFileWatchers.size} plan file watchers, data at ${dataDir}`);
 }

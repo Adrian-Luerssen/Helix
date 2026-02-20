@@ -69,6 +69,114 @@ function githubRequest(method, path, token, body) {
 }
 
 /**
+ * Make an authenticated GitHub API request, returning response headers and status.
+ * @param {string} method - HTTP method
+ * @param {string} path - API path
+ * @param {string} token - GitHub PAT
+ * @param {object} [body] - Request body
+ * @returns {Promise<{ data: object|null, headers: object, statusCode: number }>}
+ */
+function githubRequestWithHeaders(method, path, token, body) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'api.github.com',
+      path,
+      method,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'Helix/1.0',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    };
+    if (body) {
+      options.headers['Content-Type'] = 'application/json';
+    }
+
+    const req = https.request(options, (res) => {
+      let raw = '';
+      res.on('data', chunk => raw += chunk);
+      res.on('end', () => {
+        let data = null;
+        try { data = JSON.parse(raw); } catch { /* non-JSON response */ }
+        resolve({ data, headers: res.headers, statusCode: res.statusCode });
+      });
+    });
+
+    req.on('error', reject);
+    req.setTimeout(30000, () => {
+      req.destroy();
+      reject(new Error('GitHub API request timed out'));
+    });
+
+    if (body) req.write(JSON.stringify(body));
+    req.end();
+  });
+}
+
+/**
+ * Verify a GitHub token by calling the API and optionally checking repo access.
+ * @param {string} token - GitHub PAT (classic or fine-grained)
+ * @param {string} [repoUrl] - Optional repo URL to check access against
+ * @returns {Promise<object>} Verification result
+ */
+export async function verifyGitHubToken(token, repoUrl) {
+  try {
+    const { data, headers, statusCode } = await githubRequestWithHeaders('GET', '/user', token);
+
+    if (statusCode === 401 || statusCode === 403) {
+      return { valid: false, error: `Authentication failed (${statusCode}): ${data?.message || 'Invalid token'}` };
+    }
+    if (statusCode < 200 || statusCode >= 300) {
+      return { valid: false, error: `GitHub API returned ${statusCode}: ${data?.message || 'Unknown error'}` };
+    }
+
+    // Extract scopes (classic PATs have X-OAuth-Scopes, fine-grained don't)
+    const scopesHeader = headers['x-oauth-scopes'];
+    const scopes = scopesHeader ? scopesHeader.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const tokenType = scopesHeader !== undefined ? 'classic' : 'fine-grained';
+
+    const result = {
+      valid: true,
+      login: data.login,
+      name: data.name || null,
+      scopes,
+      tokenType,
+    };
+
+    // Optionally check repo access
+    if (repoUrl && typeof repoUrl === 'string') {
+      const ghMatch = repoUrl.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
+      if (ghMatch) {
+        const [, owner, repo] = ghMatch;
+        try {
+          const repoResp = await githubRequestWithHeaders('GET', `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, token);
+          if (repoResp.statusCode >= 200 && repoResp.statusCode < 300) {
+            result.repoAccess = {
+              accessible: true,
+              permissions: repoResp.data?.permissions || {},
+            };
+          } else {
+            result.repoAccess = {
+              accessible: false,
+              error: `${repoResp.statusCode}: ${repoResp.data?.message || 'Cannot access repo'}`,
+            };
+          }
+        } catch (repoErr) {
+          result.repoAccess = { accessible: false, error: repoErr.message };
+        }
+      } else {
+        result.repoAccess = { accessible: null, note: 'Non-GitHub URL' };
+      }
+    }
+
+    return result;
+  } catch (err) {
+    return { valid: false, error: err.message };
+  }
+}
+
+/**
  * Create a GitHub repository.
  * @param {string} token - GitHub PAT
  * @param {string} name - Repository name
@@ -160,6 +268,26 @@ export function pushBranch(repoPath, refspec = 'HEAD', options = {}) {
   } catch (err) {
     return { ok: false, error: err.message };
   }
+}
+
+/**
+ * Create a pull request on GitHub.
+ * @param {string} token - GitHub PAT
+ * @param {string} owner - Repo owner (user or org)
+ * @param {string} repo - Repo name
+ * @param {object} options
+ * @param {string} options.head - Branch to merge from
+ * @param {string} options.base - Branch to merge into (e.g. 'main')
+ * @param {string} options.title - PR title
+ * @param {string} [options.body] - PR description
+ * @returns {Promise<object>} GitHub PR object (includes html_url, number)
+ */
+export async function createPullRequest(token, owner, repo, { head, base, title, body }) {
+  return githubRequest('POST',
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`,
+    token,
+    { head, base, title, body: body || '' }
+  );
 }
 
 /**

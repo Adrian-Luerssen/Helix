@@ -6186,6 +6186,23 @@ a:focus-visible {
 .merge-badge.conflict { background: rgba(255,0,0,0.15); color: var(--red); }
 .merge-badge.error { background: rgba(255,0,0,0.1); color: var(--red); opacity: 0.7; }
 
+/* Autonomy mode badge */
+.autonomy-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.autonomy-full { background: rgba(0,255,0,0.12); color: var(--green); }
+.autonomy-plan { background: rgba(96,165,250,0.15); color: var(--cyan); }
+.autonomy-step { background: rgba(250,204,21,0.15); color: var(--yellow); }
+.autonomy-supervised { background: rgba(255,100,100,0.15); color: var(--red); }
+
 /* Retry badge */
 .retry-badge {
   display: inline-flex;
@@ -6364,6 +6381,138 @@ a:focus-visible {
   margin-top: auto;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   TASK CARDS (modernized task layout)
+   ═══════════════════════════════════════════════════════════════ */
+
+.goal-task-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  transition: all var(--transition-fast);
+  overflow: hidden;
+}
+
+.goal-task-card:hover {
+  border-color: var(--border);
+  background: var(--bg-hover);
+}
+
+.task-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.task-status-badge {
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+.task-status-badge.pending    { background: var(--bg-panel); color: var(--text-dim); }
+.task-status-badge.in-progress { background: rgba(255,200,0,0.15); color: var(--yellow); animation: task-pulse 1.2s ease-in-out infinite; }
+.task-status-badge.blocked    { background: rgba(255,0,0,0.1); color: var(--red); }
+.task-status-badge.waiting    { background: var(--accent-muted); color: var(--accent); }
+.task-status-badge.done       { background: rgba(0,255,0,0.1); color: var(--green); }
+.task-status-badge.failed     { background: rgba(255,0,0,0.1); color: var(--red); }
+
+.task-card-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task-card-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.task-card-summary {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-card-summary.error {
+  color: var(--red);
+}
+
+.task-card-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.task-card-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.task-card-actions .goal-task-spawn,
+.task-card-actions .goal-task-del {
+  opacity: 1;
+}
+
+.task-card-detail {
+  padding: 8px 14px 12px 14px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  animation: slideDown 0.15s ease-out;
+}
+
+/* Done state */
+.goal-task-card.done {
+  opacity: 0.6;
+}
+.goal-task-card.done .task-card-title {
+  text-decoration: line-through;
+  color: var(--text-dim);
+}
+
+/* Failed state */
+.goal-task-card.failed {
+  border-color: var(--red);
+  background: rgba(255,0,0,0.03);
+  opacity: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GIT ACTIONS (manual push/merge buttons in context tab)
+   ═══════════════════════════════════════════════════════════════ */
+
+.goal-git-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.goal-git-actions .ghost-btn {
+  font-size: 0.8rem;
+  padding: 4px 12px;
+}
 
 /* ═══════════════════════════════════════════════════════════════
    PLAN DISPLAY (Phase 4 - Claude Code Integration)
@@ -8881,5 +9030,41 @@ a:focus-visible {
   border-color: var(--green);
   color: var(--green);
   background: var(--green-dim);
+}
+
+/* ── GitHub token verification result ── */
+.verify-result {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+}
+.verify-result.success {
+  background: rgba(0, 255, 0, 0.06);
+  border: 1px solid rgba(0, 255, 0, 0.15);
+}
+.verify-result.error {
+  background: rgba(255, 0, 0, 0.06);
+  border: 1px solid rgba(255, 0, 0, 0.15);
+}
+.verify-header {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.verify-result.success .verify-header { color: var(--green); }
+.verify-result.error .verify-header { color: var(--red); }
+.verify-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.verify-label {
+  color: var(--text-dim);
+  min-width: 80px;
+}
+.verify-result code {
+  background: var(--bg-panel);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
 }
 

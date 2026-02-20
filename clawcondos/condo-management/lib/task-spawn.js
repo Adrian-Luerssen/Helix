@@ -177,6 +177,10 @@ export function createTaskSpawnHandler(store) {
         `**Plan File:** If you need to create a plan, write it to: \`${planFilePath}\``,
         'Use `goal_update` with `planStatus="awaiting_approval"` when your plan is ready for review.',
         '',
+        'When executing plan steps, update each step\'s status:',
+        `- \`goal_update({ taskId: "${taskId}", stepIndex: 0, stepStatus: "in-progress" })\` — when starting a step`,
+        `- \`goal_update({ taskId: "${taskId}", stepIndex: 0, stepStatus: "done" })\` — when completing a step`,
+        '',
         // Repeat at the end for emphasis
         `⚠️ **REMINDER: When done, call \`goal_update({ taskId: "${task.id}", status: "done", summary: "..." })\`**`,
       ].filter(line => line != null).join('\n');

@@ -68,7 +68,7 @@ describe('Plugin index.js', () => {
         'pm.condoCreateGoals', 'pm.condoCascade', 'pm.goalCascade',
         // Config handlers
         'config.get', 'config.set', 'config.setRole', 'config.getRole', 'config.listRoles',
-        'config.getServices', 'config.setService', 'config.deleteService',
+        'config.getServices', 'config.setService', 'config.deleteService', 'config.verifyGitHub',
         // Team handlers
         'team.getMessages', 'team.send', 'team.notify', 'team.status',
         // Roles handlers
@@ -88,6 +88,8 @@ describe('Plugin index.js', () => {
         'goals.close',
         // Branch status + PR
         'goals.branchStatus', 'goals.createPR',
+        // Manual git operations
+        'goals.retryPush', 'goals.retryMerge', 'goals.pushMain',
       ];
       for (const name of expected) {
         expect(api._methods).toHaveProperty(name);

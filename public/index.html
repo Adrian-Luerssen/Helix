@@ -856,6 +856,7 @@
             <button class="ghost-btn" onclick="closeServiceConfigModal()" style="background:none;border:none;color:var(--text-dim);font-size:1.2rem;cursor:pointer;">&times;</button>
           </div>
           <div class="modal-body" id="serviceConfigFields"></div>
+          <div id="serviceVerifyResult" style="display:none; margin: 0 16px 12px;"></div>
           <div class="modal-footer" style="display:flex;gap:8px;justify-content:space-between;">
             <button class="btn btn-ghost btn-sm" id="serviceDeleteBtn" onclick="deleteServiceConfig()" style="color:var(--red);">Remove</button>
             <div style="display:flex;gap:8px;">
@@ -7437,11 +7438,27 @@ Response format:
         if (repoUrl) params.repoUrl = repoUrl;
         if (autonomyMode && autonomyMode !== 'plan') params.autonomyMode = autonomyMode;
         if (color && color !== '#60a5fa') params.color = color;
-        await rpcCall('condos.create', params);
+        var result = await rpcCall('condos.create', params);
         hideCreateCondoModal();
         await loadCondos();
         renderGoals();
         showToast('Condo created: ' + name);
+
+        // Verify GitHub credentials have access to the cloned repo
+        if (repoUrl && repoUrl.includes('github.com')) {
+          try {
+            var verifyResult = await rpcCall('config.verifyGitHub', { repoUrl: repoUrl });
+            if (verifyResult.valid && verifyResult.repoAccess && !verifyResult.repoAccess.accessible) {
+              showToast('GitHub credentials cannot access this repo. Configure repo-specific credentials.', 'warning', 8000);
+              var newCondo = result && result.condo;
+              if (newCondo) {
+                promptCondoGitHubConfig(newCondo.id, newCondo.name, repoUrl);
+              }
+            } else if (!verifyResult.valid) {
+              showToast('GitHub token is invalid. Configure valid credentials in Settings.', 'warning', 8000);
+            }
+          } catch (verifyErr) { /* verification is best-effort */ }
+        }
       } catch (e) {
         errEl.textContent = 'Failed to create condo';
         errEl.style.display = 'block';
@@ -11924,6 +11941,8 @@ Response format:
 
     function closeServiceConfigModal() {
       document.getElementById('serviceConfigModal').style.display = 'none';
+      var verifyDiv = document.getElementById('serviceVerifyResult');
+      if (verifyDiv) { verifyDiv.style.display = 'none'; verifyDiv.innerHTML = ''; }
       currentServiceId = null;
       currentAuthMode = null;
     }
@@ -11966,6 +11985,14 @@ Response format:
         if (settingsCondoId) params.condoId = settingsCondoId;
         await rpcCall('config.setService', params);
         showToast(def.name + ' configured', 'success');
+
+        // For GitHub, verify the token after saving
+        if (currentServiceId === 'github') {
+          verifyGitHubAfterSave(svcConfig);
+          loadServiceSettings();
+          return;
+        }
+
         closeServiceConfigModal();
         loadServiceSettings();
       } catch (err) {
@@ -11987,6 +12014,61 @@ Response format:
       } catch (err) {
         showToast('Failed to remove: ' + err.message, 'warning');
       }
+    }
+
+    async function verifyGitHubAfterSave(svcConfig) {
+      var resultDiv = document.getElementById('serviceVerifyResult');
+      if (!resultDiv) return;
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;">Verifying credentials...</div>';
+
+      try {
+        var token = svcConfig.agentToken || svcConfig.token;
+        var result = await rpcCall('config.verifyGitHub', { token: token });
+
+        if (result.valid) {
+          resultDiv.innerHTML = buildVerifySuccessHtml(result);
+        } else {
+          resultDiv.innerHTML = buildVerifyErrorHtml(result);
+        }
+      } catch (err) {
+        resultDiv.innerHTML = '<div class="verify-result error"><div class="verify-header">Verification failed</div><div>' + escapeHtml(err.message) + '</div></div>';
+      }
+    }
+
+    function buildVerifySuccessHtml(result) {
+      var html = '<div class="verify-result success">';
+      html += '<div class="verify-header">Token verified</div>';
+      html += '<div class="verify-row"><span class="verify-label">User</span><span>' + escapeHtml(result.login) + (result.name ? ' (' + escapeHtml(result.name) + ')' : '') + '</span></div>';
+      if (result.scopes && result.scopes.length > 0) {
+        html += '<div class="verify-row"><span class="verify-label">Scopes</span><span>' + result.scopes.map(function(s) { return '<code>' + escapeHtml(s) + '</code>'; }).join(' ') + '</span></div>';
+      } else if (result.tokenType === 'fine-grained') {
+        html += '<div class="verify-row"><span class="verify-label">Type</span><span>Fine-grained (permissions not listed via API)</span></div>';
+      }
+      if (result.repoAccess) {
+        if (result.repoAccess.accessible === true) {
+          html += '<div class="verify-row"><span class="verify-label">Repo</span><span style="color:var(--green);">Accessible</span></div>';
+        } else if (result.repoAccess.accessible === false) {
+          html += '<div class="verify-row"><span class="verify-label">Repo</span><span style="color:var(--red);">No access — ' + escapeHtml(result.repoAccess.error || '') + '</span></div>';
+        }
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function buildVerifyErrorHtml(result) {
+      var html = '<div class="verify-result error">';
+      html += '<div class="verify-header">Token verification failed</div>';
+      html += '<div>' + escapeHtml(result.error || 'Unknown error') + '</div>';
+      html += '</div>';
+      return html;
+    }
+
+    function promptCondoGitHubConfig(condoId, condoName, repoUrl) {
+      settingsScope = 'condo';
+      settingsCondoId = condoId;
+      showSettings({ fromRouter: true });
+      setTimeout(function() { openServiceConfig('github'); }, 300);
     }
 
     async function renderCondoServicesPanel(condoId) {

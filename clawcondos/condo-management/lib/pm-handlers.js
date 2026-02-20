@@ -1003,10 +1003,13 @@ export function createPmHandlers(store, options = {}) {
             // Push the new branch to remote so it's visible on GitHub
             if (condo.workspace.repoUrl && wsOps.pushGoalBranch) {
               const pushResult = wsOps.pushGoalBranch(wtResult.path, wtResult.branch);
-              if (pushResult.pushed) {
+              if (pushResult.pushed || pushResult.ok) {
+                goal.pushStatus = 'pushed';
                 if (logger) logger.info(`pm.condoCreateGoals: pushed branch ${wtResult.branch} to remote for goal ${goalId}`);
-              } else if (!pushResult.ok && logger) {
-                logger.warn(`pm.condoCreateGoals: failed to push branch ${wtResult.branch}: ${pushResult.error}`);
+              } else {
+                goal.pushStatus = 'failed';
+                goal.pushError = pushResult.error || 'Push failed';
+                if (logger) logger.warn(`pm.condoCreateGoals: failed to push branch ${wtResult.branch}: ${pushResult.error}`);
               }
             }
           } else if (logger) {

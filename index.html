@@ -1376,6 +1376,11 @@
       // Goal lifecycle events (task completion, retry, failure, merge)
       if (msg.type === 'event' && msg.payload?.event) {
         const ev = msg.payload.event;
+        if (ev === 'goal.push_failed') {
+          showToast('Git push failed: ' + (msg.payload.error || 'unknown error').slice(0, 100), 'error', 8000);
+          loadGoals().then(() => renderGoalView()).catch(() => {});
+          return;
+        }
         if (ev === 'goal.task_completed' || ev === 'goal.task_retry' || ev === 'goal.task_failed' || ev === 'goal.merged' || ev === 'goal.kickoff') {
           // Refresh goals and re-render
           loadGoals().then(() => renderGoalView()).catch(() => {});
@@ -3340,13 +3345,37 @@
         }
         html += '</div>';
 
-        // Merge status
-        if (goal.mergeStatus) {
+        // Git status (push + merge + manual actions)
+        if (goal.worktree) {
           html += '<div class="goal-context-section">' +
-            '<div class="goal-context-section-title">Merge Status</div>' +
-            '<div class="goal-context-row"><span class="goal-context-label">Status</span>' + renderMergeBadge(goal) + '</div>';
-          if (goal.mergedAtMs) html += '<div class="goal-context-row"><span class="goal-context-label">Merged</span><span class="goal-context-value">' + timeAgo(goal.mergedAtMs) + '</span></div>';
-          if (goal.mergeError) html += '<div class="goal-context-row"><span class="goal-context-label">Error</span><span class="goal-context-value" style="color:var(--red);">' + escapeHtml(goal.mergeError.slice(0, 200)) + '</span></div>';
+            '<div class="goal-context-section-title">Git</div>';
+
+          // Push status
+          if (goal.pushStatus === 'failed') {
+            html += '<div class="goal-context-row"><span class="goal-context-label">Push</span><span class="goal-context-value" style="color:var(--red);">Failed: ' + escapeHtml((goal.pushError || '').slice(0, 150)) + '</span></div>';
+          } else if (goal.pushStatus === 'pushed') {
+            html += '<div class="goal-context-row"><span class="goal-context-label">Push</span><span class="goal-context-value" style="color:var(--green);">\u2713 Pushed</span></div>';
+          }
+
+          // Merge status
+          if (goal.mergeStatus) {
+            html += '<div class="goal-context-row"><span class="goal-context-label">Merge</span>' + renderMergeBadge(goal) + '</div>';
+            if (goal.mergedAtMs) html += '<div class="goal-context-row"><span class="goal-context-label">Merged</span><span class="goal-context-value">' + timeAgo(goal.mergedAtMs) + '</span></div>';
+            if (goal.mergeError) html += '<div class="goal-context-row"><span class="goal-context-label">Error</span><span class="goal-context-value" style="color:var(--red);">' + escapeHtml(goal.mergeError.slice(0, 200)) + '</span></div>';
+          }
+
+          // Manual action buttons
+          html += '<div class="goal-git-actions">';
+          if (goal.pushStatus === 'failed' || !goal.pushStatus) {
+            html += '<button class="ghost-btn" onclick="retryGoalPush(\'' + escapeHtml(goal.id) + '\')">Push Branch</button>';
+          }
+          if (goal.mergeStatus === 'error' || goal.mergeStatus === 'conflict') {
+            html += '<button class="ghost-btn" onclick="retryGoalMerge(\'' + escapeHtml(goal.id) + '\')">Retry Merge</button>';
+          }
+          if (!goal.mergeStatus && goal.pushStatus === 'pushed') {
+            html += '<button class="ghost-btn" onclick="retryGoalMerge(\'' + escapeHtml(goal.id) + '\')">Merge to Main</button>';
+          }
+          html += '</div>';
           html += '</div>';
         }
 
@@ -3412,40 +3441,69 @@
             var taskStatus = t.status || (t.done ? 'done' : 'pending');
             var isDone = t.done || taskStatus === 'done';
             var isFailed = taskStatus === 'failed';
-            var hasSession = t.sessionKey ? 'has-session' : '';
+            var statusLabels = { 'pending': 'Pending', 'in-progress': 'In Progress', 'blocked': 'Blocked', 'waiting': 'Waiting', 'done': 'Done', 'failed': 'Failed' };
+            var statusLabel = statusLabels[taskStatus] || taskStatus;
+            var statusCss = taskStatus === 'in-progress' ? 'in-progress' : escapeHtml(taskStatus);
+
+            // Action buttons — always visible
             var spawnBtn = (!t.sessionKey && !isDone && !isFailed)
               ? '<button class="goal-task-spawn" onclick="event.stopPropagation(); openSpawnTaskModal(\'' + escapeHtml(goal.id) + '\',\'' + id + '\')" title="Spawn agent session">\u25b6</button>'
               : '';
             var retryBtn = isFailed
               ? '<button class="goal-task-spawn" onclick="event.stopPropagation(); retryFailedTask(\'' + escapeHtml(goal.id) + '\',\'' + id + '\')" title="Retry task">\u21bb</button>'
               : '';
-            var retryBadge = (t.retryCount > 0 && !isDone)
-              ? '<span class="retry-badge">retry ' + t.retryCount + '</span>'
-              : '';
-            // Dependency chips
-            var depChips = '';
+
+            // Summary or error line
+            var summaryLine = '';
+            if (t.lastError) {
+              summaryLine = '<div class="task-card-summary error">' + escapeHtml(t.lastError.slice(0, 120)) + '</div>';
+            } else if (t.summary) {
+              summaryLine = '<div class="task-card-summary">' + escapeHtml(t.summary.slice(0, 120)) + '</div>';
+            }
+
+            // Meta line: deps + retry + agent
+            var metaParts = '';
             if (Array.isArray(t.dependsOn) && t.dependsOn.length) {
-              depChips = '<div class="goal-task-deps">' + t.dependsOn.map(function(depId) {
+              metaParts += t.dependsOn.map(function(depId) {
                 var dep = tasks.find(function(tt) { return tt.id === depId; });
                 var depName = dep ? (dep.text || '').slice(0, 20) : depId.slice(0, 8);
                 var depDone = dep && (dep.done || dep.status === 'done');
                 return '<span class="goal-task-dep-chip' + (depDone ? ' done' : '') + '">' + escapeHtml(depName) + '</span>';
-              }).join('') + '</div>';
+              }).join('');
             }
-            var tooltipParts = [taskStatus];
-            if (t.sessionKey) tooltipParts.push('session: ' + t.sessionKey);
-            if (t.summary) tooltipParts.push(t.summary);
-            if (t.lastError) tooltipParts.push('error: ' + t.lastError);
-            var tooltip = escapeHtml(tooltipParts.join(' \u00b7 '));
-            return '<div class="goal-task ' + (isDone ? 'done' : '') + (isFailed ? ' failed' : '') + '">' +
-              '<div class="goal-task-status ' + escapeHtml(taskStatus) + ' ' + hasSession + '"' +
-              ' onclick="cycleTaskStatus(\'' + id + '\')"' +
-              ' oncontextmenu="showTaskStatusMenu(event,\'' + id + '\')"' +
-              ' title="' + tooltip + '"></div>' +
-              '<div style="flex:1;min-width:0;"><span class="goal-task-text">' + escapeHtml(t.text || '') + '</span>' + depChips + '</div>' +
-              retryBadge +
-              spawnBtn + retryBtn +
-              '<button class="goal-task-del" onclick="deleteGoalTask(\'' + id + '\')" title="Delete">\u00d7</button>' +
+            if (t.retryCount > 0 && !isDone) {
+              metaParts += '<span class="retry-badge">retry ' + t.retryCount + '</span>';
+            }
+            if (t.sessionKey) {
+              metaParts += '<span class="retry-badge" style="background:var(--accent-muted);color:var(--accent);">' + escapeHtml(t.sessionKey.split(':').slice(1, 2).join('')) + '</span>';
+            }
+            var metaLine = metaParts ? '<div class="task-card-meta">' + metaParts + '</div>' : '';
+
+            // Expanded detail panel
+            var detailParts = [];
+            if (t.description) detailParts.push('<div><span style="color:var(--text-dim);">Description:</span> ' + escapeHtml(t.description.slice(0, 300)) + '</div>');
+            if (t.sessionKey) detailParts.push('<div><span style="color:var(--text-dim);">Session:</span> <span style="font-family:var(--font-mono);font-size:0.78rem;">' + escapeHtml(t.sessionKey) + '</span></div>');
+            if (t.assignedAgent) detailParts.push('<div><span style="color:var(--text-dim);">Agent:</span> ' + escapeHtml(t.assignedAgent) + '</div>');
+            if (t.autonomyMode) detailParts.push('<div><span style="color:var(--text-dim);">Autonomy:</span> ' + escapeHtml(t.autonomyMode) + '</div>');
+            if (t.createdAtMs) detailParts.push('<div><span style="color:var(--text-dim);">Created:</span> ' + timeAgo(t.createdAtMs) + '</div>');
+            if (t.updatedAtMs) detailParts.push('<div><span style="color:var(--text-dim);">Updated:</span> ' + timeAgo(t.updatedAtMs) + '</div>');
+
+            return '<div class="goal-task-card ' + (isDone ? 'done' : '') + (isFailed ? ' failed' : '') + '">' +
+              '<div class="task-card-header" onclick="toggleTaskExpand(\'' + id + '\')">' +
+                '<div class="task-status-badge ' + statusCss + '"' +
+                  ' onclick="event.stopPropagation(); cycleTaskStatus(\'' + id + '\')"' +
+                  ' oncontextmenu="event.stopPropagation(); showTaskStatusMenu(event,\'' + id + '\')">' + statusLabel + '</div>' +
+                '<div class="task-card-content">' +
+                  '<div class="task-card-title">' + escapeHtml(t.text || '') + '</div>' +
+                  summaryLine +
+                  metaLine +
+                '</div>' +
+                '<div class="task-card-actions">' +
+                  spawnBtn + retryBtn +
+                  '<button class="goal-task-del" onclick="event.stopPropagation(); deleteGoalTask(\'' + id + '\')" title="Delete">\u00d7</button>' +
+                '</div>' +
+              '</div>' +
+              (detailParts.length ? '<div class="task-card-detail" id="task-detail-' + id + '" style="display:none">' + detailParts.join('') + '</div>' : '') +
             '</div>';
           }).join('') +
           '<div class="goal-task-compose"><input class="chat-input" id="goalNewTaskInput" placeholder="Add a task\u2026" style="flex:1;" onkeypress="if(event.key===\'Enter\')addGoalTask()"><button class="ghost-btn" onclick="addGoalTask()">Add</button></div>';
@@ -3553,6 +3611,36 @@
       } catch (e) {
         showToast('Failed to remove file', 'error');
       }
+    }
+
+    async function retryGoalPush(goalId) {
+      showToast('Pushing branch...', 'info');
+      try {
+        var result = await rpcCall('goals.retryPush', { goalId });
+        if (result.ok) showToast('Branch pushed successfully', 'success');
+        else showToast('Push failed: ' + (result.error || 'unknown'), 'error', 8000);
+      } catch (e) {
+        showToast('Push failed: ' + e.message, 'error', 8000);
+      }
+      loadGoals().then(function() { renderGoalView(); });
+    }
+
+    async function retryGoalMerge(goalId) {
+      showToast('Merging branch...', 'info');
+      try {
+        var result = await rpcCall('goals.retryMerge', { goalId });
+        if (result.mergeStatus === 'merged') showToast('Merged successfully', 'success');
+        else showToast('Merge failed: ' + (result.mergeError || 'unknown'), 'error', 8000);
+      } catch (e) {
+        showToast('Merge failed: ' + e.message, 'error', 8000);
+      }
+      loadGoals().then(function() { renderGoalView(); });
+    }
+
+    function toggleTaskExpand(taskId) {
+      var el = document.getElementById('task-detail-' + taskId);
+      if (!el) return;
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
     }
 
     function toggleGoalRightPanel() {

@@ -5,6 +5,7 @@
  */
 
 import { getDefaultRoles, getAgentForRole } from './agent-roles.js';
+import { verifyGitHubToken } from './github.js';
 
 /**
  * Create config RPC handlers
@@ -432,6 +433,47 @@ export function createConfigHandlers(store, options = {}) {
       }
 
       respond(true, { ok: true });
+    } catch (err) {
+      respond(false, null, err.message);
+    }
+  };
+
+  /**
+   * config.verifyGitHub - Verify GitHub token and optionally check repo access
+   * Params: { token?: string, condoId?: string, repoUrl?: string }
+   * Response: verification result from verifyGitHubToken()
+   */
+  handlers['config.verifyGitHub'] = async ({ params, respond }) => {
+    try {
+      const { token: rawToken, condoId, repoUrl } = params || {};
+
+      // Resolve the token to verify
+      let tokenToVerify = rawToken;
+      if (!tokenToVerify) {
+        const data = store.load();
+
+        // Check per-condo override first
+        if (condoId) {
+          const condo = data.condos.find(c => c.id === condoId);
+          const condoGh = condo?.services?.github;
+          if (condoGh?.agentToken) tokenToVerify = condoGh.agentToken;
+          else if (condoGh?.token) tokenToVerify = condoGh.token;
+        }
+
+        // Fall back to global
+        if (!tokenToVerify) {
+          const gh = data.config?.services?.github;
+          if (gh?.agentToken) tokenToVerify = gh.agentToken;
+          else if (gh?.token) tokenToVerify = gh.token;
+        }
+      }
+
+      if (!tokenToVerify) {
+        return respond(true, { valid: false, error: 'No GitHub token configured' });
+      }
+
+      const result = await verifyGitHubToken(tokenToVerify, repoUrl || undefined);
+      respond(true, result);
     } catch (err) {
       respond(false, null, err.message);
     }

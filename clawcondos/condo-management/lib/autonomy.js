@@ -66,7 +66,11 @@ export function buildAutonomyDirective(mode) {
         `Do not execute significant actions until the plan is explicitly approved.`;
     
     case 'step':
-      return `**Autonomy: Step-by-Step Approval** — Create a plan and get it approved. After approval, pause after completing each major step and update the step status. Wait for confirmation before proceeding to the next step if it involves significant changes.`;
+      return `**Autonomy: Step-by-Step Approval** — Create a plan and get it approved. After approval, for EACH step:\n` +
+        `1. Call \`goal_update({ taskId: "<taskId>", stepIndex: <N>, stepStatus: "in-progress" })\` before starting\n` +
+        `2. Complete the step\n` +
+        `3. Call \`goal_update({ taskId: "<taskId>", stepIndex: <N>, stepStatus: "done" })\` when finished\n` +
+        `4. Wait for confirmation before proceeding to the next step if it involves significant changes.`;
     
     case 'supervised':
       return `**Autonomy: Supervised Mode** — This task requires close supervision. Before each action (file write, command execution, external API call), describe what you're about to do and wait for explicit approval. Create a plan first and get it approved.`;

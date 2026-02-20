@@ -1,5 +1,5 @@
 import { AUTONOMY_MODES } from './autonomy.js';
-import { initGitHubRepo, pushBranch } from './github.js';
+import { initGitHubRepo, pushBranch, setupGitRemote } from './github.js';
 
 export function createCondoHandlers(store, options = {}) {
   const { wsOps, logger, rpcCall } = options;
@@ -18,6 +18,25 @@ export function createCondoHandlers(store, options = {}) {
         return gh;
       }
     } catch { /* ignore */ }
+    return null;
+  }
+
+  /**
+   * Resolve the raw GitHub token from store (per-condo override or global).
+   * Returns the agentToken or token, whichever is configured.
+   */
+  function getGitHubToken(data, condoId) {
+    // Check per-condo override first
+    if (condoId) {
+      const condo = data.condos.find(c => c.id === condoId);
+      const condoGh = condo?.services?.github;
+      if (condoGh?.agentToken) return condoGh.agentToken;
+      if (condoGh?.token) return condoGh.token;
+    }
+    // Fall back to global
+    const gh = data.config?.services?.github;
+    if (gh?.agentToken) return gh.agentToken;
+    if (gh?.token) return gh.token;
     return null;
   }
 
@@ -56,6 +75,18 @@ export function createCondoHandlers(store, options = {}) {
             condo.workspace = { path: wsResult.path, repoUrl: repoUrl || null, createdAtMs: now };
           } else if (logger) {
             logger.error(`clawcondos-goals: workspace creation failed for condo ${condoId}: ${wsResult.error}`);
+          }
+        }
+
+        // Clone-mode: embed auth token in remote URL so pushes authenticate
+        if (condo.workspace?.path && repoUrl) {
+          const ghToken = getGitHubToken(loadData(), null);
+          if (ghToken) {
+            try {
+              setupGitRemote(condo.workspace.path, repoUrl, ghToken);
+            } catch (err) {
+              if (logger) logger.warn(`condos.create: failed to setup authenticated remote: ${err.message}`);
+            }
           }
         }
 

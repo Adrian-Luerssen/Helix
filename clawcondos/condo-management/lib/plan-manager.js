@@ -56,9 +56,11 @@ export function parsePlanMarkdown(content) {
     }
 
     if (title) {
+      // Truncate step titles to 100 characters for conciseness
+      const truncatedTitle = title.length > 100 ? title.slice(0, 100) + '...' : title;
       steps.push({
         index: stepIndex++,
-        title,
+        title: truncatedTitle,
         status: initialStatus,
         startedAtMs: null,
         completedAtMs: initialStatus === 'done' ? Date.now() : null,
