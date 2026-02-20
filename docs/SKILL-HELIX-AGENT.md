@@ -1,112 +1,36 @@
-# SKILL-HELIX-AGENT: External Agent Workflow Guide
+# SKILL-HELIX-AGENT: Quick Reference for External Agents
 
-This guide documents the full workflow for external agents (e.g., Telegram agents, API integrations) to drive Helix's PM cascade programmatically using agent tools.
+> Full reference: see [SKILL-AGENT.md](./SKILL-AGENT.md)
 
-## Overview
+This is a quick-start for agents that operate outside the Helix dashboard (e.g., Telegram, API integrations) and need to drive the PM cascade programmatically.
 
-External agents can now orchestrate projects without the web dashboard by using these tools:
-
-| Tool | Purpose |
-|------|---------|
-| `condo_list` | List all condos with goal counts |
-| `condo_bind` | Bind to an existing condo or create a new one (supports `repoUrl`) |
-| `condo_pm_chat` | Send a work request to the PM — PM plans goals and tasks |
-| `condo_pm_kickoff` | Approve a plan and spawn worker agents |
-| `condo_status` | Check progress on a condo's goals and tasks |
-| `goal_update` | Report on tasks assigned to you |
-
-## Workflow
-
-### 1. Find or Create a Condo
-
-List existing condos:
-```
-condo_list → shows all condos with IDs and goal counts
-```
-
-Bind to an existing condo:
-```
-condo_bind({ condoId: "condo_abc123" })
-```
-
-Or create a new condo with a git repo:
-```
-condo_bind({ name: "My Project", description: "A new project", repoUrl: "https://github.com/org/repo.git" })
-```
-
-### 2. Send Work Request to PM
-
-Use `condo_pm_chat` to describe what you want built. The PM will analyze the request, create a plan with goals and tasks, and return its response:
+## Minimal Workflow
 
 ```
-condo_pm_chat({
-  condoId: "condo_abc123",
-  message: "Build a landing page with hero section, feature grid, and contact form"
-})
+1. condo_list()                              → find existing condos
+2. condo_bind({ condoId: "..." })            → bind to a project
+   — OR —
+   condo_bind({ name: "...", repoUrl: "..." }) → create + bind
+3. condo_pm_chat({ condoId, message })       → tell PM what to build (blocks up to 3min)
+4. condo_pm_kickoff({ condoId, goalId })     → approve plan, spawn workers
+5. condo_status({ condoId })                 → check progress
 ```
 
-The PM response will include:
-- A plan describing the goals and tasks
-- Any clarifying questions (if the request is ambiguous)
-- Auto-created goals if the PM produced a clear plan
+## Tool Reference
 
-You can have a multi-turn conversation with the PM by calling `condo_pm_chat` multiple times.
+| Tool | Required Params | Returns |
+|------|----------------|---------|
+| `condo_list` | — | All condos with IDs and goal counts |
+| `condo_bind` | `condoId` or `name` | Binds session; creates condo if `name` given |
+| `condo_pm_chat` | `condoId`, `message` | PM response text + auto-created goals (if any) |
+| `condo_pm_kickoff` | `condoId`, `goalId` | Spawned session count or cascade confirmation |
+| `condo_status` | `condoId` | Full project status with all goals and tasks |
+| `goal_update` | `taskId`, `status` | Confirms update (only for tasks assigned to you) |
 
-### 3. Review and Kick Off
+## Key Behaviors
 
-After the PM creates goals with tasks, approve and spawn workers:
-
-```
-condo_pm_kickoff({
-  condoId: "condo_abc123",
-  goalId: "goal_xyz789"
-})
-```
-
-If the goal already has tasks, workers are spawned immediately. If the goal has no tasks yet, the PM goal cascade is triggered to create tasks first, then workers are auto-spawned.
-
-### 4. Monitor Progress
-
-Check the status of goals and tasks:
-
-```
-condo_status({ condoId: "condo_abc123" })
-```
-
-This returns:
-- Condo info (name, workspace path)
-- All goals with their status
-- Task breakdown with assignment and progress info
-
-## Example: Full Workflow
-
-```
-User: "Build a landing page for our startup"
-
-Agent:
-1. condo_list()
-   → Found 2 condos: "Marketing Site" (condo_mk1), "Backend API" (condo_be2)
-
-2. condo_bind({ condoId: "condo_mk1" })
-   → Session bound to "Marketing Site"
-
-3. condo_pm_chat({ condoId: "condo_mk1", message: "Build a landing page with hero section, feature highlights, and a contact form. Use Next.js and Tailwind CSS." })
-   → PM Response: Created goal "Landing Page" (goal_lp1) with 4 tasks:
-     - Design hero section layout
-     - Implement feature highlights grid
-     - Build contact form with validation
-     - Write tests and deploy
-
-4. condo_pm_kickoff({ condoId: "condo_mk1", goalId: "goal_lp1" })
-   → Kickoff complete: spawned 4 worker sessions
-
-5. condo_status({ condoId: "condo_mk1" })
-   → Landing Page: 1/4 tasks done, 3 in progress
-```
-
-## Notes
-
-- `condo_pm_chat` has a 3-minute timeout waiting for the PM to respond. If the PM is still processing, check back with `condo_status`.
-- The PM may ask clarifying questions instead of immediately creating a plan. Continue the conversation with additional `condo_pm_chat` calls.
-- `condo_pm_kickoff` handles both cases: goals with existing tasks (direct kickoff) and goals without tasks (triggers PM goal cascade first).
-- Workers report progress via `goal_update`. When all tasks in a goal complete, the goal's worktree branch is auto-merged.
+- `condo_pm_chat` is **synchronous** — it sends to the PM and polls for a response (3s intervals, 3min timeout). If it times out, the PM is still working; check `condo_status` later.
+- `condo_pm_kickoff` handles **both cases**: if the goal has tasks, it spawns workers immediately; if it has no tasks, it triggers the PM goal cascade first.
+- **Do not use** `condo_create_goal`, `condo_add_task`, or `condo_spawn_task` — these bypass PM planning.
+- Workers auto-cascade: completed tasks automatically unblock and spawn dependent tasks.
+- Goal branches auto-merge to main when all tasks complete.
