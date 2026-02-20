@@ -1234,5 +1234,170 @@ export function createPmHandlers(store, options = {}) {
     }
   };
 
+  /**
+   * pm.goalCascade - Cascade a single goal (plan tasks + optionally auto-kickoff)
+   * Params: { goalId: string, mode: 'plan' | 'full' }
+   * Like pm.condoCascade but for a single goal.
+   * Response: { goalId, title, pmSessionKey, prompt, userPrompt, mode, backendSent, sendResult }
+   */
+  handlers['pm.goalCascade'] = async ({ params, respond }) => {
+    const { goalId, mode } = params || {};
+
+    if (!goalId) {
+      return respond(false, null, 'goalId is required');
+    }
+
+    if (mode !== 'plan' && mode !== 'full') {
+      return respond(false, null, 'mode must be "plan" or "full"');
+    }
+
+    try {
+      const data = store.load();
+      const goal = data.goals.find(g => g.id === goalId);
+
+      if (!goal) {
+        return respond(false, null, `Goal ${goalId} not found`);
+      }
+
+      if (!goal.condoId) {
+        return respond(false, null, `Goal ${goalId} has no condoId`);
+      }
+
+      const condo = data.condos.find(c => c.id === goal.condoId);
+      if (!condo) {
+        return respond(false, null, `Condo ${goal.condoId} not found`);
+      }
+
+      if (goal.tasks && goal.tasks.length > 0) {
+        return respond(false, null, 'Goal already has tasks — use goals.kickoff instead');
+      }
+
+      // Build shared context — roles, skill, project snapshot (reused from pm.condoCascade)
+      const goals = data.goals.filter(g => g.condoId === goal.condoId && g.status !== 'done');
+      const allTasks = goals.flatMap(g => g.tasks || []);
+      const pendingTasks = allTasks.filter(t => t.status !== 'done');
+
+      const configuredRoles = data.config?.agentRoles || {};
+      const roleDescriptions = data.config?.roles || {};
+      const defaultRoles = getDefaultRoles();
+      const allRoleNames = new Set([...Object.keys(defaultRoles), ...Object.keys(configuredRoles), ...Object.keys(roleDescriptions)]);
+      const availableRoles = {};
+      for (const role of allRoleNames) {
+        if (role === 'pm') continue;
+        const agentId = configuredRoles[role] || defaultRoles[role] || role;
+        const description = roleDescriptions[role]?.description || null;
+        availableRoles[role] = { agentId, ...(description ? { description } : {}) };
+      }
+
+      const pmSkillContext = getPmSkillContext({
+        condoId: goal.condoId,
+        condoName: condo.name,
+        activeGoals: goals.filter(g => !g.completed).length,
+        totalTasks: allTasks.length,
+        pendingTasks: pendingTasks.length,
+        roles: availableRoles,
+      });
+
+      let projectSnapshotContext = null;
+      if (wsOps && condo?.workspace?.path) {
+        try {
+          const { snapshot } = buildProjectSnapshot(condo.workspace.path);
+          if (snapshot) projectSnapshotContext = snapshot;
+        } catch (e) {
+          if (logger) logger.warn(`pm.goalCascade: project snapshot failed: ${e.message}`);
+        }
+      }
+
+      // Build project goals summary
+      const projectGoalsSummary = (() => {
+        const lines = [`## Project Goals Summary — "${condo.name}"`];
+        for (const g of goals) {
+          const status = g.status || 'active';
+          const taskCount = (g.tasks || []).length;
+          const done = (g.tasks || []).filter(t => t.done || t.status === 'done').length;
+          const taskInfo = taskCount > 0 ? ` — ${done}/${taskCount} tasks` : '';
+          lines.push(`- [${status}] ${g.title} (${g.id})${taskInfo}`);
+        }
+        return lines.join('\n');
+      })();
+
+      // Create PM session for this goal
+      const { pmSessionKey } = getOrCreatePmSessionForGoal(store, goalId);
+      goal.pmSessionKey = pmSessionKey;
+      if (!data.sessionIndex) data.sessionIndex = {};
+      data.sessionIndex[pmSessionKey] = { goalId: goal.id };
+
+      // Build user-facing prompt
+      const userPrompt = `Plan tasks for this goal: "${goal.title}"` +
+        (goal.description ? `\n\nDescription:\n${goal.description}` : '') +
+        `\n\nThis goal is part of the "${condo.name}" project. Break it into actionable tasks with agent assignments.`;
+
+      // Build enriched prompt
+      const contextPrefix = [
+        `[SESSION IDENTITY] You are the Goal PM for "${goal.title}" in project "${condo.name}" (condo: ${goal.condoId}, goal: ${goal.id}). This is an ISOLATED session — only plan tasks for THIS goal. Do NOT reference or plan for other projects.`,
+        '',
+        projectSnapshotContext || null,
+        '',
+        projectGoalsSummary,
+        '',
+        pmSkillContext || null,
+        '',
+        `[PM Mode Context]`,
+        `Condo: ${condo.name}`,
+        `Goal: ${goal.title}`,
+        `Active Goals: ${goals.filter(g => !g.completed).length}`,
+        '',
+        'User Message:',
+      ].filter(line => line != null).join('\n');
+
+      const enrichedPrompt = `${contextPrefix}\n${userPrompt}`;
+
+      // Save clean prompt to goal's pmChatHistory
+      addToHistory(goal, 'user', userPrompt);
+
+      // Set cascade state
+      goal.cascadeState = 'awaiting_plan';
+      goal.cascadeMode = mode;
+      goal.updatedAtMs = Date.now();
+      store.save(data);
+
+      if (logger) {
+        logger.info(`pm.goalCascade: prepared PM session for goal "${goal.title}" (mode: ${mode})`);
+      }
+
+      // Backend sends chat.send directly
+      let sendResult = null;
+      if (gatewayRpcCall) {
+        try {
+          await gatewayRpcCall('chat.send', {
+            sessionKey: pmSessionKey,
+            message: enrichedPrompt,
+          });
+          sendResult = { ok: true };
+          if (logger) logger.info(`pm.goalCascade: backend chat.send OK for ${pmSessionKey}`);
+        } catch (err) {
+          sendResult = { ok: false, error: err.message };
+          if (logger) logger.error(`pm.goalCascade: backend chat.send FAILED for ${pmSessionKey}: ${err.message}`);
+        }
+      }
+
+      respond(true, {
+        goalId: goal.id,
+        title: goal.title,
+        pmSessionKey,
+        prompt: enrichedPrompt,
+        userPrompt,
+        mode,
+        backendSent: !!sendResult,
+        sendResult,
+      });
+    } catch (err) {
+      if (logger) {
+        logger.error(`pm.goalCascade error: ${err.message}`);
+      }
+      respond(false, null, err.message);
+    }
+  };
+
   return handlers;
 }

@@ -5234,7 +5234,8 @@
         return g.status !== 'done' && (!g.tasks || g.tasks.length === 0);
       });
 
-      var buttons = '<button class="pm-action-btn primary" onclick="createGoalsFromCondoPlan()" title="Create goals from this plan">📋 Create Goals</button>';
+      var buttons = '<button class="pm-action-btn primary" onclick="createGoalsFromCondoPlan()" title="Create goals from this plan">📋 Create Goals</button>' +
+        '<button class="pm-action-btn success" onclick="createGoalsFromCondoPlan(\'full\')" title="Create goals and auto-execute everything">🚀 Full Auto</button>';
 
       if (goalsNeedingPlanning.length > 0) {
         buttons +=
@@ -5356,17 +5357,20 @@
     /**
      * Create goals from the condo PM's plan
      */
-    async function createGoalsFromCondoPlan() {
+    async function createGoalsFromCondoPlan(mode) {
       var condoId = state.currentCondoOpenId;
       if (!condoId) {
         showToast('No condo selected', 'error');
         return;
       }
 
-      // Disable button
+      // Disable all action buttons
+      var btns = document.querySelectorAll('#condoPlanActions .pm-action-btn');
+      btns.forEach(function(b) {
+        b.disabled = true;
+      });
       var btn = document.querySelector('#condoPlanActions .pm-action-btn[onclick*="createGoals"]');
       if (btn) {
-        btn.disabled = true;
         btn.innerHTML = '<span class="btn-spinner"></span> Creating...';
       }
 
@@ -5376,24 +5380,28 @@
         }, 30000);
 
         if (result && result.ok) {
-          showToast('Created ' + result.goalsCreated + ' goals — starting task planning...', 'success');
+          var cascadeMode = mode || 'plan';
+          showToast('Created ' + result.goalsCreated + ' goals — starting task planning (' + cascadeMode + ')...', 'success');
 
           // Refresh data and re-render
           await loadGoals();
           renderCondoPmView();
 
-          // Auto-trigger cascade in plan mode: goal PMs will propose task plans
-          // User reviews each plan and clicks "Create Tasks" + "Start Goal" manually
+          // Cascade: goal PMs will propose task plans
+          // 'plan' mode: user reviews each plan manually
+          // 'full' mode: tasks auto-created, agents auto-started
           if (result.needsCascade) {
-            await startCondoCascade('plan');
+            await startCondoCascade(cascadeMode);
           }
         } else {
           throw new Error('Failed to create goals');
         }
       } catch (err) {
         showToast('Failed to create goals: ' + (err.message || 'Unknown error'), 'error');
+        btns.forEach(function(b) {
+          b.disabled = false;
+        });
         if (btn) {
-          btn.disabled = false;
           btn.innerHTML = '📋 Create Goals';
         }
       }
@@ -5625,6 +5633,58 @@
     }
     
     /**
+     * Full auto for a single goal: if tasks exist, kickoff; else cascade then auto-kickoff.
+     * @param {string} goalId - Goal ID
+     */
+    async function goalFullAuto(goalId) {
+      var goal = state.goals.find(function(g) { return g.id === goalId; });
+      if (!goal) return;
+
+      if (goal.tasks && goal.tasks.length > 0) {
+        // Tasks already exist — just kickoff
+        await approveAndKickoff(goalId);
+        return;
+      }
+
+      // No tasks — cascade this single goal in full mode
+      showToast('Starting full auto for "' + (goal.title || goalId) + '"...', 'info');
+      state.condoCascadeMode = 'full';
+      state.condoCascadePending = new Set([goalId]);
+
+      try {
+        var result = await rpcCall('pm.goalCascade', {
+          goalId: goalId,
+          mode: 'full',
+        }, 30000);
+
+        if (!result) {
+          throw new Error('No response from pm.goalCascade');
+        }
+
+        await loadGoals(); // Refresh so state has pmSessionKey
+
+        if (result.backendSent && result.sendResult && result.sendResult.ok) {
+          showToast('Goal PM is planning tasks (full auto)...', 'info');
+        } else if (result.prompt && result.pmSessionKey) {
+          // Fallback: send from frontend
+          await rpcCall('chat.send', {
+            sessionKey: result.pmSessionKey,
+            message: result.prompt,
+            idempotencyKey: 'goal-cascade-' + goalId + '-' + Date.now(),
+          }, 120000);
+        }
+
+        if (state.currentGoalOpenId === goalId) {
+          renderGoalView();
+        }
+      } catch (err) {
+        console.error('Goal full auto error:', err);
+        showToast('Failed to start full auto: ' + (err.message || 'Unknown error'), 'error');
+        state.condoCascadePending = new Set();
+      }
+    }
+
+    /**
      * Approve a goal-level plan (without kickoff)
      * @param {string} goalId - Goal ID
      */
@@ -5794,16 +5854,19 @@
         if (goalPlanStatus === 'awaiting_approval') {
           html += '<button class="goal-plan-btn goal-plan-btn-kickoff" onclick="approveAndKickoff(\'' + escapeHtml(goal.id) + '\')">';
           html += '🚀 Approve & Kickoff</button>';
-          
+
           html += '<button class="goal-plan-btn goal-plan-btn-approve" onclick="approveGoalPlan(\'' + escapeHtml(goal.id) + '\')">';
           html += '✓ Approve Only</button>';
-          
+
           html += '<button class="goal-plan-btn goal-plan-btn-reject" onclick="rejectGoalPlan(\'' + escapeHtml(goal.id) + '\')">';
           html += '✕ Reject</button>';
         } else if (goalPlanStatus === 'approved') {
           html += '<button class="goal-plan-btn goal-plan-btn-kickoff" onclick="approveAndKickoff(\'' + escapeHtml(goal.id) + '\')">';
           html += '🚀 Kickoff</button>';
         }
+
+        html += '<button class="goal-plan-btn goal-plan-btn-auto" onclick="goalFullAuto(\'' + escapeHtml(goal.id) + '\')" title="Auto-plan and execute everything for this goal">';
+        html += '🚀 Full Auto</button>';
         
         html += '<button class="goal-plan-btn goal-plan-btn-pm" onclick="openPMChatModal(\'' + escapeHtml(goal.id) + '\')">';
         html += '💬 Chat with PM</button>';
@@ -5825,6 +5888,8 @@
         html += '<p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 8px;">Chat with the PM agent to create a plan, or plans will appear here when the PM agent creates one.</p>';
         html += '</div>';
         html += '<div class="goal-plan-actions">';
+        html += '<button class="goal-plan-btn goal-plan-btn-auto" onclick="goalFullAuto(\'' + escapeHtml(goal.id) + '\')" title="Auto-plan and execute everything for this goal">';
+        html += '🚀 Full Auto</button>';
         html += '<button class="goal-plan-btn goal-plan-btn-pm" onclick="openPMChatModal(\'' + escapeHtml(goal.id) + '\')">';
         html += '💬 Chat with PM</button>';
         html += '</div>';

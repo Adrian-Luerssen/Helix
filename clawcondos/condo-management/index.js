@@ -425,6 +425,84 @@ export default function register(api) {
     }
   }
 
+  /**
+   * Auto-merge a goal's worktree branch into main after all tasks complete.
+   * Shared by goal_update tool wrapper and agent_end hook.
+   * Also marks the goal as done on successful merge and kicks off unblocked goals.
+   * @param {string} goalId
+   */
+  async function autoMergeGoal(goalId) {
+    if (!wsOps) return;
+    try {
+      const mergeData = store.load();
+      const mergeGoal = mergeData.goals.find(g => g.id === goalId);
+      if (!mergeGoal?.worktree?.branch) return;
+
+      const mergeCondo = mergeData.condos.find(c => c.id === mergeGoal.condoId);
+      if (!mergeCondo?.workspace?.path) return;
+
+      const mergeResult = wsOps.mergeGoalBranch(mergeCondo.workspace.path, mergeGoal.worktree.branch);
+      mergeGoal.mergeStatus = mergeResult.ok ? 'merged' : (mergeResult.conflict ? 'conflict' : 'error');
+      mergeGoal.mergedAtMs = mergeResult.ok ? Date.now() : null;
+      mergeGoal.mergeError = mergeResult.error || null;
+
+      // Auto-complete goal on successful merge
+      if (mergeResult.ok) {
+        mergeGoal.status = 'done';
+        mergeGoal.completed = true;
+        mergeGoal.completedAtMs = Date.now();
+      }
+
+      store.save(mergeData);
+
+      broadcastPlanUpdate({
+        event: 'goal.merged',
+        goalId: mergeGoal.id,
+        mergeStatus: mergeGoal.mergeStatus,
+        branch: mergeGoal.worktree.branch,
+        timestamp: Date.now(),
+      });
+
+      api.logger.info(`clawcondos-goals: auto-merge ${mergeGoal.worktree.branch} → ${mergeGoal.mergeStatus}`);
+
+      // Auto-push main to GitHub after successful merge
+      if (mergeResult.ok && mergeCondo.workspace.repoUrl) {
+        try {
+          const mainBranch = wsOps.getMainBranch(mergeCondo.workspace.path);
+          const pushResult = pushBranch(mergeCondo.workspace.path, mainBranch);
+          if (pushResult.ok) {
+            api.logger.info(`clawcondos-goals: auto-pushed ${mainBranch} to GitHub for condo ${mergeCondo.id}`);
+          } else {
+            api.logger.error(`clawcondos-goals: auto-push failed for condo ${mergeCondo.id}: ${pushResult.error}`);
+          }
+        } catch (pushErr) {
+          api.logger.error(`clawcondos-goals: auto-push error for condo ${mergeCondo.id}: ${pushErr.message}`);
+        }
+      }
+
+      // Broadcast goal.completed and kick off unblocked goals
+      if (mergeResult.ok && mergeCondo.id) {
+        broadcastPlanUpdate({
+          event: 'goal.completed',
+          goalId: mergeGoal.id,
+          condoId: mergeCondo.id,
+          phase: mergeGoal.phase || null,
+          timestamp: Date.now(),
+        });
+
+        setTimeout(async () => {
+          try {
+            await kickoffUnblockedGoals(mergeCondo.id);
+          } catch (err) {
+            api.logger.error(`clawcondos-goals: kickoffUnblockedGoals after merge failed: ${err.message}`);
+          }
+        }, 2000);
+      }
+    } catch (mergeErr) {
+      api.logger.error(`clawcondos-goals: auto-merge error for goal ${goalId}: ${mergeErr.message}`);
+    }
+  }
+
   api.registerGatewayMethod('goals.kickoff', async ({ params, respond }) => {
     const { goalId } = params || {};
 
@@ -1072,7 +1150,7 @@ export default function register(api) {
             timestamp: Date.now(),
           });
 
-          // Trigger cascading kickoff
+          // Trigger cascading kickoff or merge
           const allDone = goal.tasks.every(t => t.status === 'done');
           if (!allDone) {
             setTimeout(async () => {
@@ -1092,11 +1170,9 @@ export default function register(api) {
                 api.logger.error(`auto-kickoff after auto-complete failed: ${err.message}`);
               }
             }, 1000);
-          } else if (goal.condoId) {
-            // All tasks done — kick off unblocked goals
-            setTimeout(() => kickoffUnblockedGoals(goal.condoId).catch(err =>
-              api.logger.error(`kickoffUnblockedGoals after auto-complete failed: ${err.message}`)
-            ), 2000);
+          } else {
+            // All tasks done — auto-merge, mark goal done, kick off unblocked goals
+            await autoMergeGoal(goal.id);
           }
 
           unwatchPlanFile(sessionKey);
@@ -1334,48 +1410,8 @@ export default function register(api) {
             });
 
             // Auto-merge when all tasks in a goal are done
-            if (result._meta.allTasksDone && wsOps) {
-              try {
-                const mergeData = store.load();
-                const mergeGoal = mergeData.goals.find(g => g.id === result._meta.goalId);
-                if (mergeGoal?.worktree?.branch) {
-                  const mergeCondo = mergeData.condos.find(c => c.id === mergeGoal.condoId);
-                  if (mergeCondo?.workspace?.path) {
-                    const mergeResult = wsOps.mergeGoalBranch(mergeCondo.workspace.path, mergeGoal.worktree.branch);
-                    mergeGoal.mergeStatus = mergeResult.ok ? 'merged' : (mergeResult.conflict ? 'conflict' : 'error');
-                    mergeGoal.mergedAtMs = mergeResult.ok ? Date.now() : null;
-                    mergeGoal.mergeError = mergeResult.error || null;
-                    store.save(mergeData);
-
-                    broadcastPlanUpdate({
-                      event: 'goal.merged',
-                      goalId: mergeGoal.id,
-                      mergeStatus: mergeGoal.mergeStatus,
-                      branch: mergeGoal.worktree.branch,
-                      timestamp: Date.now(),
-                    });
-
-                    api.logger.info(`clawcondos-goals: auto-merge ${mergeGoal.worktree.branch} → ${mergeGoal.mergeStatus}`);
-
-                    // Auto-push main to GitHub after successful merge
-                    if (mergeResult.ok && mergeCondo.workspace.repoUrl) {
-                      try {
-                        const mainBranch = wsOps.getMainBranch(mergeCondo.workspace.path);
-                        const pushResult = pushBranch(mergeCondo.workspace.path, mainBranch);
-                        if (pushResult.ok) {
-                          api.logger.info(`clawcondos-goals: auto-pushed ${mainBranch} to GitHub for condo ${mergeCondo.id}`);
-                        } else {
-                          api.logger.error(`clawcondos-goals: auto-push failed for condo ${mergeCondo.id}: ${pushResult.error}`);
-                        }
-                      } catch (pushErr) {
-                        api.logger.error(`clawcondos-goals: auto-push error for condo ${mergeCondo.id}: ${pushErr.message}`);
-                      }
-                    }
-                  }
-                }
-              } catch (mergeErr) {
-                api.logger.error(`clawcondos-goals: auto-merge error: ${mergeErr.message}`);
-              }
+            if (result._meta.allTasksDone) {
+              await autoMergeGoal(result._meta.goalId);
             }
 
             // Auto-kickoff next tasks after task completion
@@ -1403,29 +1439,6 @@ export default function register(api) {
               }, 1000);
             }
 
-            // When all tasks in a goal are done, kick off unblocked goals in the same condo
-            if (result._meta.allTasksDone) {
-              const completedGoalData = store.load();
-              const completedGoal = completedGoalData.goals.find(g => g.id === result._meta.goalId);
-              if (completedGoal?.condoId) {
-                // Broadcast goal.completed event
-                broadcastPlanUpdate({
-                  event: 'goal.completed',
-                  goalId: completedGoal.id,
-                  condoId: completedGoal.condoId,
-                  phase: completedGoal.phase || null,
-                  timestamp: Date.now(),
-                });
-
-                setTimeout(async () => {
-                  try {
-                    await kickoffUnblockedGoals(completedGoal.condoId);
-                  } catch (err) {
-                    api.logger.error(`clawcondos-goals: kickoffUnblockedGoals after goal completion failed: ${err.message}`);
-                  }
-                }, 2000);
-              }
-            }
           }
 
           return result;

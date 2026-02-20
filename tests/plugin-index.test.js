@@ -65,7 +65,7 @@ describe('Plugin index.js', () => {
         'pm.createTasksFromPlan', 'pm.regenerateTasks', 'pm.detectPlan',
         // Condo PM handlers
         'pm.condoChat', 'pm.condoSaveResponse', 'pm.condoGetHistory',
-        'pm.condoCreateGoals', 'pm.condoCascade',
+        'pm.condoCreateGoals', 'pm.condoCascade', 'pm.goalCascade',
         // Config handlers
         'config.get', 'config.set', 'config.setRole', 'config.getRole', 'config.listRoles',
         'config.getServices', 'config.setService', 'config.deleteService',
@@ -86,6 +86,8 @@ describe('Plugin index.js', () => {
         'goals.checkConflicts',
         // Close goal
         'goals.close',
+        // Branch status + PR
+        'goals.branchStatus', 'goals.createPR',
       ];
       for (const name of expected) {
         expect(api._methods).toHaveProperty(name);
@@ -919,6 +921,122 @@ describe('Plugin index.js', () => {
       if (kickoffResult?.ok && kickoffResult?.payload) {
         expect(kickoffResult.payload.message).not.toContain('blocked by dependencies');
       }
+    });
+  });
+
+  describe('agent_end hook (auto-complete and auto-merge)', () => {
+    it('auto-marks in-progress task as done when agent ends normally', async () => {
+      // Create goal with a task marked in-progress
+      let goalResult;
+      api._methods['goals.create']({
+        params: { title: 'Auto-Complete Goal' },
+        respond: (ok, payload) => { goalResult = payload; },
+      });
+      const goalId = goalResult.goal.id;
+
+      // Add a task
+      let taskResult;
+      api._methods['goals.addTask']({
+        params: { goalId, text: 'Do work' },
+        respond: (ok, payload) => { taskResult = payload; },
+      });
+
+      // Manually set task to in-progress with a session key
+      api._methods['goals.updateTask']({
+        params: { goalId, taskId: taskResult.task.id, status: 'in-progress' },
+        respond: () => {},
+      });
+
+      // Assign session to goal
+      api._methods['goals.addSession']({
+        params: { id: goalId, sessionKey: 'agent:main:autocomp' },
+        respond: () => {},
+      });
+
+      // Manually set sessionKey on task (simulate spawn)
+      let data;
+      api._methods['goals.get']({
+        params: { id: goalId },
+        respond: (ok, payload) => { data = payload; },
+      });
+
+      // Directly update the task's sessionKey in the store
+      const storeData = JSON.parse(require('fs').readFileSync(join(TEST_DIR, 'goals.json'), 'utf-8'));
+      const storeGoal = storeData.goals.find(g => g.id === goalId);
+      const storeTask = storeGoal.tasks.find(t => t.id === taskResult.task.id);
+      storeTask.sessionKey = 'agent:main:autocomp';
+      storeData.sessionIndex['agent:main:autocomp'] = { goalId };
+      require('fs').writeFileSync(join(TEST_DIR, 'goals.json'), JSON.stringify(storeData));
+
+      // Trigger agent_end with success
+      await api._hooks['agent_end']({
+        context: { sessionKey: 'agent:main:autocomp' },
+        success: true,
+      });
+
+      // Verify task was auto-marked as done
+      let updatedGoal;
+      api._methods['goals.get']({
+        params: { id: goalId },
+        respond: (ok, payload) => { updatedGoal = payload.goal; },
+      });
+
+      const task = updatedGoal.tasks.find(t => t.id === taskResult.task.id);
+      expect(task.status).toBe('done');
+      expect(task.done).toBe(true);
+      expect(api.logger.info).toHaveBeenCalledWith(
+        expect.stringContaining('auto-completed task')
+      );
+    });
+
+    it('does not auto-mark task as done when agent fails', async () => {
+      // Create goal with a task marked in-progress
+      let goalResult;
+      api._methods['goals.create']({
+        params: { title: 'Fail Goal' },
+        respond: (ok, payload) => { goalResult = payload; },
+      });
+      const goalId = goalResult.goal.id;
+
+      let taskResult;
+      api._methods['goals.addTask']({
+        params: { goalId, text: 'Fail work' },
+        respond: (ok, payload) => { taskResult = payload; },
+      });
+
+      api._methods['goals.updateTask']({
+        params: { goalId, taskId: taskResult.task.id, status: 'in-progress' },
+        respond: () => {},
+      });
+
+      api._methods['goals.addSession']({
+        params: { id: goalId, sessionKey: 'agent:main:failcomp' },
+        respond: () => {},
+      });
+
+      // Set sessionKey on task
+      const storeData = JSON.parse(require('fs').readFileSync(join(TEST_DIR, 'goals.json'), 'utf-8'));
+      const storeGoal = storeData.goals.find(g => g.id === goalId);
+      const storeTask = storeGoal.tasks.find(t => t.id === taskResult.task.id);
+      storeTask.sessionKey = 'agent:main:failcomp';
+      storeData.sessionIndex['agent:main:failcomp'] = { goalId };
+      require('fs').writeFileSync(join(TEST_DIR, 'goals.json'), JSON.stringify(storeData));
+
+      // Trigger agent_end with failure
+      await api._hooks['agent_end']({
+        context: { sessionKey: 'agent:main:failcomp' },
+        success: false,
+      });
+
+      let updatedGoal;
+      api._methods['goals.get']({
+        params: { id: goalId },
+        respond: (ok, payload) => { updatedGoal = payload.goal; },
+      });
+
+      // Task should not be auto-completed on failure — it should be retried or failed
+      const task = updatedGoal.tasks.find(t => t.id === taskResult.task.id);
+      expect(task.status).not.toBe('done');
     });
   });
 

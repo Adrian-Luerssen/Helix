@@ -510,6 +510,19 @@ describe('PM Handlers - Condo PM', () => {
       expect(result.goals[0].userPrompt).toContain('Authentication system');
     });
 
+    it('saves pmChatHistory on cascaded goals', async () => {
+      const result = await callHandler(handlers['pm.condoCascade'], {
+        condoId: 'condo_1',
+        mode: 'plan',
+      });
+
+      const data = store.getData();
+      const goal = data.goals.find(g => g.id === 'goal_1');
+      expect(goal.pmChatHistory).toHaveLength(1);
+      expect(goal.pmChatHistory[0].role).toBe('user');
+      expect(goal.pmChatHistory[0].content).toContain('Build auth');
+    });
+
     it('sets backendSent false when no gatewayRpcCall available', async () => {
       const noRpcHandlers = createPmHandlers(store, {
         sendToSession: vi.fn(),
@@ -526,6 +539,133 @@ describe('PM Handlers - Condo PM', () => {
       expect(result.sendResults).toHaveLength(0);
       // Goals and prompts still returned so frontend can send
       expect(result.goals).toHaveLength(1);
+    });
+  });
+
+  describe('pm.goalCascade', () => {
+    it('cascades a single goal with PM session and prompt', async () => {
+      const result = await callHandler(handlers['pm.goalCascade'], {
+        goalId: 'goal_1',
+        mode: 'full',
+      });
+
+      expect(result.goalId).toBe('goal_1');
+      expect(result.title).toBe('Build auth');
+      expect(result.pmSessionKey).toContain(':webchat:pm-goal_1');
+      expect(result.prompt).toContain('Build auth');
+      expect(result.userPrompt).toContain('Build auth');
+      expect(result.mode).toBe('full');
+      expect(result.backendSent).toBe(true);
+      expect(result.sendResult.ok).toBe(true);
+    });
+
+    it('sets cascadeState and cascadeMode on goal', async () => {
+      await callHandler(handlers['pm.goalCascade'], {
+        goalId: 'goal_1',
+        mode: 'full',
+      });
+
+      const data = store.getData();
+      const goal = data.goals.find(g => g.id === 'goal_1');
+      expect(goal.cascadeState).toBe('awaiting_plan');
+      expect(goal.cascadeMode).toBe('full');
+      expect(goal.pmSessionKey).toContain(':webchat:pm-goal_1');
+    });
+
+    it('saves user prompt to goal pmChatHistory', async () => {
+      await callHandler(handlers['pm.goalCascade'], {
+        goalId: 'goal_1',
+        mode: 'plan',
+      });
+
+      const data = store.getData();
+      const goal = data.goals.find(g => g.id === 'goal_1');
+      expect(goal.pmChatHistory).toHaveLength(1);
+      expect(goal.pmChatHistory[0].role).toBe('user');
+      expect(goal.pmChatHistory[0].content).toContain('Build auth');
+    });
+
+    it('returns error when goal already has tasks', async () => {
+      await expect(callHandler(handlers['pm.goalCascade'], {
+        goalId: 'goal_2',
+        mode: 'full',
+      })).rejects.toThrow('Goal already has tasks');
+    });
+
+    it('returns error for missing goalId', async () => {
+      await expect(callHandler(handlers['pm.goalCascade'], {
+        mode: 'full',
+      })).rejects.toThrow('goalId is required');
+    });
+
+    it('returns error for invalid mode', async () => {
+      await expect(callHandler(handlers['pm.goalCascade'], {
+        goalId: 'goal_1',
+        mode: 'invalid',
+      })).rejects.toThrow('mode must be "plan" or "full"');
+    });
+
+    it('returns error for unknown goal', async () => {
+      await expect(callHandler(handlers['pm.goalCascade'], {
+        goalId: 'nonexistent',
+        mode: 'full',
+      })).rejects.toThrow('Goal nonexistent not found');
+    });
+
+    it('returns error for goal without condoId', async () => {
+      // Add a goal with no condoId
+      const data = store.getData();
+      data.goals.push({
+        id: 'goal_orphan',
+        title: 'Orphan Goal',
+        description: '',
+        condoId: null,
+        status: 'active',
+        completed: false,
+        tasks: [],
+        sessions: [],
+        files: [],
+        createdAtMs: Date.now(),
+        updatedAtMs: Date.now(),
+      });
+
+      await expect(callHandler(handlers['pm.goalCascade'], {
+        goalId: 'goal_orphan',
+        mode: 'full',
+      })).rejects.toThrow('has no condoId');
+    });
+
+    it('handles failed backend send gracefully', async () => {
+      const failingHandlers = createPmHandlers(store, {
+        sendToSession: vi.fn(),
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        gatewayRpcCall: vi.fn().mockRejectedValue(new Error('Gateway down')),
+      });
+
+      const result = await callHandler(failingHandlers['pm.goalCascade'], {
+        goalId: 'goal_1',
+        mode: 'full',
+      });
+
+      expect(result.backendSent).toBe(true);
+      expect(result.sendResult.ok).toBe(false);
+      expect(result.sendResult.error).toBe('Gateway down');
+    });
+
+    it('sets backendSent false when no gatewayRpcCall available', async () => {
+      const noRpcHandlers = createPmHandlers(store, {
+        sendToSession: vi.fn(),
+        logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      });
+
+      const result = await callHandler(noRpcHandlers['pm.goalCascade'], {
+        goalId: 'goal_1',
+        mode: 'plan',
+      });
+
+      expect(result.backendSent).toBe(false);
+      expect(result.sendResult).toBeNull();
+      expect(result.prompt).toContain('Build auth');
     });
   });
 });
