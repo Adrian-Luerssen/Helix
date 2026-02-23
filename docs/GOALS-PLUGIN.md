@@ -1,6 +1,6 @@
-# Helix Goals Plugin (`clawcondos-goals`)
+# Helix Goals Plugin (`helix-goals`)
 
-An OpenClaw plugin that manages goals, tasks, condos, and session-goal mappings for the Helix dashboard. Provides native gateway RPC methods, lifecycle hooks, and agent tools for autonomous goal-driven orchestration.
+An OpenClaw plugin that manages goals, tasks, strands, and session-goal mappings for the Helix dashboard. Provides native gateway RPC methods, lifecycle hooks, and agent tools for autonomous goal-driven orchestration.
 
 ## Architecture
 
@@ -10,14 +10,14 @@ An OpenClaw plugin that manages goals, tasks, condos, and session-goal mappings 
 │  (index.html)            │
 │  WebSocket RPC calls     │
 └──────────┬───────────────┘
-           │ goals.*, condos.*
+           │ goals.*, strands.*
            ▼
 ┌──────────────────────────┐
 │  OpenClaw Gateway        │
 │  (port 18789)            │
 │                          │
 │  ┌────────────────────┐  │
-│  │ clawcondos-goals   │  │
+│  │ helix-goals        │  │
 │  │ plugin             │  │
 │  │                    │  │
 │  │  26 RPC methods    │  │
@@ -34,21 +34,21 @@ An OpenClaw plugin that manages goals, tasks, condos, and session-goal mappings 
 
 ### Data Model
 
-All data lives in a single JSON file (`clawcondos/condo-management/.data/goals.json`). The store schema:
+All data lives in a single JSON file (`plugins/helix-goals/.data/goals.json`). The store schema:
 
 ```json
 {
   "version": 2,
   "goals": [],
-  "condos": [],
+  "strands": [],
   "sessionIndex": {},
-  "sessionCondoIndex": {}
+  "sessionStrandIndex": {}
 }
 ```
 
 **Goals** are the primary entity. Each goal has:
 - `id`, `title`, `description`, `notes`, `status` (`active`/`done`), `completed` (boolean, synced with status)
-- `condoId` (nullable reference to a condo)
+- `strandId` (nullable reference to a strand)
 - `priority`, `deadline` (optional metadata)
 - `tasks[]` (embedded task objects)
 - `sessions[]` (assigned session keys)
@@ -61,23 +61,23 @@ All data lives in a single JSON file (`clawcondos/condo-management/.data/goals.j
 - `createdAtMs`, `updatedAtMs`
 
 **Goals** additionally have:
-- `worktree` (nullable `{ path, branch, createdAtMs }` — present when parent condo has a workspace)
+- `worktree` (nullable `{ path, branch, createdAtMs }` — present when parent strand has a workspace)
 
-**Condos** group goals. Each condo has:
+**Strands** group goals. Each strand has:
 - `id`, `name`, `description`, `color`
 - `keywords` (array of strings for auto-classification)
 - `telegramTopicIds` (array of strings for topic-based routing)
-- `workspace` (nullable `{ path, repoUrl, createdAtMs }` — present when `CLAWCONDOS_WORKSPACES_DIR` is set)
+- `workspace` (nullable `{ path, repoUrl, createdAtMs }` — present when `HELIX_WORKSPACES_DIR` is set)
 - `createdAtMs`, `updatedAtMs`
 
 **Indexes** provide fast lookups:
 - `sessionIndex`: `{ [sessionKey]: { goalId } }` — maps sessions to their goal
-- `sessionCondoIndex`: `{ [sessionKey]: condoId }` — maps sessions to their condo
+- `sessionStrandIndex`: `{ [sessionKey]: strandId }` — maps sessions to their strand
 
 ### File Structure
 
 ```
-clawcondos/condo-management/
+plugins/helix-goals/
   index.js                  # Plugin entry point (registers everything)
   openclaw.plugin.json      # Plugin manifest
   package.json              # Node.js package metadata
@@ -85,19 +85,19 @@ clawcondos/condo-management/
   lib/
     goals-store.js          # File-backed JSON store with atomic writes
     goals-handlers.js       # Goals + tasks + sessions RPC handlers
-    condos-handlers.js      # Condos RPC handlers
+    strands-handlers.js      # Strands RPC handlers
     context-builder.js      # Builds goal context for agent prompt injection
     goal-update-tool.js     # Agent tool executor for reporting task status
-    condo-tools.js          # Agent tools for condo binding, goal creation, task management
+    strand-tools.js          # Agent tools for strand binding, goal creation, task management
     task-spawn.js           # Spawn subagent session for a task
-    workspace-manager.js    # Git workspace/worktree management for condos and goals
+    workspace-manager.js    # Git workspace/worktree management for strands and goals
     skill-injector.js       # Reads skill files and builds context for PM/worker agents
     classifier.js           # Tier 1 pattern-based session classifier
     classification-log.js   # Classification attempt logging with feedback
     learning.js             # Correction analysis and keyword suggestions
   scripts/
-    populate-condos.js      # Populate condos from goal references
-    seed-keywords.js        # Seed condo keywords from goal content
+    populate-strands.js      # Populate strands from goal references
+    seed-keywords.js        # Seed strand keywords from goal content
     weekly-learn.js         # Weekly learning pipeline (--dry-run/--apply)
   .data/
     goals.json              # Data file (gitignored)
@@ -113,9 +113,9 @@ All methods follow the standard OpenClaw JSON-RPC protocol over WebSocket.
 | Method | Params | Returns | Notes |
 |--------|--------|---------|-------|
 | `goals.list` | — | `{ goals }` | All goals |
-| `goals.create` | `title`, `condoId?`, `description?`, `status?`, `priority?`, `deadline?`, `notes?` | `{ goal }` | Tasks always start empty (use `addTask`). If `condoId` references a condo with a workspace, a git worktree is created automatically. |
+| `goals.create` | `title`, `strandId?`, `description?`, `status?`, `priority?`, `deadline?`, `notes?` | `{ goal }` | Tasks always start empty (use `addTask`). If `strandId` references a strand with a workspace, a git worktree is created automatically. |
 | `goals.get` | `id` | `{ goal }` | |
-| `goals.update` | `id`, plus any of: `title`, `description`, `status`, `completed`, `condoId`, `priority`, `deadline`, `notes`, `tasks` | `{ goal }` | Whitelist prevents overwriting `id`, `sessions`, `createdAtMs`. Title validated. Status/completed synced. |
+| `goals.update` | `id`, plus any of: `title`, `description`, `status`, `completed`, `strandId`, `priority`, `deadline`, `notes`, `tasks` | `{ goal }` | Whitelist prevents overwriting `id`, `sessions`, `createdAtMs`. Title validated. Status/completed synced. |
 | `goals.delete` | `id` | `{ ok }` | Cleans up sessionIndex entries |
 
 ### Session Management
@@ -126,13 +126,13 @@ All methods follow the standard OpenClaw JSON-RPC protocol over WebSocket.
 | `goals.removeSession` | `id`, `sessionKey` | `{ ok, goal }` | Validates sessionKey, cleans up sessionIndex |
 | `goals.sessionLookup` | `sessionKey` | `{ goalId }` | Returns `null` if not assigned |
 
-### Session-Condo Mapping
+### Session-Strand Mapping
 
 | Method | Params | Returns | Notes |
 |--------|--------|---------|-------|
-| `goals.setSessionCondo` | `sessionKey`, `condoId` | `{ ok }` | |
-| `goals.getSessionCondo` | `sessionKey` | `{ condoId }` | |
-| `goals.listSessionCondos` | — | `{ sessionCondoIndex }` | |
+| `goals.setSessionStrand` | `sessionKey`, `strandId` | `{ ok }` | |
+| `goals.getSessionStrand` | `sessionKey` | `{ strandId }` | |
+| `goals.listSessionStrands` | — | `{ sessionStrandIndex }` | |
 
 ### Task CRUD
 
@@ -154,7 +154,7 @@ All methods follow the standard OpenClaw JSON-RPC protocol over WebSocket.
 |--------|--------|---------|-------|
 | `classification.stats` | — | `{ stats }` | Returns `{ total, withFeedback, accepted, corrected, accuracy }` |
 | `classification.learningReport` | — | `{ suggestions }` | Analyzes corrections and suggests keyword updates |
-| `classification.applyLearning` | `dryRun?` | `{ dryRun, applied }` | Applies keyword suggestions to condos (`dryRun` defaults to `true`) |
+| `classification.applyLearning` | `dryRun?` | `{ dryRun, applied }` | Applies keyword suggestions to strands (`dryRun` defaults to `true`) |
 
 ## Lifecycle Hooks
 
@@ -162,13 +162,13 @@ All methods follow the standard OpenClaw JSON-RPC protocol over WebSocket.
 
 Fires before an agent processes a message. Checks in order:
 
-1. **Condo-bound session** — If `sessionCondoIndex[sessionKey]` exists, injects condo context with all goals
-2. **Goal-bound session** — If `sessionIndex[sessionKey]` exists, injects goal context (with project summary if in a condo)
-3. **Auto-classification** — For unbound sessions (when `CLAWCONDOS_CLASSIFICATION !== 'off'`):
+1. **Strand-bound session** — If `sessionStrandIndex[sessionKey]` exists, injects strand context with all goals
+2. **Goal-bound session** — If `sessionIndex[sessionKey]` exists, injects goal context (with project summary if in a strand)
+3. **Auto-classification** — For unbound sessions (when `HELIX_CLASSIFICATION !== 'off'`):
    - Extracts the last user message and parses Telegram context (topic ID) from the session key
-   - Runs tier 1 pattern matching: `@condo:name` mentions (1.0), topic ID match (0.95), keyword match (0.15 each, max 0.45), condo name match (0.3)
-   - High confidence (>=0.8) → auto-binds session to condo, injects condo context. Also checks for goal intent and appends a hint if detected.
-   - Low confidence → injects a condo menu listing available projects for agent-mediated selection via `condo_bind`
+   - Runs tier 1 pattern matching: `@strand:name` mentions (1.0), topic ID match (0.95), keyword match (0.15 each, max 0.45), strand name match (0.3)
+   - High confidence (>=0.8) → auto-binds session to strand, injects strand context. Also checks for goal intent and appends a hint if detected.
+   - Low confidence → injects a strand menu listing available projects for agent-mediated selection via `strand_bind`
    - All classification attempts are logged to `classification-log.json`
 
 The injected goal context includes:
@@ -179,11 +179,11 @@ The injected goal context includes:
 - Completed task summaries
 - Reminder to use `goal_update` tool when tasks remain
 
-The injected condo context includes workspace path if the condo has a workspace.
+The injected strand context includes workspace path if the strand has a workspace.
 
 ### `agent_end`
 
-Fires after a successful agent response. Updates `goal.updatedAtMs` or `condo.updatedAtMs` to track last activity. Wrapped in try-catch so errors don't break the agent lifecycle.
+Fires after a successful agent response. Updates `goal.updatedAtMs` or `strand.updatedAtMs` to track last activity. Wrapped in try-catch so errors don't break the agent lifecycle.
 
 ## Agent Tools
 
@@ -192,7 +192,7 @@ Fires after a successful agent response. Updates `goal.updatedAtMs` or `condo.up
 Agents call this tool to report task progress. Available to any session with a `sessionKey`.
 
 **Parameters:**
-- `goalId` (string, optional) — explicit goal to update (required for condo-bound sessions updating non-own goals)
+- `goalId` (string, optional) — explicit goal to update (required for strand-bound sessions updating non-own goals)
 - `taskId` (string, optional) — task to update
 - `status` (`done` | `in-progress` | `blocked`) — required when `taskId` is set
 - `summary` (string, optional) — what was accomplished or what's blocking
@@ -201,20 +201,20 @@ Agents call this tool to report task progress. Available to any session with a `
 - `goalStatus` (`done` | `active`, optional) — mark goal as done or reactivate
 - `notes` (string, optional) — append notes to the goal
 
-**Cross-goal boundaries:** Sessions bound to a condo can update sibling goals, but only `addTasks` and `notes` are allowed cross-goal. Task status updates, `goalStatus`, and `nextTask` are restricted to the session's own goal.
+**Cross-goal boundaries:** Sessions bound to a strand can update sibling goals, but only `addTasks` and `notes` are allowed cross-goal. Task status updates, `goalStatus`, and `nextTask` are restricted to the session's own goal.
 
-### `condo_bind`
+### `strand_bind`
 
-Binds the current session to a condo. Available when the session is not yet bound.
+Binds the current session to a strand. Available when the session is not yet bound.
 
 **Parameters:**
-- `condoId` (string, optional) — bind to existing condo
-- `name` (string, optional) — create a new condo and bind to it
-- `description` (string, optional) — description for new condo
+- `strandId` (string, optional) — bind to existing strand
+- `name` (string, optional) — create a new strand and bind to it
+- `description` (string, optional) — description for new strand
 
-### `condo_create_goal`
+### `strand_create_goal`
 
-Creates a goal in the bound condo. Available when session is bound to a condo.
+Creates a goal in the bound strand. Available when session is bound to a strand.
 
 **Parameters:**
 - `title` (string, required) — goal title
@@ -222,9 +222,9 @@ Creates a goal in the bound condo. Available when session is bound to a condo.
 - `priority` (string, optional) — priority level
 - `tasks` (array, optional) — initial tasks (strings or `{text, description, priority}` objects)
 
-### `condo_add_task`
+### `strand_add_task`
 
-Adds a task to a goal in the bound condo.
+Adds a task to a goal in the bound strand.
 
 **Parameters:**
 - `goalId` (string, required) — goal to add the task to
@@ -232,9 +232,9 @@ Adds a task to a goal in the bound condo.
 - `description` (string, optional) — detailed description
 - `priority` (string, optional) — priority level
 
-### `condo_spawn_task`
+### `strand_spawn_task`
 
-Spawns a subagent session for a task in the bound condo.
+Spawns a subagent session for a task in the bound strand.
 
 **Parameters:**
 - `goalId` (string, required) — goal containing the task
@@ -242,45 +242,45 @@ Spawns a subagent session for a task in the bound condo.
 - `agentId` (string, optional) — agent to use (default: `main`)
 - `model` (string, optional) — model override
 
-### `condo_list`
+### `strand_list`
 
-Lists all condos with IDs, descriptions, and goal counts. Available to any session.
+Lists all strands with IDs, descriptions, and goal counts. Available to any session.
 
 **Parameters:** *(none)*
 
-### `condo_status`
+### `strand_status`
 
-Returns full project status for a condo: goals, tasks, assignments, and progress.
-
-**Parameters:**
-- `condoId` (string, required) — condo to get status for
-
-### `condo_pm_chat`
-
-Sends a work request to the PM for a condo. Blocks up to 3 minutes while the PM processes. Returns the PM's response (plan, questions, or created goals).
+Returns full project status for a strand: goals, tasks, assignments, and progress.
 
 **Parameters:**
-- `condoId` (string, required) — condo to send the request to
+- `strandId` (string, required) — strand to get status for
+
+### `strand_pm_chat`
+
+Sends a work request to the PM for a strand. Blocks up to 3 minutes while the PM processes. Returns the PM's response (plan, questions, or created goals).
+
+**Parameters:**
+- `strandId` (string, required) — strand to send the request to
 - `message` (string, required) — the work request or follow-up message
 
-### `condo_pm_kickoff`
+### `strand_pm_kickoff`
 
 Approves a goal and spawns worker agents. If the goal has no tasks yet, triggers PM goal cascade to plan tasks first, then auto-spawns workers.
 
 **Parameters:**
-- `condoId` (string, required) — condo containing the goal
+- `strandId` (string, required) — strand containing the goal
 - `goalId` (string, required) — goal to kick off
 
-## Condo Workspaces & Goal Worktrees
+## Strand Workspaces & Goal Worktrees
 
-When `CLAWCONDOS_WORKSPACES_DIR` is set, the plugin creates git workspaces for condos and git worktrees for goals, enabling agents to work on multiple goals in parallel without conflicts.
+When `HELIX_WORKSPACES_DIR` is set, the plugin creates git workspaces for strands and git worktrees for goals, enabling agents to work on multiple goals in parallel without conflicts.
 
 ### Setup
 
 Set the environment variable to enable:
 
 ```bash
-export CLAWCONDOS_WORKSPACES_DIR=/path/to/workspaces
+export HELIX_WORKSPACES_DIR=/path/to/workspaces
 ```
 
 When not set, all workspace functionality is completely disabled — full backward compatibility.
@@ -288,8 +288,8 @@ When not set, all workspace functionality is completely disabled — full backwa
 ### Workspace Layout
 
 ```
-$CLAWCONDOS_WORKSPACES_DIR/
-  my-project-a1b2c3d4/          <- condo workspace (git init or git clone)
+$HELIX_WORKSPACES_DIR/
+  my-project-a1b2c3d4/          <- strand workspace (git init or git clone)
     .git/
     goals/
       goal_abc123/              <- worktree (branch: goal/goal_abc123)
@@ -301,25 +301,25 @@ $CLAWCONDOS_WORKSPACES_DIR/
 
 | Event | Action |
 |-------|--------|
-| `condos.create` | `git init` (or `git clone <repoUrl>`) → empty initial commit → `goals/` subdir |
-| `condos.create` with `repoUrl` | `git clone <repoUrl>` into workspace path |
-| `goals.create` (in condo with workspace) | `git worktree add goals/<goalId> -b goal/<goalId>` |
+| `strands.create` | `git init` (or `git clone <repoUrl>`) → empty initial commit → `goals/` subdir |
+| `strands.create` with `repoUrl` | `git clone <repoUrl>` into workspace path |
+| `goals.create` (in strand with workspace) | `git worktree add goals/<goalId> -b goal/<goalId>` |
 | `goals.delete` (with worktree) | `git worktree remove --force` + `git branch -D` + prune |
-| `condos.delete` (with workspace) | `rm -rf` the workspace directory |
-| `condo_bind` (new condo via name) | Same as `condos.create` workspace flow |
-| `condo_create_goal` | Same as `goals.create` worktree flow |
-| `pm.condoCreateGoals` | Creates worktrees for each goal in bulk |
+| `strands.delete` (with workspace) | `rm -rf` the workspace directory |
+| `strand_bind` (new strand via name) | Same as `strands.create` workspace flow |
+| `strand_create_goal` | Same as `goals.create` worktree flow |
+| `pm.strandCreateGoals` | Creates worktrees for each goal in bulk |
 
 ### Error Handling
 
-All workspace operations are best-effort. Failures are logged but never block condo/goal CRUD:
-- Workspace creation fails → condo created with `workspace: null`
+All workspace operations are best-effort. Failures are logged but never block strand/goal CRUD:
+- Workspace creation fails → strand created with `workspace: null`
 - Worktree creation fails → goal created with `worktree: null`
 - Removal fails → deletion still proceeds
 
 ### Agent Awareness
 
-- `context-builder.js` adds `Workspace: <path>` to goal context (with branch) and condo context
+- `context-builder.js` adds `Workspace: <path>` to goal context (with branch) and strand context
 - `skill-injector.js` adds `**Working Directory:** <path>` to worker task headers
 - `task-spawn.js` includes `cd <path>` instruction in task context and `workspacePath` in response payload
 
@@ -327,14 +327,14 @@ All workspace operations are best-effort. Failures are logged but never block co
 
 | Function | Purpose |
 |----------|---------|
-| `sanitizeDirName(name)` | Slug a condo name for directory use |
-| `condoWorkspacePath(baseDir, condoId, name)` | `<baseDir>/<slug>-<id-suffix>/` |
-| `goalWorktreePath(condoWs, goalId)` | `<condoWs>/goals/<goalId>/` |
+| `sanitizeDirName(name)` | Slug a strand name for directory use |
+| `strandWorkspacePath(baseDir, strandId, name)` | `<baseDir>/<slug>-<id-suffix>/` |
+| `goalWorktreePath(strandWs, goalId)` | `<strandWs>/goals/<goalId>/` |
 | `goalBranchName(goalId)` | `goal/<goalId>` |
-| `createCondoWorkspace(baseDir, condoId, name, repoUrl?)` | mkdir + git init/clone + empty commit + goals/ |
-| `createGoalWorktree(condoWs, goalId)` | `git worktree add` with new branch |
-| `removeGoalWorktree(condoWs, goalId)` | `git worktree remove --force` + prune + branch delete |
-| `removeCondoWorkspace(condoWs)` | `rm -rf` the workspace |
+| `createStrandWorkspace(baseDir, strandId, name, repoUrl?)` | mkdir + git init/clone + empty commit + goals/ |
+| `createGoalWorktree(strandWs, goalId)` | `git worktree add` with new branch |
+| `removeGoalWorktree(strandWs, goalId)` | `git worktree remove --force` + prune + branch delete |
+| `removeStrandWorkspace(strandWs)` | `rm -rf` the workspace |
 
 All functions return `{ ok, path?, error? }` result objects and never throw.
 
@@ -343,7 +343,7 @@ All functions return `{ ok, path?, error? }` result objects and never throw.
 `goals-store.js` provides a simple file-backed JSON store:
 
 - **Atomic writes**: Writes to a `.tmp` file then renames (prevents corruption on crash)
-- **Data migration**: Normalizes legacy data (adds `condoId`, `completed`, `sessions`, `tasks` defaults)
+- **Data migration**: Normalizes legacy data (adds `strandId`, `completed`, `sessions`, `tasks` defaults)
 - **Safety**: Refuses to save if the store was loaded with parse errors (`_loadError` flag)
 - **ID generation**: `newId(prefix)` returns `<prefix>_<24 hex chars>` using `crypto.randomBytes`
 
@@ -368,12 +368,12 @@ Tests across 15+ test files. Run with `npm test`.
 | Test File | Coverage |
 |-----------|----------|
 | `goals-handlers.test.js` | Goals CRUD, session management, task CRUD, validation |
-| `condos-handlers.test.js` | Condos CRUD, goalCount enrichment, cascade delete, sessionCondoIndex cleanup |
+| `strands-handlers.test.js` | Strands CRUD, goalCount enrichment, cascade delete, sessionStrandIndex cleanup |
 | `goal-update-tool.test.js` | Status sync, cross-goal boundaries, goal-level update, error cases |
-| `condo-tools.test.js` | condo_bind, condo_create_goal, condo_add_task, condo_spawn_task |
+| `strand-tools.test.js` | strand_bind, strand_create_goal, strand_add_task, strand_spawn_task |
 | `task-spawn.test.js` | Spawn config, session linking, project summary, re-spawn guard |
-| `context-builder.test.js` | Goal context, project summary, condo context, null safety |
-| `goals-store.test.js` | Load/save, atomic writes, data migration, ID generation, condos array |
+| `context-builder.test.js` | Goal context, project summary, strand context, null safety |
+| `goals-store.test.js` | Load/save, atomic writes, data migration, ID generation, strands array |
 | `classifier.test.js` | Tier 1 classification, topic/keyword/name scoring, ambiguity detection, goal intent |
 | `classification-log.test.js` | Append, feedback, corrections, stats, reclassification, load error safety |
 | `learning.test.js` | Correction analysis, keyword suggestion, apply learning with dry run |
@@ -385,11 +385,11 @@ Tests across 15+ test files. Run with `npm test`.
 
 ## Installation
 
-The plugin lives in the Helix repo at `clawcondos/condo-management/`. Install it into OpenClaw using the link flag (recommended for development — edits take effect on gateway restart):
+The plugin lives in the Helix repo at `plugins/helix-goals/`. Install it into OpenClaw using the link flag (recommended for development — edits take effect on gateway restart):
 
 ```bash
-cd /path/to/clawcondos
-openclaw plugins install -l ./clawcondos/condo-management
+cd /path/to/helix
+openclaw plugins install -l ./helix/strand-management
 ```
 
 This registers the plugin, creates the config entries, and symlinks to the source directory. Restart the gateway to load it.

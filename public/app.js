@@ -11,10 +11,10 @@
     // ═══════════════════════════════════════════════════════════════
     
     // Get configuration (from config.js)
-    const config = window.ClawCondosConfig ? window.ClawCondosConfig.getConfig() : {};
+    const config = window.HelixConfig ? window.HelixConfig.getConfig() : {};
 
     // localStorage keys (migrate from legacy "sharp_*" keys)
-    const LS_PREFIX = 'clawcondos_';
+    const LS_PREFIX = 'helix_';
     function lsGet(key, fallback = null) {
       const v = localStorage.getItem(LS_PREFIX + key);
       if (v != null) return v;
@@ -37,9 +37,9 @@
       goals: [],
       currentGoalId: 'all',
       currentGoalOpenId: null,
-      currentCondoId: null,
-      newSessionCondoId: null,
-      newGoalCondoId: null,
+      currentStrandId: null,
+      newSessionStrandId: null,
+      newGoalStrandId: null,
       attachSessionKey: null,
       attachGoalId: null,
       
@@ -55,10 +55,10 @@
       newSessionAgentId: null,
       pendingRouteSessionKey: null,
       pendingRouteGoalId: null,
-      pendingRouteCondoId: null,
+      pendingRouteStrandId: null,
       pendingRouteAppId: null,
       pendingRouteNewSession: null,
-      pendingRouteNewGoalCondoId: null,
+      pendingRouteNewGoalStrandId: null,
       chatHistory: [],
       // Cache last loaded history per session so UI doesn't go blank on transient disconnects.
       sessionHistoryCache: new Map(), // Map<sessionKey, messages[]>
@@ -167,8 +167,8 @@
       // Track which session groups are expanded (for nested view)
       expandedGroups: JSON.parse(lsGet('expanded_groups', '{}') || '{}'),
 
-      // Track which condos are expanded/collapsed in sidebar
-      expandedCondos: JSON.parse(lsGet('expanded_condos', '{}') || '{}'),
+      // Track which strands are expanded/collapsed in sidebar
+      expandedStrands: JSON.parse(lsGet('expanded_strands', '{}') || '{}'),
 
       // Track which agent nodes are expanded in sidebar (Agents > Sessions/Subsessions)
       expandedAgents: JSON.parse(lsGet('expanded_agents', '{}') || '{}'),
@@ -217,7 +217,7 @@
       return { type: 'standalone', isGrouped: false };
     }
 
-    function getSessionCondoId(session) {
+    function getSessionStrandId(session) {
       if (!session?.key) return 'unknown';
       const parsed = parseSessionGroup(session.key);
       if (parsed.type === 'topic') {
@@ -230,7 +230,7 @@
       return `misc:${session.key.split(':')[0] || 'misc'}`;
     }
 
-    function getSessionCondoName(session) {
+    function getSessionStrandName(session) {
       if (!session) return 'Unknown';
       if (session.key.startsWith('cron:')) return 'Recurring';
       if (session.key.includes(':topic:')) return getSessionName(session);
@@ -245,10 +245,10 @@
       return goal?.completed === true || goal?.status === 'done';
     }
 
-    function getCondoIdForSessionKey(sessionKey) {
+    function getStrandIdForSessionKey(sessionKey) {
       const session = state.sessions.find(s => s.key === sessionKey);
-      if (session) return getSessionCondoId(session);
-      return state.currentCondoId || null;
+      if (session) return getSessionStrandId(session);
+      return state.currentStrandId || null;
     }
     
     function getGroupDisplayName(groupKey) {
@@ -274,15 +274,15 @@
       return state.expandedGroups[groupKey] !== false;
     }
 
-    function toggleCondoExpanded(condoId) {
-      state.expandedCondos[condoId] = !isCondoExpanded(condoId);
-      lsSet('expanded_condos', JSON.stringify(state.expandedCondos));
-      renderCondos();
+    function toggleStrandExpanded(strandId) {
+      state.expandedStrands[strandId] = !isStrandExpanded(strandId);
+      lsSet('expanded_strands', JSON.stringify(state.expandedStrands));
+      renderStrands();
     }
 
-    function isCondoExpanded(condoId) {
+    function isStrandExpanded(strandId) {
       // Default: expanded unless explicitly set false
-      return state.expandedCondos[condoId] !== false;
+      return state.expandedStrands[strandId] !== false;
     }
 
     function toggleAgentExpanded(agentId) {
@@ -767,7 +767,7 @@
 
     // ═══════════════════════════════════════════════════════════════
     // ACTIVITY WINDOW PRESET (Albert)
-    // Collapse all condos except those with goals modified in the last X.
+    // Collapse all strands except those with goals modified in the last X.
     // X comes from the preset dropdown.
 
     function parseDaysValue(v) {
@@ -807,29 +807,29 @@
 
       const threshold = Date.now() - (days * 24 * 60 * 60 * 1000);
 
-      // Build condo -> goals mapping (pending goals only)
-      const recentCondos = new Set();
+      // Build strand -> goals mapping (pending goals only)
+      const recentStrands = new Set();
       for (const g of (state.goals || [])) {
         if (!g || isGoalCompleted(g)) continue;
         const last = goalLastActivityMs(g);
         if (last && last >= threshold) {
-          const condoId = g.condoId || 'misc:default';
-          recentCondos.add(condoId);
+          const strandId = g.strandId || 'misc:default';
+          recentStrands.add(strandId);
         }
       }
 
-      // Collapse everything except recent condos
+      // Collapse everything except recent strands
       const nextExpanded = {};
-      // Keep explicit expansion for current condo if it has recent activity, otherwise collapse it too.
+      // Keep explicit expansion for current strand if it has recent activity, otherwise collapse it too.
       // (Albert preference: collapse all except recent)
-      for (const condoId of Object.keys(state.expandedCondos || {})) {
-        nextExpanded[condoId] = false;
+      for (const strandId of Object.keys(state.expandedStrands || {})) {
+        nextExpanded[strandId] = false;
       }
-      for (const condoId of recentCondos) {
-        nextExpanded[condoId] = true;
+      for (const strandId of recentStrands) {
+        nextExpanded[strandId] = true;
       }
-      state.expandedCondos = nextExpanded;
-      lsSet('expanded_condos', JSON.stringify(state.expandedCondos));
+      state.expandedStrands = nextExpanded;
+      lsSet('expanded_strands', JSON.stringify(state.expandedStrands));
 
       renderGoals();
     }
@@ -883,9 +883,9 @@
       
       // Build WebSocket URL
       let wsUrl = state.gatewayUrl.replace(/^http/, 'ws');
-      // If connecting through Caddy (not directly to :18789), use the dedicated ClawCondos WS endpoint.
+      // If connecting through Caddy (not directly to :18789), use the dedicated Helix WS endpoint.
       if (!wsUrl.includes(':18789')) {
-        wsUrl = wsUrl.replace(/\/?$/, '/clawcondos-ws');
+        wsUrl = wsUrl.replace(/\/?$/, '/helix-ws');
       }
       console.log('[WS] Connecting to', wsUrl);
       
@@ -1887,7 +1887,7 @@
     function computeWsUrlForDiagnostics() {
       let wsUrl = (state.gatewayUrl || '').replace(/^http/, 'ws');
       if (wsUrl && !wsUrl.includes(':18789')) {
-        wsUrl = wsUrl.replace(/\/?$/, '/clawcondos-ws');
+        wsUrl = wsUrl.replace(/\/?$/, '/helix-ws');
       }
       return wsUrl;
     }
@@ -1895,7 +1895,7 @@
     function buildConnectionDiagnosticsText() {
       const wsUrl = computeWsUrlForDiagnostics();
       const lines = [];
-      lines.push('ClawCondos connection diagnostics');
+      lines.push('Helix connection diagnostics');
       lines.push('time: ' + new Date().toISOString());
       lines.push('page: ' + window.location.href);
       lines.push('gatewayUrl: ' + (state.gatewayUrl || '')); 
@@ -1916,7 +1916,7 @@
       }
       lines.push('lastError: ' + (state.wsLastError || 'n/a'));
       lines.push('protocol: ' + String(WS_PROTOCOL_VERSION));
-      lines.push('client: webchat-ui / ClawCondos Dashboard');
+      lines.push('client: webchat-ui / Helix Dashboard');
       lines.push('tokenPresent: ' + String(!!state.token));
       lines.push('userAgent: ' + (navigator.userAgent || ''));
       return lines.join('\n');
@@ -1992,8 +1992,8 @@
     async function loadInitialData() {
       console.log('[Helix] loadInitialData starting');
       try {
-        // Load persisted session->condo mappings (doesn't require gateway connection)
-        await loadSessionCondos();
+        // Load persisted session->strand mappings (doesn't require gateway connection)
+        await loadSessionStrands();
 
         // Fetch active runs from server first (authoritative source)
         console.log('[Helix] About to call syncActiveRunsFromServer...');
@@ -2056,16 +2056,16 @@
       }
     }
     
-    async function loadSessionCondos() {
+    async function loadSessionStrands() {
       try {
-        const data = await rpcCall('goals.listSessionCondos', {});
-        state.sessionCondoIndex = data.sessionCondoIndex || {};
+        const data = await rpcCall('goals.listSessionStrands', {});
+        state.sessionStrandIndex = data.sessionStrandIndex || {};
       } catch (err) {
-        console.warn('[Helix] Failed to load session condos:', err);
+        console.warn('[Helix] Failed to load session strands:', err);
       }
     }
 
-    function isSystemCondoSession(session) {
+    function isSystemStrandSession(session) {
       const k = String(session?.key || '');
       if (!k.startsWith('agent:')) return false;
       // Heartbeats + internal scheduled runs generally show up as cron sessions.
@@ -2074,21 +2074,21 @@
       return false;
     }
 
-    async function persistSessionCondo(sessionKey, condoId) {
+    async function persistSessionStrand(sessionKey, strandId) {
       const key = String(sessionKey || '').trim();
-      const cid = String(condoId || '').trim();
+      const cid = String(strandId || '').trim();
       if (!key || !cid) return;
-      if (state.sessionCondoIndex?.[key] === cid) return;
+      if (state.sessionStrandIndex?.[key] === cid) return;
 
       // Optimistic local write
-      state.sessionCondoIndex = state.sessionCondoIndex || {};
-      state.sessionCondoIndex[key] = cid;
+      state.sessionStrandIndex = state.sessionStrandIndex || {};
+      state.sessionStrandIndex[key] = cid;
 
       // Best-effort persist (data-level)
       try {
-        await rpcCall('goals.setSessionCondo', { sessionKey: key, condoId: cid });
+        await rpcCall('goals.setSessionStrand', { sessionKey: key, strandId: cid });
       } catch (err) {
-        console.warn('persistSessionCondo failed:', err.message || err);
+        console.warn('persistSessionStrand failed:', err.message || err);
       }
     }
 
@@ -2096,8 +2096,8 @@
       try {
         const data = await rpcCall('goals.list', {});
         state.goals = (data.goals || []).map(g => {
-          if (!g.condoId && Array.isArray(g.sessions) && g.sessions.length > 0) {
-            g.condoId = getCondoIdForSessionKey(g.sessions[0]);
+          if (!g.strandId && Array.isArray(g.sessions) && g.sessions.length > 0) {
+            g.strandId = getStrandIdForSessionKey(g.sessions[0]);
           }
           return g;
         });
@@ -2122,15 +2122,15 @@
         if (state.pendingRouteNewSession) {
           const pending = state.pendingRouteNewSession;
           state.pendingRouteNewSession = null;
-          state.newSessionCondoId = pending?.condoId || state.currentCondoId;
+          state.newSessionStrandId = pending?.strandId || state.currentStrandId;
           state.attachGoalId = pending?.goalId || null;
           showNewSessionView({ fromRouter: true });
         }
 
-        if (state.pendingRouteNewGoalCondoId !== null) {
-          const pending = state.pendingRouteNewGoalCondoId;
-          state.pendingRouteNewGoalCondoId = null;
-          state.newGoalCondoId = pending || state.currentCondoId;
+        if (state.pendingRouteNewGoalStrandId !== null) {
+          const pending = state.pendingRouteNewGoalStrandId;
+          state.pendingRouteNewGoalStrandId = null;
+          state.newGoalStrandId = pending || state.currentStrandId;
           showNewGoalView({ fromRouter: true });
         }
       } catch (err) {
@@ -2229,14 +2229,14 @@
       renderSidebar();
     }
 
-    // Back-compat alias (some helper functions call renderCondos)
-    function renderCondos() {
+    // Back-compat alias (some helper functions call renderStrands)
+    function renderStrands() {
       renderSidebar();
     }
 
-    function setCurrentGoal(goalId, condoId = null) {
+    function setCurrentGoal(goalId, strandId = null) {
       state.currentGoalId = goalId;
-      if (condoId) state.currentCondoId = condoId;
+      if (strandId) state.currentStrandId = strandId;
       renderSidebar();
       renderSessionsGrid();
       updateOverview();
@@ -2279,54 +2279,54 @@
         (g.sessions || []).forEach(s => sessionToGoal.set(s, g.id));
       }
 
-      const condos = new Map();
-      const condoNameForId = (condoId, fallbackSession) => {
-        if (condoId === 'condo:genlayer') return 'GenLayer';
-        if (condoId === 'condo:clawcondos') return 'ClawCondos';
-        if (condoId === 'condo:rally') return 'Rally';
-        if (condoId === 'condo:moltcourt') return 'MoltCourt';
-        if (condoId === 'condo:personal') return 'Personal';
-        if (condoId === 'condo:finances') return 'Finances';
-        if (condoId === 'condo:subastas') return 'Subastas';
-        if (condoId === 'condo:system') return 'SYSTEM';
-        if (condoId?.startsWith('condo:')) return condoId.split(':').slice(1).join(':');
-        return fallbackSession ? getSessionCondoName(fallbackSession) : 'Condo';
+      const strands = new Map();
+      const strandNameForId = (strandId, fallbackSession) => {
+        if (strandId === 'strand:genlayer') return 'GenLayer';
+        if (strandId === 'strand:helix') return 'Helix';
+        if (strandId === 'strand:rally') return 'Rally';
+        if (strandId === 'strand:moltcourt') return 'MoltCourt';
+        if (strandId === 'strand:personal') return 'Personal';
+        if (strandId === 'strand:finances') return 'Finances';
+        if (strandId === 'strand:subastas') return 'Subastas';
+        if (strandId === 'strand:system') return 'SYSTEM';
+        if (strandId?.startsWith('strand:')) return strandId.split(':').slice(1).join(':');
+        return fallbackSession ? getSessionStrandName(fallbackSession) : 'Strand';
       };
 
       const sessionByKey = new Map((state.sessions || []).map(s => [s.key, s]));
       for (const g of activeGoals) {
-        const condoId = g.condoId || 'misc:default';
-        if (!condos.has(condoId)) {
-          condos.set(condoId, {
-            id: condoId,
-            name: g.condoName || condoNameForId(condoId, null),
+        const strandId = g.strandId || 'misc:default';
+        if (!strands.has(strandId)) {
+          strands.set(strandId, {
+            id: strandId,
+            name: g.strandName || strandNameForId(strandId, null),
             sessions: [],
             goals: new Map(),
             latest: g.updatedAtMs || 0,
             sessionKeySet: new Set(),
           });
         }
-        const condo = condos.get(condoId);
-        condo.goals.set(g.id, g);
-        condo.latest = Math.max(condo.latest, goalLastActivityMs(g));
+        const strand = strands.get(strandId);
+        strand.goals.set(g.id, g);
+        strand.latest = Math.max(strand.latest, goalLastActivityMs(g));
         for (const key of (g.sessions || [])) {
-          if (condo.sessionKeySet.has(key)) continue;
+          if (strand.sessionKeySet.has(key)) continue;
           const s = sessionByKey.get(key);
           if (s) {
-            condo.sessions.push(s);
-            condo.sessionKeySet.add(key);
+            strand.sessions.push(s);
+            strand.sessionKeySet.add(key);
           }
         }
       }
 
-      // Ensure SYSTEM condo is visible when there are system-tagged sessions,
-      // even if it has no active goals (sessions are hidden-by-default, but condo should exist).
-      const systemTaggedKeys = Object.entries(state.sessionCondoIndex || {}).filter(([k, v]) => v === 'condo:system').map(([k]) => k);
-      const systemSessions = (state.sessions || []).filter(s => getSessionCondoId(s) === 'condo:system');
+      // Ensure SYSTEM strand is visible when there are system-tagged sessions,
+      // even if it has no active goals (sessions are hidden-by-default, but strand should exist).
+      const systemTaggedKeys = Object.entries(state.sessionStrandIndex || {}).filter(([k, v]) => v === 'strand:system').map(([k]) => k);
+      const systemSessions = (state.sessions || []).filter(s => getSessionStrandId(s) === 'strand:system');
       if (systemSessions.length > 0 || systemTaggedKeys.length > 0) {
-        if (!condos.has('condo:system')) {
-          condos.set('condo:system', {
-            id: 'condo:system',
+        if (!strands.has('strand:system')) {
+          strands.set('strand:system', {
+            id: 'strand:system',
             name: 'SYSTEM',
             sessions: [],
             goals: new Map(),
@@ -2334,7 +2334,7 @@
             sessionKeySet: new Set(),
           });
         }
-        const sys = condos.get('condo:system');
+        const sys = strands.get('strand:system');
 
         // Keys from persisted mapping (even if sessions haven't loaded yet)
         for (const key of systemTaggedKeys) {
@@ -2355,59 +2355,59 @@
       const filterDays = { '1': 1, '7': 7, '30': 30 }[state.goalTimeFilter] || null;
       const filterCutoff = filterDays ? Date.now() - filterDays * 86400000 : 0;
 
-      const sortedCondos = Array.from(condos.values())
+      const sortedStrands = Array.from(strands.values())
         .filter(c => !filterCutoff || c.latest >= filterCutoff)
         .sort((a, b) => (b.latest || 0) - (a.latest || 0));
 
-      if (sortedCondos.length === 0) {
-        container.innerHTML = `<div style=\"padding: 16px; color: var(--text-dim); font-size: 0.85rem;\">No condos with recent activity</div>`;
+      if (sortedStrands.length === 0) {
+        container.innerHTML = `<div style=\"padding: 16px; color: var(--text-dim); font-size: 0.85rem;\">No strands with recent activity</div>`;
         return;
       }
 
-      if (!state.currentCondoId && sortedCondos[0]) {
-        state.currentCondoId = sortedCondos[0].id;
+      if (!state.currentStrandId && sortedStrands[0]) {
+        state.currentStrandId = sortedStrands[0].id;
       }
 
       let html = '';
-      for (const condo of sortedCondos) {
-        const condoUnread = condo.sessions.filter(s => isSessionUnread(s.key)).length;
-        const condoErrors = condo.sessions.filter(s => s.lastError).length;
-        const badge = condoUnread > 0
-          ? `<span class=\"badge unread\">${condoUnread}</span>`
-          : condoErrors > 0 ? `<span class=\"badge error\">${condoErrors}</span>` : '';
-        const activeCondo = state.currentCondoId === condo.id ? 'active' : '';
+      for (const strand of sortedStrands) {
+        const strandUnread = strand.sessions.filter(s => isSessionUnread(s.key)).length;
+        const strandErrors = strand.sessions.filter(s => s.lastError).length;
+        const badge = strandUnread > 0
+          ? `<span class=\"badge unread\">${strandUnread}</span>`
+          : strandErrors > 0 ? `<span class=\"badge error\">${strandErrors}</span>` : '';
+        const activeStrand = state.currentStrandId === strand.id ? 'active' : '';
 
-        const pendingGoalsCount = Array.from(condo.goals.values()).filter(g => !isGoalCompleted(g) && !isGoalDropped(g)).length;
+        const pendingGoalsCount = Array.from(strand.goals.values()).filter(g => !isGoalCompleted(g) && !isGoalDropped(g)).length;
 
-        // Default collapse condos that have "nothing happening" unless user explicitly expanded them before.
+        // Default collapse strands that have "nothing happening" unless user explicitly expanded them before.
         // Heuristic: no pending goals OR no sessions attached to any pending goal and no unassigned sessions.
-        if (state.expandedCondos[condo.id] === undefined) {
-          const pendingGoals = Array.from(condo.goals.values()).filter(g => !isGoalCompleted(g) && !isGoalDropped(g));
+        if (state.expandedStrands[strand.id] === undefined) {
+          const pendingGoals = Array.from(strand.goals.values()).filter(g => !isGoalCompleted(g) && !isGoalDropped(g));
           const pendingGoalsSessionsCount = pendingGoals.reduce((acc, g) => acc + (Array.isArray(g.sessions) ? g.sessions.length : 0), 0);
-          const hasAnySessions = (condo.sessions?.length || 0) > 0;
+          const hasAnySessions = (strand.sessions?.length || 0) > 0;
           const shouldCollapse = pendingGoals.length === 0 || (!hasAnySessions && pendingGoalsSessionsCount === 0);
-          if (shouldCollapse) state.expandedCondos[condo.id] = false;
+          if (shouldCollapse) state.expandedStrands[strand.id] = false;
         }
 
-        const isExpanded = isCondoExpanded(condo.id);
+        const isExpanded = isStrandExpanded(strand.id);
         const toggleIcon = isExpanded ? '▾' : '▸';
 
         html += `
-          <div class=\"condo-item\">
-            <a class=\"condo-header ${activeCondo}\" href=\"${escapeHtml(fullHref(`#/condo/${encodeURIComponent(condo.id)}`))}\" onclick=\"return handleCondoLinkClick(event, '${escapeHtml(condo.id)}')\">
-              <span class=\"condo-toggle\" title=\"${isExpanded ? 'Collapse' : 'Expand'}\" onclick=\"event.preventDefault(); event.stopPropagation(); toggleCondoExpanded('${escapeHtml(condo.id)}')\">${toggleIcon}</span>
-              <span class=\"condo-icon\">🏢</span>
-              <span class=\"condo-name\">${escapeHtml(condo.name || 'Condo')}</span>
+          <div class=\"strand-item\">
+            <a class=\"strand-header ${activeStrand}\" href=\"${escapeHtml(fullHref(`#/strand/${encodeURIComponent(strand.id)}`))}\" onclick=\"return handleStrandLinkClick(event, '${escapeHtml(strand.id)}')\">
+              <span class=\"strand-toggle\" title=\"${isExpanded ? 'Collapse' : 'Expand'}\" onclick=\"event.preventDefault(); event.stopPropagation(); toggleStrandExpanded('${escapeHtml(strand.id)}')\">${toggleIcon}</span>
+              <span class=\"strand-icon\">🏢</span>
+              <span class=\"strand-name\">${escapeHtml(strand.name || 'Strand')}</span>
               ${badge}
-              <span class=\"condo-add\" title=\"New goal\" onclick=\"event.preventDefault(); event.stopPropagation(); state.newGoalCondoId = '${escapeHtml(condo.id)}'; showCreateGoalModal()\">+</span>
+              <span class=\"strand-add\" title=\"New goal\" onclick=\"event.preventDefault(); event.stopPropagation(); state.newGoalStrandId = '${escapeHtml(strand.id)}'; showCreateGoalModal()\">+</span>
             </a>
-            ${isExpanded ? `<div class=\"condo-goals\">${renderCondoGoals(condo, sessionToGoal, goalById)}</div>` : ''}
+            ${isExpanded ? `<div class=\"strand-goals\">${renderStrandGoals(strand, sessionToGoal, goalById)}</div>` : ''}
           </div>
         `;
       }
 
       // persist any new default-collapse decisions
-      localStorage.setItem('sharp_expanded_condos', JSON.stringify(state.expandedCondos));
+      localStorage.setItem('sharp_expanded_strands', JSON.stringify(state.expandedStrands));
 
       container.innerHTML = html;
       updateUncategorizedLink();
@@ -2428,8 +2428,8 @@
     }
 
 
-    function renderCondoGoals(condo, sessionToGoal, goalById) {
-      const goals = Array.from(condo.goals.values()).filter(g => !isGoalCompleted(g) && !isGoalDropped(g) && matchesGoalSearch(g));
+    function renderStrandGoals(strand, sessionToGoal, goalById) {
+      const goals = Array.from(strand.goals.values()).filter(g => !isGoalCompleted(g) && !isGoalDropped(g) && matchesGoalSearch(g));
       const goalRows = [];
 
       for (const goal of goals) {
@@ -2448,7 +2448,7 @@
               ${dot}
               <span class="goal-name" title="${escapeHtml(nextTask || '')}">${escapeHtml(goal.title || 'Untitled goal')}</span>
               <span class="goal-count">${sessionsForGoal.length}</span>
-              <span class="goal-add" title="New session for this goal" onclick="event.preventDefault(); event.stopPropagation(); openNewSession('${escapeHtml(condo.id)}','${escapeHtml(goal.id)}')">+</span>
+              <span class="goal-add" title="New session for this goal" onclick="event.preventDefault(); event.stopPropagation(); openNewSession('${escapeHtml(strand.id)}','${escapeHtml(goal.id)}')">+</span>
             </div>
             ${nextTaskEl}
           </a>
@@ -2513,7 +2513,7 @@
       }
       state.currentGoalOpenId = goalId;
       state.currentGoalId = goalId;
-      if (goal.condoId) state.currentCondoId = goal.condoId;
+      if (goal.strandId) state.currentStrandId = goal.strandId;
 
       // Mark latest session as read
       const sessKeys = Array.isArray(goal.sessions) ? goal.sessions : [];
@@ -2592,11 +2592,11 @@
       // even if the before_agent_start hook context injection doesn't reach it.
       // Instructions adapt based on how much context is available.
       const hasTasks = Array.isArray(goal.tasks) && goal.tasks.length > 0;
-      const hasCondo = !!goal.condoId;
+      const hasStrand = !!goal.strandId;
       const desc = (goal.description || goal.notes || '').trim();
       const hasDescription = !!desc;
-      const condoLabel = hasCondo
-        ? (goal.condoName || (goal.condoId.includes(':') ? goal.condoId.split(':').pop() : goal.condoId))
+      const strandLabel = hasStrand
+        ? (goal.strandName || (goal.strandId.includes(':') ? goal.strandId.split(':').pop() : goal.strandId))
         : null;
 
       const taskLines = hasTasks
@@ -2627,7 +2627,7 @@
 
       const kickoff = [
         `Goal: ${goal.title} [${goal.id}]`,
-        condoLabel ? `Project: ${condoLabel}` : null,
+        strandLabel ? `Project: ${strandLabel}` : null,
         hasDescription ? desc : null,
         ...taskLines,
         ``,
@@ -2697,15 +2697,15 @@
       const titleEl = document.getElementById('goalHeroTitle');
       if (titleEl) titleEl.textContent = goal.title || 'Untitled goal';
 
-      const condoNameEl = document.getElementById('goalCondoName');
-      if (condoNameEl) {
-        const condoName = (() => {
-          const cid = goal.condoId || state.currentCondoId || '';
+      const strandNameEl = document.getElementById('goalStrandName');
+      if (strandNameEl) {
+        const strandName = (() => {
+          const cid = goal.strandId || state.currentStrandId || '';
           if (cid === 'cron') return 'Recurring';
-          const s = (state.sessions || []).find(x => getSessionCondoId(x) === cid);
-          return s ? getSessionCondoName(s) : (cid.split(':').pop() || 'Condo');
+          const s = (state.sessions || []).find(x => getSessionStrandId(x) === cid);
+          return s ? getSessionStrandName(s) : (cid.split(':').pop() || 'Strand');
         })();
-        condoNameEl.textContent = condoName;
+        strandNameEl.textContent = strandName;
       }
 
       const lastEl = document.getElementById('goalLastUpdated');
@@ -2972,7 +2972,7 @@
               return;
             }
           } else {
-            // Images are uploaded to ClawCondos and referenced by URL.
+            // Images are uploaded to Helix and referenced by URL.
             // Avoid sending base64 blobs over WebSocket (can exceed frame limits and close the socket).
             try {
               showToast('Uploading image…', 'info', 2000);
@@ -3059,7 +3059,7 @@
             return;
           }
         } else {
-          // Images are uploaded to ClawCondos and referenced by URL.
+          // Images are uploaded to Helix and referenced by URL.
           // Avoid sending base64 blobs over WebSocket (can exceed frame limits and close the socket).
           try {
             showToast('Uploading image…', 'info', 2000);
@@ -3762,12 +3762,12 @@
 
         try {
           const obj = JSON.parse(jsonStr);
-          const patch = obj?.goalPatch || obj?.clawcondosGoalPatch || obj;
+          const patch = obj?.goalPatch || obj?.helixGoalPatch || obj;
           if (!patch || typeof patch !== 'object') continue;
 
           // Heuristic: only treat as patch if it looks like one.
           const keys = Object.keys(patch);
-          const allowed = new Set(['status','priority','deadline','notes','description','tasks','nextTask','completed','dropped','droppedAtMs','condoId','condoName']);
+          const allowed = new Set(['status','priority','deadline','notes','description','tasks','nextTask','completed','dropped','droppedAtMs','strandId','strandName']);
           const looksLikePatch = keys.some(k => allowed.has(k));
           if (!looksLikePatch) continue;
 
@@ -3797,7 +3797,7 @@
         if (!candidate) break;
         try {
           const obj = JSON.parse(candidate);
-          if (obj?.goalPatch || obj?.clawcondosGoalPatch) {
+          if (obj?.goalPatch || obj?.helixGoalPatch) {
             cleaned = cleaned.slice(0, start) + cleaned.slice(start + candidate.length);
             idx = start;
             continue;
@@ -3945,8 +3945,8 @@
       if (doneBtn) doneBtn.classList.toggle('active', state.archivedTab === 'done');
       if (dropBtn) dropBtn.classList.toggle('active', state.archivedTab === 'dropped');
 
-      const condoId = state.currentCondoId;
-      const all = (state.goals || []).filter(g => (g.condoId || 'misc:default') === condoId);
+      const strandId = state.currentStrandId;
+      const all = (state.goals || []).filter(g => (g.strandId || 'misc:default') === strandId);
       const items = (state.archivedTab === 'dropped')
         ? all.filter(g => isGoalDropped(g))
         : all.filter(g => isGoalCompleted(g) && !isGoalDropped(g));
@@ -3978,14 +3978,14 @@
     async function restoreGoal(goalId) {
       await updateGoal(goalId, { dropped: false, status: 'active' });
       await loadGoals();
-      renderCondoView();
+      renderStrandView();
       renderArchivedGoals();
     }
 
     async function markGoalActive(goalId) {
       await updateGoal(goalId, { completed: false, status: 'active' });
       await loadGoals();
-      renderCondoView();
+      renderStrandView();
       renderArchivedGoals();
     }
 
@@ -3997,7 +3997,7 @@
         await rpcCall('goals.delete', { id: goalId });
         await loadGoals();
         renderArchivedGoals();
-        renderCondoView();
+        renderStrandView();
         showToast('Goal deleted', 'info');
       } catch {
         showToast('Failed to delete goal', 'error');
@@ -4011,7 +4011,7 @@
       try {
         await updateGoal(goal.id, { dropped: true, status: 'dropped', droppedAtMs: Date.now() });
         await loadGoals();
-        navigateTo(`condo/${encodeURIComponent(goal.condoId || state.currentCondoId || 'misc:default')}`);
+        navigateTo(`strand/${encodeURIComponent(goal.strandId || state.currentStrandId || 'misc:default')}`);
       } catch {
         showToast('Failed to drop goal', 'error');
       }
@@ -4024,7 +4024,7 @@
       try {
         await rpcCall('goals.delete', { id: goal.id });
         await loadGoals();
-        navigateTo(`condo/${encodeURIComponent(goal.condoId || state.currentCondoId || 'misc:default')}`);
+        navigateTo(`strand/${encodeURIComponent(goal.strandId || state.currentStrandId || 'misc:default')}`);
       } catch {
         showToast('Failed to delete goal', 'error');
       }
@@ -4044,8 +4044,8 @@
       if (!state.attachGoalId && state.currentGoalOpenId) state.attachGoalId = state.currentGoalOpenId;
 
       const picker = document.getElementById('goalPicker');
-      const condoId = getCondoIdForSessionKey(key);
-      const goals = state.goals.filter(g => !isGoalCompleted(g) && (g.condoId || condoId) === condoId);
+      const strandId = getStrandIdForSessionKey(key);
+      const goals = state.goals.filter(g => !isGoalCompleted(g) && (g.strandId || strandId) === strandId);
       if (!state.attachGoalId && goals[0]) state.attachGoalId = goals[0].id;
       const rows = goals.map(g => {
         const active = state.attachGoalId === g.id ? 'active' : '';
@@ -4309,7 +4309,7 @@ If none fit well, include a suggestion with goalId:null and a proposed new goal 
       if (!sessionKey || !title) return;
       
       try {
-        const data = await rpcCall('goals.create', { title, condoId: getCondoIdForSessionKey(sessionKey) });
+        const data = await rpcCall('goals.create', { title, strandId: getStrandIdForSessionKey(sessionKey) });
 
         if (data?.goal?.id) {
           await rpcCall('goals.addSession', { id: data.goal.id, sessionKey });
@@ -4378,7 +4378,7 @@ If none fit well, include a suggestion with goalId:null and a proposed new goal 
       
       try {
         // Create goal
-        const data = await rpcCall('goals.create', { title, condoId: getCondoIdForSessionKey(sessionKey) });
+        const data = await rpcCall('goals.create', { title, strandId: getStrandIdForSessionKey(sessionKey) });
 
         // Assign session to new goal
         if (sessionKey && data?.goal?.id) {
@@ -4753,7 +4753,7 @@ Response format:
           await rpcCall('goals.addSession', { id: proposal.goalId, sessionKey });
         } else {
           // Create new goal and assign
-          const data = await rpcCall('goals.create', { title: proposal.title || 'New Goal', condoId: getCondoIdForSessionKey(sessionKey) });
+          const data = await rpcCall('goals.create', { title: proposal.title || 'New Goal', strandId: getStrandIdForSessionKey(sessionKey) });
           if (data?.goal?.id) {
             await rpcCall('goals.addSession', { id: data.goal.id, sessionKey });
             // Refresh goals
@@ -4793,7 +4793,7 @@ Response format:
       if (!sessionKey) return;
       
       try {
-        const data = await rpcCall('goals.create', { title, condoId: getCondoIdForSessionKey(state.wizardPendingSessionKey) });
+        const data = await rpcCall('goals.create', { title, strandId: getStrandIdForSessionKey(state.wizardPendingSessionKey) });
 
         if (data?.goal?.id) {
           await rpcCall('goals.addSession', { id: data.goal.id, sessionKey });
@@ -4843,9 +4843,9 @@ Response format:
         return;
       }
       try {
-        const condoId = state.newGoalCondoId || state.currentCondoId || null;
-        state.newGoalCondoId = null;
-        const data = await rpcCall('goals.create', { title, deadline: deadline || null, condoId });
+        const strandId = state.newGoalStrandId || state.currentStrandId || null;
+        state.newGoalStrandId = null;
+        const data = await rpcCall('goals.create', { title, deadline: deadline || null, strandId });
         hideCreateGoalModal();
         await loadGoals();
         if (data?.goal?.id) setCurrentGoal(data.goal.id);
@@ -4902,11 +4902,11 @@ Response format:
         if (result?.sessions) {
           state.sessions = result.sessions;
 
-          // Data-level: funnel heartbeat/cron sessions into SYSTEM condo.
+          // Data-level: funnel heartbeat/cron sessions into SYSTEM strand.
           for (const s of state.sessions) {
-            if (isSystemCondoSession(s)) {
+            if (isSystemStrandSession(s)) {
               // Fire-and-forget; don't block rendering.
-              persistSessionCondo(s.key, 'condo:system');
+              persistSessionStrand(s.key, 'strand:system');
             }
           }
 
@@ -4933,10 +4933,10 @@ Response format:
               openSession(pending, { fromRouter: true });
             }
           }
-          if (state.pendingRouteCondoId) {
-            const pending = state.pendingRouteCondoId;
-            state.pendingRouteCondoId = null;
-            openCondo(pending, { fromRouter: true });
+          if (state.pendingRouteStrandId) {
+            const pending = state.pendingRouteStrandId;
+            state.pendingRouteStrandId = null;
+            openStrand(pending, { fromRouter: true });
           }
           // Agents tree uses sessions for its nested view
           if (state.agents?.length) renderAgents();
@@ -6627,9 +6627,9 @@ Response format:
       }
 
       const goal = state.goals?.find(g => g.id === state.currentGoalOpenId);
-      const condoId = goal?.condoId || state.currentCondoId;
-      if (condoId) {
-        navigateTo(`condo/${encodeURIComponent(condoId)}`);
+      const strandId = goal?.strandId || state.currentStrandId;
+      if (strandId) {
+        navigateTo(`strand/${encodeURIComponent(strandId)}`);
       } else {
         navigateTo('dashboard');
       }
@@ -6717,15 +6717,15 @@ Response format:
           }
           break;
         }
-        case 'condo':
+        case 'strand':
           if (payload) {
-            const condoId = decodeURIComponent(payload);
+            const strandId = decodeURIComponent(payload);
             // If data hasn't loaded yet, defer
             if (!(state.sessions?.length || state.goals?.length)) {
-              state.pendingRouteCondoId = condoId;
+              state.pendingRouteStrandId = strandId;
               showOverview(); // don't navigate; we're already in a router call
             } else {
-              openCondo(condoId, { fromRouter: true });
+              openStrand(strandId, { fromRouter: true });
             }
           } else {
             showOverview();
@@ -6763,32 +6763,32 @@ Response format:
           break;
         }
         case 'new-session': {
-          // /new-session/<condoId>/<goalId?>
+          // /new-session/<strandId>/<goalId?>
           const parts = payload ? payload.split('/').map(decodeURIComponent) : [];
-          const condoId = parts[0] || null;
+          const strandId = parts[0] || null;
           const goalId = parts[1] || null;
 
           // If goals aren't loaded yet, defer so the goal dropdown can populate.
           if (!state.goals?.length) {
-            state.pendingRouteNewSession = { condoId, goalId };
+            state.pendingRouteNewSession = { strandId, goalId };
             showNewSessionView({ fromRouter: true });
           } else {
-            state.newSessionCondoId = condoId || state.currentCondoId;
+            state.newSessionStrandId = strandId || state.currentStrandId;
             state.attachGoalId = goalId || null;
             showNewSessionView({ fromRouter: true });
           }
           break;
         }
         case 'new-goal': {
-          // /new-goal/<condoId>
+          // /new-goal/<strandId>
           const parts = payload ? payload.split('/').map(decodeURIComponent) : [];
-          const condoId = parts[0] || null;
+          const strandId = parts[0] || null;
 
           if (!state.goals?.length) {
-            state.pendingRouteNewGoalCondoId = condoId;
+            state.pendingRouteNewGoalStrandId = strandId;
             showNewGoalView({ fromRouter: true });
           } else {
-            state.newGoalCondoId = condoId || state.currentCondoId;
+            state.newGoalStrandId = strandId || state.currentStrandId;
             showNewGoalView({ fromRouter: true });
           }
           break;
@@ -6840,7 +6840,7 @@ Response format:
       state.goalPanelOpen = true;
       state.currentGoalOpenId = goalId;
       state.currentGoalId = goalId;
-      if (goal.condoId) state.currentCondoId = goal.condoId;
+      if (goal.strandId) state.currentStrandId = goal.strandId;
 
       // Mark latest session as read
       const sessKeys = Array.isArray(goal.sessions) ? goal.sessions : [];
@@ -6990,8 +6990,8 @@ Response format:
       closeSidebar();
     }
 
-    function openNewSession(condoId, goalId = null) {
-      const c = condoId || state.currentCondoId || '';
+    function openNewSession(strandId, goalId = null) {
+      const c = strandId || state.currentStrandId || '';
       const g = goalId || '';
 
       // If we're creating a session from within a goal context, don't show the New Session modal.
@@ -7007,71 +7007,71 @@ Response format:
       navigateTo(path);
     }
 
-    function openNewGoal(condoId) {
-      const c = condoId || state.currentCondoId || '';
+    function openNewGoal(strandId) {
+      const c = strandId || state.currentStrandId || '';
       navigateTo(`new-goal/${encodeURIComponent(c)}`);
     }
 
-    function selectCondo(condoId) {
-      openCondo(condoId);
+    function selectStrand(strandId) {
+      openStrand(strandId);
     }
 
-    function openCondo(condoId, opts = {}) {
-      if (!condoId) return;
+    function openStrand(strandId, opts = {}) {
+      if (!strandId) return;
 
       if (!opts.fromRouter) {
-        navigateTo(`condo/${encodeURIComponent(condoId)}`);
+        navigateTo(`strand/${encodeURIComponent(strandId)}`);
         return;
       }
 
-      state.currentView = 'condo';
-      state.currentCondoId = condoId;
+      state.currentView = 'strand';
+      state.currentStrandId = strandId;
       state.currentSession = null;
       state.currentGoalId = 'all';
       localStorage.removeItem('sharp_current_session');
 
-      setView('condoView');
+      setView('strandView');
       setActiveNav(null);
 
-      const condoName = (() => {
-        if (condoId === 'cron') return 'Recurring';
+      const strandName = (() => {
+        if (strandId === 'cron') return 'Recurring';
         // Try to resolve from existing sessions
-        const s = (state.sessions || []).find(x => getSessionCondoId(x) === condoId);
-        if (s) return getSessionCondoName(s);
-        return condoId.split(':').pop() || 'Condo';
+        const s = (state.sessions || []).find(x => getSessionStrandId(x) === strandId);
+        if (s) return getSessionStrandName(s);
+        return strandId.split(':').pop() || 'Strand';
       })();
 
       setBreadcrumbs([
         { label: '🏠', onClick: "navigateTo('dashboard')" },
-        { label: `🏢 ${escapeHtml(condoName)}`, current: true }
+        { label: `🏢 ${escapeHtml(strandName)}`, current: true }
       ]);
 
       document.getElementById('headerAction').style.display = 'none';
       document.getElementById('headerStatusIndicator').style.display = 'none';
 
-      renderCondoView();
+      renderStrandView();
       renderDetailPanel();
       updateMobileHeader();
       closeSidebar();
     }
 
-    function renderCondoView() {
-      const gridEl = document.getElementById('condoGoalGrid');
-      const sessionsEl = document.getElementById('condoSessionsList');
+    function renderStrandView() {
+      const gridEl = document.getElementById('strandGoalGrid');
+      const sessionsEl = document.getElementById('strandSessionsList');
       if (!gridEl) return;
 
-      const condoId = state.currentCondoId;
+      const strandId = state.currentStrandId;
 
-      const condoName = (() => {
-        if (condoId === 'cron') return 'Recurring';
-        const s = (state.sessions || []).find(x => getSessionCondoId(x) === condoId);
-        return s ? getSessionCondoName(s) : (condoId.split(':').pop() || 'Condo');
+      const strandName = (() => {
+        if (strandId === 'cron') return 'Recurring';
+        const s = (state.sessions || []).find(x => getSessionStrandId(x) === strandId);
+        return s ? getSessionStrandName(s) : (strandId.split(':').pop() || 'Strand');
       })();
 
-      const titleEl = document.getElementById('condoHeroTitle');
-      if (titleEl) titleEl.textContent = condoName;
+      const titleEl = document.getElementById('strandHeroTitle');
+      if (titleEl) titleEl.textContent = strandName;
 
-      const allGoals = (state.goals || []).filter(g => (g.condoId || 'misc:default') === condoId);
+      const allGoals = (state.goals || []).filter(g => (g.strandId || 'misc:default') === strandId);
       const activeGoals = allGoals.filter(g => !isGoalCompleted(g) && !isGoalDropped(g));
       const completedGoals = allGoals.filter(g => isGoalCompleted(g) && !isGoalDropped(g));
       const droppedGoals = allGoals.filter(g => isGoalDropped(g));
@@ -7079,24 +7079,24 @@ Response format:
       const doing = activeGoals.filter(g => (g.status || 'active') === 'doing' || (g.priority === 'P0'));
       const blocked = activeGoals.filter(g => (g.status || '').toLowerCase() === 'blocked');
 
-      const statActive = document.getElementById('condoStatActive');
-      const statTotal = document.getElementById('condoStatTotal');
-      const statDoing = document.getElementById('condoStatDoing');
-      const statBlocked = document.getElementById('condoStatBlocked');
+      const statActive = document.getElementById('strandStatActive');
+      const statTotal = document.getElementById('strandStatTotal');
+      const statDoing = document.getElementById('strandStatDoing');
+      const statBlocked = document.getElementById('strandStatBlocked');
       if (statActive) statActive.textContent = String(activeGoals.length);
       if (statTotal) statTotal.textContent = String(allGoals.length);
-      const statDropped = document.getElementById('condoStatDropped');
+      const statDropped = document.getElementById('strandStatDropped');
       if (statDropped) statDropped.textContent = String(droppedGoals.length);
       if (statDoing) statDoing.textContent = String(doing.length);
       if (statBlocked) statBlocked.textContent = String(blocked.length);
 
-      const focusEl = document.getElementById('condoStatFocus');
+      const focusEl = document.getElementById('strandStatFocus');
       if (focusEl) {
         const focus = (activeGoals[0]?.title || completedGoals[0]?.title || '—');
         focusEl.textContent = focus;
       }
 
-      const lastEl = document.getElementById('condoLastUpdated');
+      const lastEl = document.getElementById('strandLastUpdated');
       if (lastEl) {
         const last = Math.max(0, ...allGoals.map(g => Number(g.updatedAtMs || g.updatedAt || g.createdAtMs || 0)));
         lastEl.textContent = last ? formatTimestamp(last) : '—';
@@ -7104,7 +7104,7 @@ Response format:
 
       // Goal grid cards (D1)
       if (!activeGoals.length) {
-        gridEl.innerHTML = `<div class="empty-state">No pending goals in this condo.</div>`;
+        gridEl.innerHTML = `<div class="empty-state">No pending goals in this strand.</div>`;
       } else {
         gridEl.innerHTML = activeGoals
           .sort((a, b) => Number(b.updatedAtMs || b.updatedAt || 0) - Number(a.updatedAtMs || a.updatedAt || 0))
@@ -7122,30 +7122,30 @@ Response format:
             const owner = (Array.isArray(g.sessions) && g.sessions.length) ? `${g.sessions.length} session${g.sessions.length===1?'':'s'}` : '—';
 
             return `
-              <a class="condo-goal-card" href="${escapeHtml(goalHref(g.id))}" onclick="return handleGoalLinkClick(event, '${escapeHtml(g.id)}')">
-                <div class="condo-card-top">
+              <a class="strand-goal-card" href="${escapeHtml(goalHref(g.id))}" onclick="return handleGoalLinkClick(event, '${escapeHtml(g.id)}')">
+                <div class="strand-card-top">
                   <div>
-                    <div class="condo-card-title">${escapeHtml(g.title || 'Untitled goal')}</div>
-                    <div class="condo-card-meta">
-                      <span class="condo-tag ${escapeHtml(status)}">${escapeHtml(status)}</span>
+                    <div class="strand-card-title">${escapeHtml(g.title || 'Untitled goal')}</div>
+                    <div class="strand-card-meta">
+                      <span class="strand-tag ${escapeHtml(status)}">${escapeHtml(status)}</span>
                       <span>${escapeHtml(owner)}</span>
                     </div>
                   </div>
                   <div style="font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11px; color: var(--text-muted);">${escapeHtml(updated)}</div>
                 </div>
 
-                <div class="condo-card-body">
-                  <div class="condo-next-label">Next task</div>
-                  <div class="condo-next-task">
-                    <div class="condo-dot ${dotClass}"></div>
+                <div class="strand-card-body">
+                  <div class="strand-next-label">Next task</div>
+                  <div class="strand-next-task">
+                    <div class="strand-dot ${dotClass}"></div>
                     <div>
-                      <div class="condo-task-title">${escapeHtml(nextTitle)}</div>
-                      <div class="condo-task-sub">${nextId ? `<span style=\"font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11px; color: rgba(148,163,184,.75);\">${escapeHtml(String(nextId))}</span>` : ''}${g.priority ? `<span>${escapeHtml(g.priority)}</span>` : ''}${g.deadline ? `<span>due ${escapeHtml(g.deadline)}</span>` : ''}</div>
+                      <div class="strand-task-title">${escapeHtml(nextTitle)}</div>
+                      <div class="strand-task-sub">${nextId ? `<span style=\"font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11px; color: rgba(148,163,184,.75);\">${escapeHtml(String(nextId))}</span>` : ''}${g.priority ? `<span>${escapeHtml(g.priority)}</span>` : ''}${g.deadline ? `<span>due ${escapeHtml(g.deadline)}</span>` : ''}</div>
                     </div>
                   </div>
                 </div>
 
-                <div class="condo-card-foot"><span>Updated recently</span><span>Open →</span></div>
+                <div class="strand-card-foot"><span>Updated recently</span><span>Open →</span></div>
               </a>
             `;
           }).join('');
@@ -7153,12 +7153,12 @@ Response format:
 
       // Keep the sessions list render for now (even if hidden)
       if (sessionsEl) {
-        const condoSessions = (state.sessions || [])
+        const strandSessions = (state.sessions || [])
           .filter(s => !s.key.includes(':subagent:'))
-          .filter(s => getSessionCondoId(s) === condoId)
+          .filter(s => getSessionStrandId(s) === strandId)
           .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
-        sessionsEl.innerHTML = condoSessions.length ? condoSessions.map(s => {
+        sessionsEl.innerHTML = strandSessions.length ? strandSessions.map(s => {
           const preview = getMessagePreview(s);
           const g = getGoalForSession(s.key);
           const goalPill = g ? `<button type="button" class="card-badge goal" onclick="event.preventDefault(); event.stopPropagation(); openGoal('${escapeHtml(g.id)}')">🏙️ ${escapeHtml(g.title || 'Goal')}</button>` : '';
@@ -7178,17 +7178,17 @@ Response format:
               </div>
             </a>
           `;
-        }).join('') : `<div class="empty-state">No sessions in this condo.</div>`;
+        }).join('') : `<div class="empty-state">No sessions in this strand.</div>`;
       }
     }
 
     function buildSessionBreadcrumbs(session) {
-      const condoName = getSessionCondoName(session);
-      const condoId = getSessionCondoId(session);
+      const strandName = getSessionStrandName(session);
+      const strandId = getSessionStrandId(session);
       const goal = getGoalForSession(session.key);
       const crumbs = [
         { label: '🏠', onClick: "navigateTo('dashboard')" },
-        { label: `🏢 ${escapeHtml(condoName)}`, onClick: `openCondo('${escapeHtml(condoId)}')` },
+        { label: `🏢 ${escapeHtml(strandName)}`, onClick: `openStrand('${escapeHtml(strandId)}')` },
       ];
       if (goal) {
         crumbs.push({ label: escapeHtml(goal.title || 'Goal'), onClick: `openGoal('${escapeHtml(goal.id)}')` });
@@ -7198,18 +7198,18 @@ Response format:
     }
 
     function buildGoalBreadcrumbs(goal) {
-      const condoId = goal.condoId || state.currentCondoId || 'misc:default';
-      const condoName = (() => {
-        if (goal.condoName) return goal.condoName;
-        const cid = condoId;
+      const strandId = goal.strandId || state.currentStrandId || 'misc:default';
+      const strandName = (() => {
+        if (goal.strandName) return goal.strandName;
+        const cid = strandId;
         if (cid === 'cron') return 'Recurring';
-        const s = (state.sessions || []).find(x => getSessionCondoId(x) === cid);
-        if (s) return getSessionCondoName(s);
+        const s = (state.sessions || []).find(x => getSessionStrandId(x) === cid);
+        if (s) return getSessionStrandName(s);
         return cid.includes(':') ? cid.split(':').pop() : cid;
       })();
       return [
         { label: '🏠', onClick: "navigateTo('dashboard')" },
-        { label: `🏢 ${escapeHtml(condoName)}`, onClick: `openCondo('${escapeHtml(condoId)}')` },
+        { label: `🏢 ${escapeHtml(strandName)}`, onClick: `openStrand('${escapeHtml(strandId)}')` },
         { label: escapeHtml(goal.title || 'Goal'), current: true }
       ];
     }
@@ -7460,9 +7460,9 @@ Response format:
         return `<div class="agent-chip ${active}" onclick="selectNewSessionAgent('${escapeHtml(agent.id)}')">${escapeHtml(agent.id)}</div>`;
       }).join('');
 
-      const condoGoals = state.goals.filter(g => (g.condoId || state.currentCondoId) === state.newSessionCondoId && !isGoalCompleted(g));
+      const strandGoals = state.goals.filter(g => (g.strandId || state.currentStrandId) === state.newSessionStrandId && !isGoalCompleted(g));
       goalSelect.innerHTML = ['<option value="">— Assign later —</option>']
-        .concat(condoGoals.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.title)}</option>`))
+        .concat(strandGoals.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.title)}</option>`))
         .join('');
       if (state.attachGoalId) goalSelect.value = state.attachGoalId;
     }
@@ -7512,11 +7512,11 @@ Response format:
         return;
       }
       try {
-        const data = await rpcCall('goals.create', { title, notes: description || '', condoId: state.newGoalCondoId || state.currentCondoId || null });
+        const data = await rpcCall('goals.create', { title, notes: description || '', strandId: state.newGoalStrandId || state.currentStrandId || null });
         await loadGoals();
         const startSession = document.querySelector('input[name="startGoalSession"]:checked')?.value === 'yes';
         if (startSession && data?.goal?.id) {
-          openNewSession(state.newGoalCondoId || state.currentCondoId, data.goal.id);
+          openNewSession(state.newGoalStrandId || state.currentStrandId, data.goal.id);
         } else if (data?.goal?.id) {
           openGoal(data.goal.id);
         } else {
@@ -7573,12 +7573,12 @@ Response format:
       return false;
     }
 
-    function handleCondoLinkClick(e, condoId) {
+    function handleStrandLinkClick(e, strandId) {
       if (!e) return true;
       e.stopPropagation();
       if (!isPlainLeftClick(e)) return true;
       e.preventDefault();
-      openCondo(condoId);  // UI click → update URL
+      openStrand(strandId);  // UI click → update URL
       return false;
     }
 
@@ -7606,7 +7606,7 @@ Response format:
       
       state.currentView = 'chat';
       state.currentSession = session;
-      state.currentCondoId = getSessionCondoId(session);
+      state.currentStrandId = getSessionStrandId(session);
       const sessionGoal = getGoalForSession(session.key);
       if (sessionGoal) state.currentGoalId = sessionGoal.id;
       state.chatHistory = [];
@@ -8084,7 +8084,7 @@ Response format:
               return;
             }
           } else {
-            // Images: upload to ClawCondos and reference by URL.
+            // Images: upload to Helix and reference by URL.
             // Avoid base64 attachments (can exceed WebSocket frame limits via reverse proxy and close the socket).
             try {
               showToast('Uploading image…', 'info', 2000);
@@ -8132,7 +8132,7 @@ Response format:
         const files = MediaUpload.getPendingFiles();
         const hasAudio = files.some(f => f.fileType === 'audio');
 
-        // If any audio is present: upload to ClawCondos first, transcribe locally, then send transcript + link.
+        // If any audio is present: upload to Helix first, transcribe locally, then send transcript + link.
         if (hasAudio) {
           // Give immediate user feedback (upload/transcribe can take time, esp. first run while Whisper model downloads)
           state.isThinking = true;
@@ -8188,7 +8188,7 @@ Response format:
             return;
           }
         } else {
-          // Images: upload to ClawCondos and reference by URL.
+          // Images: upload to Helix and reference by URL.
           // Avoid base64 attachments (can exceed WebSocket frame limits via reverse proxy and close the socket).
           try {
             showToast('Uploading image…', 'info', 2000);
@@ -9047,71 +9047,71 @@ Response format:
       const container = document.getElementById('goalsGrid');
       if (!container) return;
 
-      // Dashboard "Condos Overview" (prototype): render condos with a few goal rows inside each card.
+      // Dashboard "Strands Overview" (prototype): render strands with a few goal rows inside each card.
       const visibleSessions = (state.sessions || []).filter(s => !s.key.includes(':subagent:'));
 
-      const condos = new Map();
+      const strands = new Map();
       for (const s of visibleSessions) {
-        const condoId = getSessionCondoId(s);
-        if (!condos.has(condoId)) {
-          condos.set(condoId, {
-            id: condoId,
-            name: getSessionCondoName(s),
+        const strandId = getSessionStrandId(s);
+        if (!strands.has(strandId)) {
+          strands.set(strandId, {
+            id: strandId,
+            name: getSessionStrandName(s),
             sessions: [],
             goals: [],
             latest: 0,
           });
         }
-        const c = condos.get(condoId);
+        const c = strands.get(strandId);
         c.sessions.push(s);
         c.latest = Math.max(c.latest, s.updatedAt || 0);
       }
 
       const goals = Array.isArray(state.goals) ? state.goals : [];
       for (const g of goals) {
-        // If condoId is missing but the goal already has sessions, infer condoId from the first session.
-        // This makes the dashboard "Condos Overview" populate correctly even for legacy goals.
-        const inferredCondoId = (!g.condoId && Array.isArray(g.sessions) && g.sessions[0])
-          ? getCondoIdForSessionKey(g.sessions[0])
+        // If strandId is missing but the goal already has sessions, infer strandId from the first session.
+        // This makes the dashboard "Strands Overview" populate correctly even for legacy goals.
+        const inferredStrandId = (!g.strandId && Array.isArray(g.sessions) && g.sessions[0])
+          ? getStrandIdForSessionKey(g.sessions[0])
           : null;
-        const condoId = g.condoId || inferredCondoId || 'misc:default';
-        if (!condos.has(condoId)) {
-          condos.set(condoId, {
-            id: condoId,
-            name: g.condoName || (condoId.includes(':') ? condoId.split(':').pop() : condoId),
+        const strandId = g.strandId || inferredStrandId || 'misc:default';
+        if (!strands.has(strandId)) {
+          strands.set(strandId, {
+            id: strandId,
+            name: g.strandName || (strandId.includes(':') ? strandId.split(':').pop() : strandId),
             sessions: [],
             goals: [],
             latest: g.updatedAtMs || 0,
           });
         }
-        condos.get(condoId).goals.push(g);
+        strands.get(strandId).goals.push(g);
       }
 
-      // When searching, filter condos to those with matching goals or matching condo name
+      // When searching, filter strands to those with matching goals or matching strand name
       if (state.searchQuery) {
-        for (const [condoId, condo] of condos) {
-          const nameMatch = (condo.name || '').toLowerCase().includes(state.searchQuery);
-          const hasMatchingGoal = condo.goals.some(g => matchesGoalSearch(g));
+        for (const [strandId, strand] of strands) {
+          const nameMatch = (strand.name || '').toLowerCase().includes(state.searchQuery);
+          const hasMatchingGoal = strand.goals.some(g => matchesGoalSearch(g));
           if (!nameMatch && !hasMatchingGoal) {
-            condos.delete(condoId);
+            strands.delete(strandId);
           }
         }
       }
 
-      const sorted = Array.from(condos.values()).sort((a, b) => (b.latest || 0) - (a.latest || 0));
+      const sorted = Array.from(strands.values()).sort((a, b) => (b.latest || 0) - (a.latest || 0));
 
       if (!sorted.length) {
         container.innerHTML = `
-          <div class="condo-card" style="opacity:.7">
-            <div class="condo-card-header">
+          <div class="strand-card" style="opacity:.7">
+            <div class="strand-card-header">
               <span style="font-size:18px">🏢</span>
-              <span class="condo-card-title">No condos yet</span>
+              <span class="strand-card-title">No strands yet</span>
             </div>
-            <div class="condo-card-goals">
-              <div class="condo-goal-row">
-                <div class="condo-goal-status pending"></div>
-                <span class="condo-goal-name">Create a goal to get started</span>
-                <span class="condo-goal-meta">+</span>
+            <div class="strand-card-goals">
+              <div class="strand-goal-row">
+                <div class="strand-goal-status pending"></div>
+                <span class="strand-goal-name">Create a goal to get started</span>
+                <span class="strand-goal-meta">+</span>
               </div>
             </div>
           </div>
@@ -9121,60 +9121,60 @@ Response format:
 
       // Prototype shows a tight grid; start with up to 8 cards.
       const maxCards = 8;
-      const cards = sorted.slice(0, maxCards).map(condo => {
-        const condoUnread = condo.sessions.filter(s => isSessionUnread(s.key)).length;
-        const condoErrors = condo.sessions.filter(s => s.lastError).length;
-        const badge = condoUnread > 0
-          ? `<span class="badge unread">${condoUnread}</span>`
-          : condoErrors > 0 ? `<span class="badge error">${condoErrors}</span>` : '';
+      const cards = sorted.slice(0, maxCards).map(strand => {
+        const strandUnread = strand.sessions.filter(s => isSessionUnread(s.key)).length;
+        const strandErrors = strand.sessions.filter(s => s.lastError).length;
+        const badge = strandUnread > 0
+          ? `<span class="badge unread">${strandUnread}</span>`
+          : strandErrors > 0 ? `<span class="badge error">${strandErrors}</span>` : '';
 
         // Pick up to 3 non-completed goals (prototype shows a few rows)
-        const goalsForCondo = (condo.goals || []).filter(g => !isGoalCompleted(g) && matchesGoalSearch(g)).slice(0, 3);
-        const rows = goalsForCondo.map(g => {
+        const goalsForStrand = (strand.goals || []).filter(g => !isGoalCompleted(g) && matchesGoalSearch(g)).slice(0, 3);
+        const rows = goalsForStrand.map(g => {
           const sessionCount = Array.isArray(g.sessions) ? g.sessions.length : 0;
           const meta = sessionCount ? `${sessionCount} session${sessionCount === 1 ? '' : 's'}` : '';
           return `
-            <a class="condo-goal-row" href="${escapeHtml(goalHref(g.id))}" onclick="return handleGoalLinkClick(event, '${escapeHtml(g.id)}')">
-              <div class="condo-goal-status pending"></div>
-              <span class="condo-goal-name">${escapeHtml(g.title || 'Untitled goal')}</span>
-              <span class="condo-goal-meta">${escapeHtml(meta || '—')}</span>
+            <a class="strand-goal-row" href="${escapeHtml(goalHref(g.id))}" onclick="return handleGoalLinkClick(event, '${escapeHtml(g.id)}')">
+              <div class="strand-goal-status pending"></div>
+              <span class="strand-goal-name">${escapeHtml(g.title || 'Untitled goal')}</span>
+              <span class="strand-goal-meta">${escapeHtml(meta || '—')}</span>
             </a>
           `;
         }).join('');
 
         const fallback = !rows
           ? `
-            <a class="condo-goal-row" href="${escapeHtml(fullHref(`#/new-goal/${encodeURIComponent(condo.id)}`))}" onclick="return handleRouteLinkClick(event, 'new-goal/${encodeURIComponent(condo.id)}')">
-              <div class="condo-goal-status pending"></div>
-              <span class="condo-goal-name">New goal…</span>
-              <span class="condo-goal-meta">+</span>
+            <a class="strand-goal-row" href="${escapeHtml(fullHref(`#/new-goal/${encodeURIComponent(strand.id)}`))}" onclick="return handleRouteLinkClick(event, 'new-goal/${encodeURIComponent(strand.id)}')">
+              <div class="strand-goal-status pending"></div>
+              <span class="strand-goal-name">New goal…</span>
+              <span class="strand-goal-meta">+</span>
             </a>
           `
           : '';
 
-        // NOTE: condo cards must NOT be <a> tags because they contain goal-row <a> links.
+        // NOTE: strand cards must NOT be <a> tags because they contain goal-row <a> links.
         // Nested anchors are invalid HTML and can explode the grid layout in some browsers.
         return `
-          <div class="condo-card" role="link" tabindex="0"
-               onclick="openCondo('${escapeHtml(condo.id)}')"
-               onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); openCondo('${escapeHtml(condo.id)}');}">
-            <div class="condo-card-header">
+          <div class="strand-card" role="link" tabindex="0"
+               onclick="openStrand('${escapeHtml(strand.id)}')"
+               onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); openStrand('${escapeHtml(strand.id)}');}">
+            <div class="strand-card-header">
               <span style="font-size:18px">🏢</span>
-              <span class="condo-card-title">${escapeHtml(condo.name || 'Condo')}</span>
+              <span class="strand-card-title">${escapeHtml(strand.name || 'Strand')}</span>
               ${badge}
             </div>
-            <div class="condo-card-goals">
+            <div class="strand-card-goals">
               ${rows || fallback}
             </div>
           </div>
         `;
       }).join('');
 
-      container.innerHTML = `<div class="condos-grid">${cards}</div>`;
+      container.innerHTML = `<div class="strands-grid">${cards}</div>`;
     }
 
     function renderSessionsGrid() {
-      // Show ALL recent sessions (top 20), sorted by updatedAt, with attention dots + condo badges
+      // Show ALL recent sessions (top 20), sorted by updatedAt, with attention dots + strand badges
       const mainSessions = state.sessions
         .filter(s => !s.key.includes(':subagent:'))
         .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
@@ -9212,11 +9212,11 @@ Response format:
             ? 'card-attention card-attention-unread'
             : '';
 
-        // Condo badge — clicking opens goal panel if session belongs to a goal
-        let condoBadge = '';
+        // Strand badge — clicking opens goal panel if session belongs to a goal
+        let strandBadge = '';
         if (g) {
-          const condoName = g.condoName || g.title || 'Condo';
-          condoBadge = `<button type="button" class="card-badge goal" onclick="event.preventDefault(); event.stopPropagation(); openGoalPanel('${escapeHtml(g.id)}')">${escapeHtml(condoName)}</button>`;
+          const strandName = g.strandName || g.title || 'Strand';
+          strandBadge = `<button type="button" class="card-badge goal" onclick="event.preventDefault(); event.stopPropagation(); openGoalPanel('${escapeHtml(g.id)}')">${escapeHtml(strandName)}</button>`;
         }
 
         return `
@@ -9233,7 +9233,7 @@ Response format:
             ${preview ? `<div class="card-preview">${escapeHtml(preview)}</div>` : ''}
             <div class="card-footer">
               <span>${timeAgo(s.updatedAt)}</span>
-              <span class="card-footer-right">${condoBadge}<span class="card-badge">${(s.totalTokens || 0).toLocaleString()} tokens</span></span>
+              <span class="card-footer-right">${strandBadge}<span class="card-badge">${(s.totalTokens || 0).toLocaleString()} tokens</span></span>
             </div>
           </a>
         `;
@@ -9484,13 +9484,13 @@ Response format:
 
     async function init() {
       // Prevent browser from restoring scroll positions between hash routes.
-      // ClawCondos manages its own scroll behavior per-view.
+      // Helix manages its own scroll behavior per-view.
       try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch {}
 
       // Best-effort: load config.json (async) and allow it to provide an auth token for localhost.
       try {
-        if (window.ClawCondosConfig?.initConfig) {
-          const cfg = await window.ClawCondosConfig.initConfig();
+        if (window.HelixConfig?.initConfig) {
+          const cfg = await window.HelixConfig.initConfig();
           const tok = cfg?.authToken || cfg?.gatewayToken || cfg?.token || null;
           if (!state.token && tok) state.token = tok;
           if (cfg?.gatewayWsUrl) state.gatewayUrl = cfg.gatewayWsUrl;

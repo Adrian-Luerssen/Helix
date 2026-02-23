@@ -18,14 +18,16 @@
 
 ---
 
-Helix is a web dashboard for managing AI agent sessions organized into "Condos" (goals). It connects to any WebSocket backend implementing the [Clawdbot protocol](docs/BACKEND-API.md), and provides a platform for embedding your own web apps with AI assistant sidebars.
+> **Fork:** Helix is a fork of [ClawCondos](https://github.com/acastellana/clawcondos), building on infrastructure originally created by Albert Castellana. Now maintained by Adrian Luerssen Medina.
+
+Helix is a web dashboard for managing AI agent sessions organized into "Strands" (goals). It connects to any WebSocket backend implementing the [Clawdbot protocol](docs/BACKEND-API.md), and provides a platform for embedding your own web apps with AI assistant sidebars.
 
 No build step. No framework. Vanilla HTML/JS/CSS. Edit and refresh.
 
 ## Features
 
-- **Goals-First Organization** - Group agent sessions into high-level goals/projects ("Condos")
-- **Condo Workspaces** - Optional git-initialized workspaces per condo with worktrees per goal for isolated parallel development
+- **Goals-First Organization** - Group agent sessions into high-level goals/projects ("Strands")
+- **Strand Workspaces** - Optional git-initialized workspaces per strand with worktrees per goal for isolated parallel development
 - **Real-time Chat** - WebSocket-based streaming responses, tool activity indicators, message queue
 - **Embedded Apps Platform** - Register any web app and get it embedded with an AI assistant sidebar
 - **Smart Filters** - Filter sessions by channel (Telegram, Discord, etc.) and status (Running, Unread, Error)
@@ -37,9 +39,9 @@ No build step. No framework. Vanilla HTML/JS/CSS. Edit and refresh.
 
 ## Screenshots
 
-| Dashboard | Condo Context |
+| Dashboard | Strand Context |
 |---|---|
-| ![Dashboard with stat cards, sidebar, and project board](public/media/screenshots/dashboard-overview.png) | ![Condo context with goals graph, workspace, and timeline](public/media/screenshots/condo-context.png) |
+| ![Dashboard with stat cards, sidebar, and project board](public/media/screenshots/dashboard-overview.png) | ![Strand context with goals graph, workspace, and timeline](public/media/screenshots/strand-context.png) |
 
 | Agents Overview | Settings |
 |---|---|
@@ -112,22 +114,22 @@ Register apps in `.registry/apps.json`:
 
 See [docs/BUILDING-APPS.md](docs/BUILDING-APPS.md) for the full guide including schema reference, assistant integration, and example apps.
 
-## Goals & Condos Plugin
+## Goals & Strands Plugin
 
 Helix includes an [OpenClaw](https://github.com/acastellana/openclaw) plugin for goals and task management. When installed in your gateway, it provides:
 
-- **26+ RPC methods** for goals, tasks, condos, PM coordination, and session management
+- **26+ RPC methods** for goals, tasks, strands, PM coordination, and session management
 - **Context injection** — agents automatically receive their goal/project context (including workspace paths)
 - **Agent tools** — agents can report progress, create goals, and spawn sub-agents
-- **Condo workspaces** — optional git workspaces per condo with worktrees per goal (set `CLAWCONDOS_WORKSPACES_DIR`)
+- **Strand workspaces** — optional git workspaces per strand with worktrees per goal (set `HELIX_WORKSPACES_DIR`)
 - **File-backed storage** — no database required
 
-See [docs/GOALS-PLUGIN.md](docs/GOALS-PLUGIN.md) for the full specification and [clawcondos/condo-management/](clawcondos/condo-management/) for the plugin source.
+See [docs/GOALS-PLUGIN.md](docs/GOALS-PLUGIN.md) for the full specification and [plugins/helix-goals/](plugins/helix-goals/) for the plugin source.
 
 ## Project Structure
 
 ```
-clawcondos/
+helix/
 ├── index.html                     # Main dashboard (all HTML/CSS/JS inline)
 ├── app.html                       # App viewer with assistant panel
 ├── serve.js                       # Node.js server (static files, WS proxy, app proxy)
@@ -143,7 +145,7 @@ clawcondos/
 │   ├── agents.css                 # Agent-specific styles
 │   ├── media-upload.css           # Upload UI styles
 │   └── voice-recorder.css         # Recorder UI styles
-├── clawcondos/condo-management/   # OpenClaw goals plugin
+├── plugins/helix-goals/   # OpenClaw goals plugin
 │   ├── index.js                   # Plugin entry (26+ methods, 2 hooks, 9 tools)
 │   └── lib/                       # Handlers, storage, context, tools, workspace manager
 ├── .registry/

@@ -15,7 +15,7 @@ Just want to see it? This takes 2 minutes:
 ```bash
 # Clone and install
 git clone https://github.com/Adrian-Luerssen/Helix.git
-cd clawcondos
+cd Helix
 npm install
 
 # Start the server
@@ -60,7 +60,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/path/to/clawcondos
+WorkingDirectory=/path/to/helix
 ExecStart=/usr/bin/node serve.js 9011
 Restart=always
 RestartSec=3
@@ -72,7 +72,7 @@ WantedBy=default.target
 EOF
 ```
 
-Replace `/path/to/clawcondos` with your actual path.
+Replace `/path/to/helix` with your actual path.
 
 ### Step 2: Create the environment file
 
@@ -83,11 +83,11 @@ GATEWAY_HTTP_HOST=127.0.0.1
 GATEWAY_WS_URL=ws://127.0.0.1:18789/ws
 GATEWAY_AUTH=your-gateway-token-here
 
-# Condo workspaces — git repos per condo, worktrees per goal
+# Strand workspaces — git repos per strand, worktrees per goal
 # This MUST be set in BOTH the Helix env AND the OpenClaw Gateway service
 # for workspace/worktree features to work (the plugin runs inside the gateway).
-# Create the directory first: mkdir -p /home/youruser/clawcondos-workspaces
-CLAWCONDOS_WORKSPACES_DIR=/home/youruser/clawcondos-workspaces
+# Create the directory first: mkdir -p /home/youruser/helix-workspaces
+HELIX_WORKSPACES_DIR=/home/youruser/helix-workspaces
 EOF
 
 chmod 600 ~/.config/helix.env
@@ -227,10 +227,10 @@ These override config.json:
 | `GATEWAY_HTTP_HOST` | HTTP host for gateway |
 | `GATEWAY_AUTH` | Bearer token for gateway auth |
 | `PORT` | Server port (default: 9000) |
-| `CLAWCONDOS_WORKSPACES_DIR` | Base directory for condo git workspaces and goal worktrees (disabled if not set). **Must be set on the OpenClaw Gateway service** since the plugin runs there. |
-| `CLAWCONDOS_CLASSIFICATION` | Set to `off` to disable auto-classification of unbound sessions |
-| `CLAWCONDOS_AGENT_WORKSPACES` | JSON mapping agent IDs to workspace paths for introspection |
-| `CLAWCONDOS_SKILLS_DIRS` | Colon-separated skill directory paths |
+| `HELIX_WORKSPACES_DIR` | Base directory for strand git workspaces and goal worktrees (disabled if not set). **Must be set on the OpenClaw Gateway service** since the plugin runs there. |
+| `HELIX_CLASSIFICATION` | Set to `off` to disable auto-classification of unbound sessions |
+| `HELIX_AGENT_WORKSPACES` | JSON mapping agent IDs to workspace paths for introspection |
+| `HELIX_SKILLS_DIRS` | Colon-separated skill directory paths |
 
 ---
 
@@ -360,9 +360,9 @@ This way agents can work fully autonomously — creating repos, pushing code, op
 | `url` | Webhook endpoint URL |
 | `secret` | Signing secret for verification |
 
-### Per-Condo Overrides
+### Per-Strand Overrides
 
-Each condo (project) can override global service settings. Use this when different projects need different GitHub orgs, Vercel teams, or API keys. Set overrides from Settings > Per-Project tab, or in the condo context view.
+Each strand (project) can override global service settings. Use this when different projects need different GitHub orgs, Vercel teams, or API keys. Set overrides from Settings > Per-Project tab, or in the strand context view.
 
 ### Pre-configuring Services
 
@@ -382,11 +382,11 @@ rpcCall('config.setService', {
   }
 });
 
-// Set per-condo override
+// Set per-strand override
 rpcCall('config.setService', {
   service: 'github',
   config: { org: 'project-specific-org' },
-  condoId: 'condo_abc123',
+  strandId: 'strand_abc123',
 });
 ```
 

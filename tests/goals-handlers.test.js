@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { createGoalsStore } from '../clawcondos/condo-management/lib/goals-store.js';
-import { createGoalHandlers } from '../clawcondos/condo-management/lib/goals-handlers.js';
-import { createCondoHandlers } from '../clawcondos/condo-management/lib/condos-handlers.js';
+import { createGoalsStore } from '../plugins/helix-goals/lib/goals-store.js';
+import { createGoalHandlers } from '../plugins/helix-goals/lib/goals-handlers.js';
+import { createStrandHandlers } from '../plugins/helix-goals/lib/strands-handlers.js';
 
 const TEST_DIR = join(import.meta.dirname, '__fixtures__', 'goals-handlers-test');
 
@@ -16,9 +16,9 @@ function makeResponder() {
 describe('GoalHandlers', () => {
   let store, handlers;
 
-  // Helper: create condo handlers sharing the same store
-  function require_condoHandlers() {
-    return createCondoHandlers(store);
+  // Helper: create strand handlers sharing the same store
+  function require_strandHandlers() {
+    return createStrandHandlers(store);
   }
 
   beforeEach(() => {
@@ -64,11 +64,11 @@ describe('GoalHandlers', () => {
     it('accepts optional fields', () => {
       const { respond, getResult } = makeResponder();
       handlers['goals.create']({
-        params: { title: 'G', condoId: 'condo:test', priority: 'P0', deadline: '2026-03-01' },
+        params: { title: 'G', strandId: 'strand:test', priority: 'P0', deadline: '2026-03-01' },
         respond,
       });
       const goal = getResult().payload.goal;
-      expect(goal.condoId).toBe('condo:test');
+      expect(goal.strandId).toBe('strand:test');
       expect(goal.priority).toBe('P0');
       expect(goal.deadline).toBe('2026-03-01');
     });
@@ -341,38 +341,38 @@ describe('GoalHandlers', () => {
     });
   });
 
-  describe('goals.setSessionCondo', () => {
-    it('maps a session to a condo', () => {
-      // First create a condo
+  describe('goals.setSessionStrand', () => {
+    it('maps a session to a strand', () => {
+      // First create a strand
       const rc = makeResponder();
-      const condoHandlers = require_condoHandlers();
-      condoHandlers['condos.create']({
-        params: { name: 'Test Condo' },
+      const strandHandlers = require_strandHandlers();
+      strandHandlers['strands.create']({
+        params: { name: 'Test Strand' },
         respond: rc.respond,
       });
-      const condoId = rc.getResult().payload.condo.id;
+      const strandId = rc.getResult().payload.strand.id;
 
       const { respond, getResult } = makeResponder();
-      handlers['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:main:main', condoId },
+      handlers['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:main:main', strandId },
         respond,
       });
       expect(getResult().ok).toBe(true);
     });
 
-    it('rejects nonexistent condoId', () => {
+    it('rejects nonexistent strandId', () => {
       const { respond, getResult } = makeResponder();
-      handlers['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:main:main', condoId: 'condo_nonexistent' },
+      handlers['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:main:main', strandId: 'strand_nonexistent' },
         respond,
       });
       expect(getResult().ok).toBe(false);
-      expect(getResult().error.message).toBe('Condo not found');
+      expect(getResult().error.message).toBe('Strand not found');
     });
 
     it('rejects missing params', () => {
       const { respond, getResult } = makeResponder();
-      handlers['goals.setSessionCondo']({
+      handlers['goals.setSessionStrand']({
         params: { sessionKey: 'agent:main:main' },
         respond,
       });
@@ -380,24 +380,24 @@ describe('GoalHandlers', () => {
     });
   });
 
-  describe('goals.removeSessionCondo', () => {
-    it('removes a session-condo mapping', () => {
-      // First create a condo and map it
+  describe('goals.removeSessionStrand', () => {
+    it('removes a session-strand mapping', () => {
+      // First create a strand and map it
       const rc = makeResponder();
-      const condoHandlers = require_condoHandlers();
-      condoHandlers['condos.create']({
-        params: { name: 'Test Condo' },
+      const strandHandlers = require_strandHandlers();
+      strandHandlers['strands.create']({
+        params: { name: 'Test Strand' },
         respond: rc.respond,
       });
-      const condoId = rc.getResult().payload.condo.id;
+      const strandId = rc.getResult().payload.strand.id;
 
-      handlers['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:main:main', condoId },
+      handlers['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:main:main', strandId },
         respond: makeResponder().respond,
       });
 
       const { respond, getResult } = makeResponder();
-      handlers['goals.removeSessionCondo']({
+      handlers['goals.removeSessionStrand']({
         params: { sessionKey: 'agent:main:main' },
         respond,
       });
@@ -405,16 +405,16 @@ describe('GoalHandlers', () => {
 
       // Verify it's gone
       const r2 = makeResponder();
-      handlers['goals.getSessionCondo']({
+      handlers['goals.getSessionStrand']({
         params: { sessionKey: 'agent:main:main' },
         respond: r2.respond,
       });
-      expect(r2.getResult().payload.condoId).toBeNull();
+      expect(r2.getResult().payload.strandId).toBeNull();
     });
 
     it('rejects missing sessionKey', () => {
       const { respond, getResult } = makeResponder();
-      handlers['goals.removeSessionCondo']({
+      handlers['goals.removeSessionStrand']({
         params: {},
         respond,
       });
@@ -423,56 +423,56 @@ describe('GoalHandlers', () => {
     });
   });
 
-  describe('goals.getSessionCondo', () => {
-    it('returns condo for a mapped session', () => {
-      const condoHandlers = require_condoHandlers();
+  describe('goals.getSessionStrand', () => {
+    it('returns strand for a mapped session', () => {
+      const strandHandlers = require_strandHandlers();
       const rc = makeResponder();
-      condoHandlers['condos.create']({ params: { name: 'Test Condo' }, respond: rc.respond });
-      const condoId = rc.getResult().payload.condo.id;
+      strandHandlers['strands.create']({ params: { name: 'Test Strand' }, respond: rc.respond });
+      const strandId = rc.getResult().payload.strand.id;
 
-      handlers['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:main:main', condoId },
+      handlers['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:main:main', strandId },
         respond: makeResponder().respond,
       });
       const { respond, getResult } = makeResponder();
-      handlers['goals.getSessionCondo']({
+      handlers['goals.getSessionStrand']({
         params: { sessionKey: 'agent:main:main' },
         respond,
       });
-      expect(getResult().payload.condoId).toBe(condoId);
+      expect(getResult().payload.strandId).toBe(strandId);
     });
 
     it('returns null for unmapped session', () => {
       const { respond, getResult } = makeResponder();
-      handlers['goals.getSessionCondo']({
+      handlers['goals.getSessionStrand']({
         params: { sessionKey: 'agent:nobody:main' },
         respond,
       });
-      expect(getResult().payload.condoId).toBeNull();
+      expect(getResult().payload.strandId).toBeNull();
     });
   });
 
-  describe('goals.listSessionCondos', () => {
-    it('returns all session-condo mappings', () => {
-      const condoHandlers = require_condoHandlers();
+  describe('goals.listSessionStrands', () => {
+    it('returns all session-strand mappings', () => {
+      const strandHandlers = require_strandHandlers();
       const rc1 = makeResponder();
-      condoHandlers['condos.create']({ params: { name: 'Condo 1' }, respond: rc1.respond });
-      const c1 = rc1.getResult().payload.condo.id;
+      strandHandlers['strands.create']({ params: { name: 'Strand 1' }, respond: rc1.respond });
+      const c1 = rc1.getResult().payload.strand.id;
       const rc2 = makeResponder();
-      condoHandlers['condos.create']({ params: { name: 'Condo 2' }, respond: rc2.respond });
-      const c2 = rc2.getResult().payload.condo.id;
+      strandHandlers['strands.create']({ params: { name: 'Strand 2' }, respond: rc2.respond });
+      const c2 = rc2.getResult().payload.strand.id;
 
-      handlers['goals.setSessionCondo']({
-        params: { sessionKey: 'a', condoId: c1 },
+      handlers['goals.setSessionStrand']({
+        params: { sessionKey: 'a', strandId: c1 },
         respond: makeResponder().respond,
       });
-      handlers['goals.setSessionCondo']({
-        params: { sessionKey: 'b', condoId: c2 },
+      handlers['goals.setSessionStrand']({
+        params: { sessionKey: 'b', strandId: c2 },
         respond: makeResponder().respond,
       });
       const { respond, getResult } = makeResponder();
-      handlers['goals.listSessionCondos']({ params: {}, respond });
-      expect(Object.keys(getResult().payload.sessionCondoIndex)).toHaveLength(2);
+      handlers['goals.listSessionStrands']({ params: {}, respond });
+      expect(Object.keys(getResult().payload.sessionStrandIndex)).toHaveLength(2);
     });
   });
 

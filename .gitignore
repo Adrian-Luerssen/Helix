@@ -1,4 +1,4 @@
-# ClawCondos .gitignore
+# Helix .gitignore
 
 # User-specific configuration (contains secrets)
 /config.json

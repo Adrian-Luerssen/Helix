@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { createGoalsStore } from '../clawcondos/condo-management/lib/goals-store.js';
-import { createTaskSpawnHandler } from '../clawcondos/condo-management/lib/task-spawn.js';
+import { createGoalsStore } from '../plugins/helix-goals/lib/goals-store.js';
+import { createTaskSpawnHandler } from '../plugins/helix-goals/lib/task-spawn.js';
 
 const TEST_DIR = join(import.meta.dirname, '__fixtures__', 'task-spawn-test');
 
@@ -24,7 +24,7 @@ describe('goals.spawnTaskSession', () => {
     const data = store.load();
     data.goals.push({
       id: 'goal_1', title: 'Ship feature', description: 'Launch feature',
-      status: 'active', completed: false, condoId: null,
+      status: 'active', completed: false, strandId: null,
       priority: 'P0', deadline: '2026-03-01',
       tasks: [
         { id: 'task_1', text: 'Build API', description: 'REST endpoints', status: 'pending', done: false, sessionKey: null },
@@ -146,14 +146,14 @@ describe('goals.spawnTaskSession', () => {
     expect(getResult().ok).toBe(false);
   });
 
-  it('includes project summary in taskContext when goal has condoId', () => {
-    // Update goal to have a condoId and add a condo + sibling goal
+  it('includes project summary in taskContext when goal has strandId', () => {
+    // Update goal to have a strandId and add a strand + sibling goal
     const data = store.load();
-    data.goals[0].condoId = 'condo_1';
-    data.condos = [{ id: 'condo_1', name: 'Test Project', description: '' }];
+    data.goals[0].strandId = 'strand_1';
+    data.strands = [{ id: 'strand_1', name: 'Test Project', description: '' }];
     data.goals.push({
       id: 'goal_2', title: 'Sibling Goal', description: '',
-      status: 'active', completed: false, condoId: 'condo_1',
+      status: 'active', completed: false, strandId: 'strand_1',
       priority: null, deadline: null,
       tasks: [{ id: 'task_s1', text: 'Sibling task', status: 'pending', done: false, sessionKey: null }],
       sessions: [], notes: '',
@@ -174,7 +174,7 @@ describe('goals.spawnTaskSession', () => {
     expect(r.payload.taskContext).toContain('<goal');
   });
 
-  it('no project summary when goal has no condoId', () => {
+  it('no project summary when goal has no strandId', () => {
     const { respond, getResult } = makeResponder();
     handler({
       params: { goalId: 'goal_1', taskId: 'task_1', agentId: 'main' },

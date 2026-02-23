@@ -5,7 +5,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import crypto from 'crypto';
 
-const TEST_DIR = join(tmpdir(), 'clawcondos-test-chat-' + crypto.randomBytes(4).toString('hex'));
+const TEST_DIR = join(tmpdir(), 'helix-test-chat-' + crypto.randomBytes(4).toString('hex'));
 const DB_PATH = join(TEST_DIR, 'chat-index.db');
 
 const nullProvider = {

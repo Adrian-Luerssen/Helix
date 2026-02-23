@@ -1,4 +1,4 @@
-# ClawCondos + Telegram Agent Integration Testing Review
+# Helix + Telegram Agent Integration Testing Review
 
 **Date:** 2026-02-07
 **Tester:** Bob (AI Agent)
@@ -8,7 +8,7 @@
 
 ## Test Environment
 
-- **ClawCondos URL:** http://localhost:9000/
+- **Helix URL:** http://localhost:9000/
 - **Telegram Group:** Auto (-1003814943696)
 - **Telebiz MCP:** via mcporter
 
@@ -18,11 +18,11 @@
 
 ### 1. Session auto-classification (before_agent_start hook)
 **Status:** ⚠️ PARTIALLY TESTED
-**Expected:** Session appears, auto-binds or shows condo menu
+**Expected:** Session appears, auto-binds or shows strand menu
 **Actual:** 
 - Sent test message via telebiz to Auto group topic:1 (General)
-- Message appeared in "Telebiz Message Testing Results" condo in ClawCondos
-- Session correctly classified to the topic-based condo
+- Message appeared in "Telebiz Message Testing Results" strand in Helix
+- Session correctly classified to the topic-based strand
 **Issues:** 
 - Cannot fully test before_agent_start hook without triggering agent response
 - telebiz messages appear as if user sent them, not invoking agent hook
@@ -30,15 +30,15 @@
 
 ---
 
-### 2. Agent creates a new condo (condo_bind)
+### 2. Agent creates a new strand (strand_bind)
 **Status:** ⏳ PENDING
-**Expected:** New condo appears in real-time, session binds to it
+**Expected:** New strand appears in real-time, session binds to it
 **Actual:** _TBD_
 **Issues:** _TBD_
 
 ---
 
-### 3. Agent creates a goal inside the condo (condo_create_goal)
+### 3. Agent creates a goal inside the strand (strand_create_goal)
 **Status:** ⏳ PENDING
 **Expected:** New goal card appears in real-time with tasks
 **Actual:** _TBD_
@@ -108,7 +108,7 @@
 
 ---
 
-### 10. Agent spawns a subagent for a task (condo_spawn_task)
+### 10. Agent spawns a subagent for a task (strand_spawn_task)
 **Status:** ⏳ PENDING
 **Expected:** Task gets session key, subagent appears in sessions panel
 **Actual:** _TBD_

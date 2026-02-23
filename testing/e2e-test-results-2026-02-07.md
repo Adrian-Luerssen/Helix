@@ -1,8 +1,8 @@
-# ClawCondos + Telegram Agent E2E Test Results
+# Helix + Telegram Agent E2E Test Results
 
 **Date:** 2026-02-07 14:18-14:52
 **Tester:** Bob (AI Agent)
-**Environment:** localhost:9011 (ClawCondos)
+**Environment:** localhost:9011 (Helix)
 
 ---
 
@@ -10,7 +10,7 @@
 
 | # | Test Case | Result | Notes |
 |---|-----------|--------|-------|
-| 1 | Create condo via condo_bind | ✅ PASS | Condo created and session bound |
+| 1 | Create strand via strand_bind | ✅ PASS | Strand created and session bound |
 | 2 | Create goal with tasks | ✅ PASS | 5 tasks created, visible after refresh |
 | 3 | Update task to in-progress | ✅ PASS | Stage now correctly set to 'doing' |
 | 4 | Mark task done | ✅ PASS | Stage grouping shows Done section |
@@ -42,24 +42,24 @@
 
 ## Remaining Issues (Not Blockers)
 
-### ISSUE-001: Condo name not displayed
+### ISSUE-001: Strand name not displayed
 - **Severity:** LOW
-- **Description:** Condo shows as ID (condo_xxx) instead of name in:
+- **Description:** Strand shows as ID (strand_xxx) instead of name in:
   - Breadcrumb navigation
   - Goal detail view header
   - Dashboard overview
 - **Status:** Known, not blocking functionality
 
-### ISSUE-002: E2E test condo not in sidebar
+### ISSUE-002: E2E test strand not in sidebar
 - **Severity:** LOW
-- **Description:** Dynamically created condos don't appear in sidebar
+- **Description:** Dynamically created strands don't appear in sidebar
 - **Likely cause:** Sidebar may filter by slug format or require explicit registration
 
 ---
 
 ## What's Working
 
-1. ✅ **condo_bind** - Creates condos and binds sessions
+1. ✅ **strand_bind** - Creates strands and binds sessions
 2. ✅ **goal_update.addTasks** - Creates tasks with correct stage
 3. ✅ **goal_update.status** - Updates task status and stage together
 4. ✅ **goal_update.files** - Tracks files with taskId, sessionKey, timestamp
@@ -82,7 +82,7 @@
 
 ## Test Artifacts
 
-- **Test condo:** `condo_e4f760e8dc69986d598e58e2` ("E2E Integration Test")
+- **Test strand:** `strand_e4f760e8dc69986d598e58e2` ("E2E Integration Test")
 - **Test goal:** `goal_e2e_main` ("E2E Test: Full Workflow") - COMPLETED ✅
 - **Tasks:** 5 created, all marked done
 - **Files tracked:** 2 (serve.js, app.js)

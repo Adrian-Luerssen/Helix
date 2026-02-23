@@ -1,7 +1,7 @@
 /**
  * Pipeline Debug E2E Test
  *
- * Creates a condo, sends a prompt, clicks Full Auto, and traces the pipeline
+ * Creates a strand, sends a prompt, clicks Full Auto, and traces the pipeline
  * to identify where auto-kickoff of next tasks breaks.
  *
  * Run: npx playwright test e2e/pipeline-debug.spec.js
@@ -13,7 +13,7 @@ import os from 'os';
 
 test.setTimeout(1_800_000); // 30 minutes
 
-const CONDO_NAME = 'Helix Landing';
+const STRAND_NAME = 'Helix Landing';
 const REPO_URL = 'https://github.com/Adrian-LuMed/helix-landing';
 const PROMPT = "I dont like how the hero is set up with the instructions for the agent/human below the main title, put them side by side and validate the design with playwright. review the entire design to make sure it has a good UI/UX";
 
@@ -67,7 +67,7 @@ test.describe('Pipeline Debug', () => {
 
     // Override config to connect through serve.js proxy + set token
     await page.addInitScript((token) => {
-      window.CLAWCONDOS_CONFIG = {
+      window.HELIX_CONFIG = {
         gatewayWsUrl: window.location.origin.replace(/^http/, 'ws') + '/',
       };
       if (token) localStorage.setItem('sharp_token', token);
@@ -88,61 +88,61 @@ test.describe('Pipeline Debug', () => {
     await page.waitForSelector('#connectionText:has-text("Connected")', { timeout: 30_000 });
     console.log('Connected');
 
-    // ─── 2. Clean up existing test condo ───
+    // ─── 2. Clean up existing test strand ───
     console.log('\n=== 2. Cleanup ===');
     const existing = await page.evaluate((name) => {
-      return (state.condos || []).find(c => c.name === name);
-    }, CONDO_NAME);
+      return (state.strands || []).find(c => c.name === name);
+    }, STRAND_NAME);
     if (existing) {
-      console.log(`Deleting existing condo ${existing.id}...`);
+      console.log(`Deleting existing strand ${existing.id}...`);
       await page.evaluate(async (id) => {
-        await rpcCall('condos.delete', { id }, 30000);
-        await loadCondos();
+        await rpcCall('strands.delete', { id }, 30000);
+        await loadStrands();
         await loadGoals();
       }, existing.id);
       await page.waitForTimeout(2000);
     }
 
-    // ─── 3. Create condo via UI ───
-    console.log('\n=== 3. Creating condo ===');
-    await page.click('button[onclick="showCreateCondoModal()"]');
-    await page.waitForSelector('#createCondoModal', { state: 'visible' });
-    await page.fill('#createCondoName', CONDO_NAME);
-    await page.fill('#createCondoRepoUrl', REPO_URL);
-    await page.click('#createCondoModal .form-btn:has-text("Create")');
+    // ─── 3. Create strand via UI ───
+    console.log('\n=== 3. Creating strand ===');
+    await page.click('button[onclick="showCreateStrandModal()"]');
+    await page.waitForSelector('#createStrandModal', { state: 'visible' });
+    await page.fill('#createStrandName', STRAND_NAME);
+    await page.fill('#createStrandRepoUrl', REPO_URL);
+    await page.click('#createStrandModal .form-btn:has-text("Create")');
 
-    const condo = await pollUntil(page, (name) => {
-      const c = state.condos.find(c => c.name === name);
+    const strand = await pollUntil(page, (name) => {
+      const c = state.strands.find(c => c.name === name);
       return c ? { id: c.id, name: c.name } : null;
-    }, CONDO_NAME, { label: 'condo created', timeoutMs: 60_000 });
+    }, STRAND_NAME, { label: 'strand created', timeoutMs: 60_000 });
 
-    console.log(`Condo: ${condo.id}`);
-    await page.screenshot({ path: 'test-results/01-condo-created.png' });
+    console.log(`Strand: ${strand.id}`);
+    await page.screenshot({ path: 'test-results/01-strand-created.png' });
 
-    // ─── 4. Open condo and send prompt ───
-    console.log('\n=== 4. Opening condo & sending prompt ===');
-    await page.evaluate((id) => openCondoPanel(id), condo.id);
+    // ─── 4. Open strand and send prompt ───
+    console.log('\n=== 4. Opening strand & sending prompt ===');
+    await page.evaluate((id) => openStrandPanel(id), strand.id);
     await page.waitForTimeout(1000);
 
     // Clear events before sending
     await page.evaluate(() => { window.__pipelineEvents = []; });
 
-    await page.fill('#condoChatInput', PROMPT);
-    await page.click('#condoChatSendBtn');
+    await page.fill('#strandChatInput', PROMPT);
+    await page.click('#strandChatSendBtn');
     console.log('Prompt sent');
 
     // ─── 5. Wait for PM to finish responding ───
     console.log('\n=== 5. Waiting for PM to finish... ===');
-    // PM sets condoPmPendingResponse=true while responding, false when done
+    // PM sets strandPmPendingResponse=true while responding, false when done
     // Also wait for action buttons to appear
     let pmDone = false;
     for (let i = 0; i < 600; i++) { // 10 min max
       await page.waitForTimeout(1000);
 
       const status = await page.evaluate(() => ({
-        pending: state.condoPmPendingResponse,
+        pending: state.strandPmPendingResponse,
         planActionsVisible: (() => {
-          const el = document.getElementById('condoPlanActions');
+          const el = document.getElementById('strandPlanActions');
           return el ? !el.classList.contains('hidden') : false;
         })(),
       }));
@@ -158,9 +158,9 @@ test.describe('Pipeline Debug', () => {
       }
       // Also check if PM finished but no action buttons (PM may have auto-created goals)
       if (!status.pending && i > 10) {
-        const goalCount = await page.evaluate((condoId) => {
-          return state.goals.filter(g => g.condoId === condoId).length;
-        }, condo.id);
+        const goalCount = await page.evaluate((strandId) => {
+          return state.goals.filter(g => g.strandId === strandId).length;
+        }, strand.id);
         if (goalCount > 0) {
           console.log(`PM auto-created ${goalCount} goals after ${i}s`);
           pmDone = true;
@@ -175,7 +175,7 @@ test.describe('Pipeline Debug', () => {
     // ─── 6. Create goals from PM plan ───
     console.log('\n=== 6. Creating goals ===');
 
-    let goalCount = await page.evaluate((id) => state.goals.filter(g => g.condoId === id).length, condo.id);
+    let goalCount = await page.evaluate((id) => state.goals.filter(g => g.strandId === id).length, strand.id);
 
     if (goalCount === 0) {
       // First, click "Create Goals" to create goal records from the PM plan
@@ -189,38 +189,38 @@ test.describe('Pipeline Debug', () => {
       }
     }
 
-    goalCount = await page.evaluate((id) => state.goals.filter(g => g.condoId === id).length, condo.id);
+    goalCount = await page.evaluate((id) => state.goals.filter(g => g.strandId === id).length, strand.id);
     console.log(`Goals after Create: ${goalCount}`);
 
     if (goalCount === 0) {
       console.log('No goals created — dumping state');
       const dump = await page.evaluate((id) => ({
-        allGoals: state.goals.map(g => ({ id: g.id, title: g.title, condoId: g.condoId })),
-        condos: state.condos.map(c => ({ id: c.id, name: c.name })),
+        allGoals: state.goals.map(g => ({ id: g.id, title: g.title, strandId: g.strandId })),
+        strands: state.strands.map(c => ({ id: c.id, name: c.name })),
         events: window.__pipelineEvents.map(e => e.event).slice(-20),
-      }), condo.id);
+      }), strand.id);
       console.log(JSON.stringify(dump, null, 2));
       await page.screenshot({ path: 'test-results/03-no-goals.png' });
       // Wait longer
       await pollUntil(page, (id) => {
-        const goals = state.goals.filter(g => g.condoId === id);
+        const goals = state.goals.filter(g => g.strandId === id);
         return goals.length > 0 ? true : null;
-      }, condo.id, { label: 'goals appear', timeoutMs: 60_000 }).catch(() => null);
-      goalCount = await page.evaluate((id) => state.goals.filter(g => g.condoId === id).length, condo.id);
+      }, strand.id, { label: 'goals appear', timeoutMs: 60_000 }).catch(() => null);
+      goalCount = await page.evaluate((id) => state.goals.filter(g => g.strandId === id).length, strand.id);
     }
 
     expect(goalCount).toBeGreaterThan(0);
 
     // Print initial goal details (likely 0 tasks — tasks are created by cascade)
     let goals = await page.evaluate((id) => {
-      return state.goals.filter(g => g.condoId === id).map(g => ({
+      return state.goals.filter(g => g.strandId === id).map(g => ({
         id: g.id, title: g.title, status: g.status,
         tasks: (g.tasks || []).map(t => ({
           id: t.id, text: t.text, status: t.status,
           sessionKey: t.sessionKey, dependsOn: t.dependsOn,
         })),
       }));
-    }, condo.id);
+    }, strand.id);
     for (const g of goals) {
       console.log(`  Goal: "${g.title}" (${g.status}) — ${g.tasks.length} tasks`);
     }
@@ -232,14 +232,14 @@ test.describe('Pipeline Debug', () => {
     // Now that goals exist, buttons should show "Plan All Goals" / "Full Auto"
     // Wait for the buttons to re-render
     await page.waitForTimeout(1000);
-    // Force re-render of condo panel to get updated buttons
+    // Force re-render of strand panel to get updated buttons
     await page.evaluate(() => {
-      const el = document.getElementById('condoPlanActions');
+      const el = document.getElementById('strandPlanActions');
       if (el) {
         const parent = el.parentElement;
         if (parent) parent.innerHTML = parent.innerHTML; // force re-render
       }
-      renderCondoPmChat();
+      renderStrandPmChat();
     });
     await page.waitForTimeout(1000);
 
@@ -257,7 +257,7 @@ test.describe('Pipeline Debug', () => {
       console.log('No cascade button visible — triggering cascade via RPC...');
       const cascadeResult = await page.evaluate(async () => {
         try {
-          return await startCondoCascade('full');
+          return await startStrandCascade('full');
         } catch (e) { return { error: e.message }; }
       });
       console.log(`Cascade result: ${JSON.stringify(cascadeResult)}`);
@@ -274,8 +274,8 @@ test.describe('Pipeline Debug', () => {
         await page.evaluate(() => loadGoals()).catch(() => {});
       }
 
-      const snapshot = await page.evaluate((condoId) => {
-        const gs = state.goals.filter(g => g.condoId === condoId);
+      const snapshot = await page.evaluate((strandId) => {
+        const gs = state.goals.filter(g => g.strandId === strandId);
         return {
           totalTasks: gs.reduce((sum, g) => sum + (g.tasks || []).length, 0),
           goals: gs.map(g => ({
@@ -285,7 +285,7 @@ test.describe('Pipeline Debug', () => {
           })),
           kickoffEvents: (window.__pipelineEvents || []).filter(e => e.event === 'goal.kickoff').length,
         };
-      }, condo.id);
+      }, strand.id);
 
       if (i % 15 === 0) {
         console.log(`  [${i}s] tasks=${snapshot.totalTasks} kickoff-events=${snapshot.kickoffEvents}`);
@@ -313,14 +313,14 @@ test.describe('Pipeline Debug', () => {
     await page.evaluate(() => loadGoals());
     await page.waitForTimeout(1000);
     goals = await page.evaluate((id) => {
-      return state.goals.filter(g => g.condoId === id).map(g => ({
+      return state.goals.filter(g => g.strandId === id).map(g => ({
         id: g.id, title: g.title, status: g.status,
         tasks: (g.tasks || []).map(t => ({
           id: t.id, text: t.text, status: t.status,
           sessionKey: t.sessionKey, dependsOn: t.dependsOn,
         })),
       }));
-    }, condo.id);
+    }, strand.id);
     for (const g of goals) {
       console.log(`  Goal: "${g.title}" (${g.status}) — ${g.tasks.length} tasks`);
       for (const t of g.tasks) {
@@ -345,8 +345,8 @@ test.describe('Pipeline Debug', () => {
         await page.evaluate(() => loadGoals()).catch(() => {});
       }
 
-      const snapshot = await page.evaluate((condoId) => {
-        const goals = state.goals.filter(g => g.condoId === condoId);
+      const snapshot = await page.evaluate((strandId) => {
+        const goals = state.goals.filter(g => g.strandId === strandId);
         const events = window.__pipelineEvents;
         return {
           goals: goals.map(g => ({
@@ -369,7 +369,7 @@ test.describe('Pipeline Debug', () => {
             allDone: e.payload?.allTasksDone,
           })),
         };
-      }, condo.id);
+      }, strand.id);
 
       // Count statuses
       let done = 0, inProg = 0, pending = 0, total = 0;
@@ -487,8 +487,8 @@ test.describe('Pipeline Debug', () => {
 
     // ─── Final report ───
     console.log('\n=== FINAL REPORT ===');
-    const final = await page.evaluate((condoId) => {
-      const goals = state.goals.filter(g => g.condoId === condoId);
+    const final = await page.evaluate((strandId) => {
+      const goals = state.goals.filter(g => g.strandId === strandId);
       return {
         goals: goals.map(g => ({
           title: g.title, status: g.status,
@@ -501,7 +501,7 @@ test.describe('Pipeline Debug', () => {
           .filter(e => ['goal.kickoff', 'goal.task_completed', 'goal.completed'].includes(e.event))
           .map(e => ({ event: e.event, goalId: e.payload?.goalId, taskId: e.payload?.taskId, spawned: e.payload?.spawnedCount })),
       };
-    }, condo.id);
+    }, strand.id);
 
     for (const g of final.goals) {
       const d = g.tasks.filter(t => t.done || t.status === 'done').length;

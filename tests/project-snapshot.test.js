@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
-import { buildProjectSnapshot } from '../clawcondos/condo-management/lib/project-snapshot.js';
+import { buildProjectSnapshot } from '../plugins/helix-goals/lib/project-snapshot.js';
 
 const TEST_BASE = join(import.meta.dirname, '__fixtures__', 'project-snapshot-test');
 const gitEnv = {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
-import { setupGitRemote, pushBranch } from '../clawcondos/condo-management/lib/github.js';
+import { setupGitRemote, pushBranch } from '../plugins/helix-goals/lib/github.js';
 
 const TEST_DIR = join(import.meta.dirname, '__fixtures__', 'github-test');
 
@@ -128,38 +128,38 @@ describe('GitHub integration helpers', () => {
     });
   });
 
-  describe('condos.create GitHub integration', () => {
+  describe('strands.create GitHub integration', () => {
     it('skips GitHub repo creation when no workspace ops', async () => {
       // Import handler factory
-      const { createCondoHandlers } = await import(
-        '../clawcondos/condo-management/lib/condos-handlers.js'
+      const { createStrandHandlers } = await import(
+        '../plugins/helix-goals/lib/strands-handlers.js'
       );
       const { createGoalsStore } = await import(
-        '../clawcondos/condo-management/lib/goals-store.js'
+        '../plugins/helix-goals/lib/goals-store.js'
       );
 
       const store = createGoalsStore(join(TEST_DIR, 'store'));
-      const handlers = createCondoHandlers(store);
+      const handlers = createStrandHandlers(store);
 
       let result;
-      await handlers['condos.create']({
+      await handlers['strands.create']({
         params: { name: 'NoGitHub' },
         respond: (ok, payload, error) => { result = { ok, payload, error }; },
       });
 
       expect(result.ok).toBe(true);
-      expect(result.payload.condo.workspace).toBeNull();
+      expect(result.payload.strand.workspace).toBeNull();
     });
 
     it('skips GitHub when workspace exists but no GitHub config in store', async () => {
-      const { createCondoHandlers } = await import(
-        '../clawcondos/condo-management/lib/condos-handlers.js'
+      const { createStrandHandlers } = await import(
+        '../plugins/helix-goals/lib/strands-handlers.js'
       );
       const { createGoalsStore } = await import(
-        '../clawcondos/condo-management/lib/goals-store.js'
+        '../plugins/helix-goals/lib/goals-store.js'
       );
       const ws = await import(
-        '../clawcondos/condo-management/lib/workspace-manager.js'
+        '../plugins/helix-goals/lib/workspace-manager.js'
       );
 
       const storeDir = join(TEST_DIR, 'store2');
@@ -167,29 +167,29 @@ describe('GitHub integration helpers', () => {
       mkdirSync(wsDir, { recursive: true });
 
       const store = createGoalsStore(storeDir);
-      const handlers = createCondoHandlers(store, {
+      const handlers = createStrandHandlers(store, {
         wsOps: { dir: wsDir, ...ws },
       });
 
       let result;
-      await handlers['condos.create']({
+      await handlers['strands.create']({
         params: { name: 'NoGitHubConfig' },
         respond: (ok, payload, error) => { result = { ok, payload, error }; },
       });
 
       expect(result.ok).toBe(true);
-      expect(result.payload.condo.workspace).not.toBeNull();
-      expect(result.payload.condo.workspace.path).toBeTruthy();
+      expect(result.payload.strand.workspace).not.toBeNull();
+      expect(result.payload.strand.workspace.path).toBeTruthy();
       // No repoUrl since no GitHub config
-      expect(result.payload.condo.workspace.repoUrl).toBeNull();
+      expect(result.payload.strand.workspace.repoUrl).toBeNull();
     });
 
     it('skips GitHub when repoUrl is explicitly provided (clone mode)', async () => {
-      const { createCondoHandlers } = await import(
-        '../clawcondos/condo-management/lib/condos-handlers.js'
+      const { createStrandHandlers } = await import(
+        '../plugins/helix-goals/lib/strands-handlers.js'
       );
       const { createGoalsStore } = await import(
-        '../clawcondos/condo-management/lib/goals-store.js'
+        '../plugins/helix-goals/lib/goals-store.js'
       );
 
       // Create a bare repo to clone from
@@ -205,7 +205,7 @@ describe('GitHub integration helpers', () => {
       execSync('git push -u origin master', { cwd: tmpDir, stdio: 'pipe' });
 
       const ws = await import(
-        '../clawcondos/condo-management/lib/workspace-manager.js'
+        '../plugins/helix-goals/lib/workspace-manager.js'
       );
 
       const storeDir = join(TEST_DIR, 'store3');
@@ -225,21 +225,21 @@ describe('GitHub integration helpers', () => {
       };
       store.save(data);
 
-      const handlers = createCondoHandlers(store, {
+      const handlers = createStrandHandlers(store, {
         wsOps: { dir: wsDir, ...ws },
       });
 
       let result;
-      await handlers['condos.create']({
+      await handlers['strands.create']({
         params: { name: 'ClonedRepo', repoUrl: bareDir },
         respond: (ok, payload, error) => { result = { ok, payload, error }; },
       });
 
       expect(result.ok).toBe(true);
       // repoUrl is set to the provided URL, NOT a GitHub URL
-      expect(result.payload.condo.workspace.repoUrl).toBe(bareDir);
+      expect(result.payload.strand.workspace.repoUrl).toBe(bareDir);
       // No githubFullName since we didn't create a GitHub repo
-      expect(result.payload.condo.workspace.githubFullName).toBeUndefined();
+      expect(result.payload.strand.workspace.githubFullName).toBeUndefined();
     });
   });
 });

@@ -4,7 +4,7 @@ import {
   getWorkerSkillContext,
   getSkillAvailability,
   clearSkillCache,
-} from '../clawcondos/condo-management/lib/skill-injector.js';
+} from '../plugins/helix-goals/lib/skill-injector.js';
 
 describe('Skill Injector', () => {
   beforeEach(() => {
@@ -19,17 +19,17 @@ describe('Skill Injector', () => {
       expect(context).toContain('Project Manager');
     });
 
-    it('includes condo context when provided', () => {
+    it('includes strand context when provided', () => {
       const context = getPmSkillContext({
-        condoId: 'condo_123',
-        condoName: 'My Project',
+        strandId: 'strand_123',
+        strandName: 'My Project',
         activeGoals: 3,
         totalTasks: 10,
         pendingTasks: 5,
       });
 
       expect(context).toContain('My Project');
-      expect(context).toContain('condo_123');
+      expect(context).toContain('strand_123');
       expect(context).toContain('Active Goals:** 3');
       expect(context).toContain('Tasks:** 10 total, 5 pending');
     });
@@ -98,7 +98,7 @@ describe('Skill Injector', () => {
         taskText: 'Implement feature X',
         taskDescription: 'Detailed description here',
         goalTitle: 'Feature Y',
-        condoName: 'My Project',
+        strandName: 'My Project',
         autonomyMode: 'semi',
         planFilePath: '/path/to/plan.md',
         assignedRole: 'backend',

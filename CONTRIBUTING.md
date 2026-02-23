@@ -6,7 +6,7 @@ Thanks for your interest in contributing!
 
 ```bash
 git clone https://github.com/Adrian-Luerssen/Helix.git
-cd clawcondos
+cd Helix
 npm install
 cp config.example.json config.json
 node serve.js

@@ -146,7 +146,7 @@
   loadConfigSync();
 
   // Export
-  window.ClawCondosConfig = {
+  window.HelixConfig = {
     getConfig,
     getPmSessionKey,
     getAgentForRole,

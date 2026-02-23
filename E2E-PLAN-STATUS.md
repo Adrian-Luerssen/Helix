@@ -11,8 +11,8 @@ All 10 plan steps are done. Full E2E pipeline validated against live gateway wit
 
 ## E2E Run Summary (2026-02-14)
 
-**Condo**: Recipe Box (`condo_242698473178054522a532bb`)
-**Workspace**: `/home/clawdia/clawcondos-workspaces/recipe-box-24269847`
+**Strand**: Recipe Box (`strand_242698473178054522a532bb`)
+**Workspace**: `/home/clawdia/helix-workspaces/recipe-box-24269847`
 
 | Goal | Tasks | Status | Branch Commits |
 |------|-------|--------|---------------|
@@ -26,15 +26,15 @@ All 10 plan steps are done. Full E2E pipeline validated against live gateway wit
 1. **PM creates vertical-slice goals** — 4 self-contained goals (Foundation, Recipe CRUD, Browse & Search, Favorites), each with backend+frontend+designer+tester tasks
 2. **Sequential task dependencies** — Each goal's tasks chain: T1 → T2 → T3 → T4. Kickoff only spawns T1; re-kickoff spawns T2 when T1 completes, etc.
 3. **Parallel goal execution** — All 4 goals run simultaneously on isolated git worktrees/branches
-4. **Autonomy mode** — Condo created with `autonomyMode: 'full'`; agents execute immediately without plan approval
+4. **Autonomy mode** — Strand created with `autonomyMode: 'full'`; agents execute immediately without plan approval
 5. **Re-kickoff pipeline** — E2E monitor detects completed tasks and re-kickoffs to spawn next unblocked task
 6. **Git worktree isolation** — Each goal has its own worktree+branch; all branches merge cleanly (zero conflicts)
-7. **Cascade deletion** — Condo delete now cascade-deletes all linked goals and cleans up session index
+7. **Cascade deletion** — Strand delete now cascade-deletes all linked goals and cleans up session index
 8. **Gateway scope auth** — E2E test and serve.js now request `operator.admin` scope in connect params
 
 ### Pipeline Timeline
 - 22:01:30 — Connected to gateway
-- 22:01:31 — Condo created with repo clone
+- 22:01:31 — Strand created with repo clone
 - 22:02:01 — PM responded with plan (3174 chars, 30s)
 - 22:02:01 — 4 goals created from plan
 - 22:02:01 — Worktrees verified
@@ -51,12 +51,12 @@ All 10 plan steps are done. Full E2E pipeline validated against live gateway wit
 ## Changes Made in This Session
 
 ### Bug Fixes
-1. **Cascade deletion** (`condos-handlers.js`) — `condos.delete` now cascade-deletes all linked goals (was only nullifying `condoId`)
+1. **Cascade deletion** (`strands-handlers.js`) — `strands.delete` now cascade-deletes all linked goals (was only nullifying `strandId`)
 2. **Gateway scope auth** (`e2e-live-pipeline.js`, `gateway-client.js`, `serve-helpers.js`) — Added `scopes: ['operator.admin']` to connect params for full method access
 
 ### Files Modified
-- `clawcondos/condo-management/lib/condos-handlers.js` — Cascade delete goals on condo delete
-- `tests/condos-handlers.test.js` — Updated tests for cascade deletion behavior, added session cleanup test
+- `plugins/helix-goals/lib/strands-handlers.js` — Cascade delete goals on strand delete
+- `tests/strands-handlers.test.js` — Updated tests for cascade deletion behavior, added session cleanup test
 - `tests/e2e-live-pipeline.js` — Added `scopes: ['operator.admin']` to connect params
 - `lib/gateway-client.js` — Added `scopes: ['operator.admin']` to internal gateway client
 - `lib/serve-helpers.js` — `rewriteConnectFrame` now injects `operator.admin` scope
@@ -73,9 +73,9 @@ Task created by PM
   → E2E polling loop calls goals.kickoff again → spawns T2
   → Repeat until all tasks done
 
-Autonomy resolution: task.autonomyMode > goal.autonomyMode > condo.autonomyMode > 'plan'
-  → Condo created with autonomyMode:'full'
-  → Goals inherit from condo
+Autonomy resolution: task.autonomyMode > goal.autonomyMode > strand.autonomyMode > 'plan'
+  → Strand created with autonomyMode:'full'
+  → Goals inherit from strand
   → Agents execute without plan approval
 
 Goal isolation:

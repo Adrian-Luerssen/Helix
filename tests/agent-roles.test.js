@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getAgentForRole, getDefaultRoles, resolveAgent, getPmSession, buildSessionKey, getOrCreatePmSessionForGoal, getOrCreatePmSessionForCondo, isPmSession } from '../clawcondos/condo-management/lib/agent-roles.js';
+import { getAgentForRole, getDefaultRoles, resolveAgent, getPmSession, buildSessionKey, getOrCreatePmSessionForGoal, getOrCreatePmSessionForStrand, isPmSession } from '../plugins/helix-goals/lib/agent-roles.js';
 
 describe('agent-roles', () => {
   const originalEnv = process.env;
@@ -23,8 +23,8 @@ describe('agent-roles', () => {
     });
 
     it('respects environment variables for defaults', () => {
-      process.env.CLAWCONDOS_PM_AGENT = 'custom-pm';
-      process.env.CLAWCONDOS_FRONTEND_AGENT = 'custom-frontend';
+      process.env.HELIX_PM_AGENT = 'custom-pm';
+      process.env.HELIX_FRONTEND_AGENT = 'custom-frontend';
       
       const roles = getDefaultRoles();
       expect(roles.pm).toBe('custom-pm');
@@ -48,7 +48,7 @@ describe('agent-roles', () => {
     });
 
     it('falls back to environment variable', () => {
-      process.env.CLAWCONDOS_BACKEND_AGENT = 'env-backend';
+      process.env.HELIX_BACKEND_AGENT = 'env-backend';
       const data = { config: {} };
       
       expect(getAgentForRole(data, 'backend')).toBe('env-backend');
@@ -98,33 +98,33 @@ describe('agent-roles', () => {
   });
 
   describe('getPmSession', () => {
-    it('returns condo-specific pmSession if set', () => {
+    it('returns strand-specific pmSession if set', () => {
       const store = {
         load: () => ({
-          condos: [{ id: 'condo_1', pmSession: 'agent:custom-pm:main' }],
+          strands: [{ id: 'strand_1', pmSession: 'agent:custom-pm:main' }],
           config: { pmSession: 'agent:global-pm:main' },
         }),
       };
       
-      expect(getPmSession(store, 'condo_1')).toBe('agent:custom-pm:main');
+      expect(getPmSession(store, 'strand_1')).toBe('agent:custom-pm:main');
     });
 
     it('falls back to global config pmSession', () => {
       const store = {
         load: () => ({
-          condos: [{ id: 'condo_1' }],
+          strands: [{ id: 'strand_1' }],
           config: { pmSession: 'agent:global-pm:main' },
         }),
       };
       
-      expect(getPmSession(store, 'condo_1')).toBe('agent:global-pm:main');
+      expect(getPmSession(store, 'strand_1')).toBe('agent:global-pm:main');
     });
 
     it('falls back to environment variable', () => {
-      process.env.CLAWCONDOS_PM_SESSION = 'agent:env-pm:main';
+      process.env.HELIX_PM_SESSION = 'agent:env-pm:main';
       const store = {
         load: () => ({
-          condos: [],
+          strands: [],
           config: {},
         }),
       };
@@ -133,10 +133,10 @@ describe('agent-roles', () => {
     });
 
     it('falls back to system default', () => {
-      delete process.env.CLAWCONDOS_PM_SESSION;
+      delete process.env.HELIX_PM_SESSION;
       const store = {
         load: () => ({
-          condos: [],
+          strands: [],
           config: {},
         }),
       };
@@ -163,8 +163,8 @@ describe('agent-roles', () => {
     it('creates a PM session on first call with webchat key format', () => {
       let savedData = null;
       const data = {
-        goals: [{ id: 'goal_1', condoId: 'condo_1', tasks: [] }],
-        condos: [{ id: 'condo_1' }],
+        goals: [{ id: 'goal_1', strandId: 'strand_1', tasks: [] }],
+        strands: [{ id: 'strand_1' }],
         config: { agentRoles: { pm: 'claudia' } },
         sessionIndex: {},
       };
@@ -184,8 +184,8 @@ describe('agent-roles', () => {
 
     it('returns existing webchat session on subsequent calls (created: false)', () => {
       const data = {
-        goals: [{ id: 'goal_1', condoId: 'condo_1', pmSessionKey: 'agent:claudia:webchat:pm-goal_1', tasks: [] }],
-        condos: [{ id: 'condo_1' }],
+        goals: [{ id: 'goal_1', strandId: 'strand_1', pmSessionKey: 'agent:claudia:webchat:pm-goal_1', tasks: [] }],
+        strands: [{ id: 'strand_1' }],
         config: { agentRoles: { pm: 'claudia' } },
         sessionIndex: { 'agent:claudia:webchat:pm-goal_1': { goalId: 'goal_1' } },
       };
@@ -203,8 +203,8 @@ describe('agent-roles', () => {
 
     it('migrates old subagent key to webchat format', () => {
       const data = {
-        goals: [{ id: 'goal_1', condoId: 'condo_1', pmSessionKey: 'agent:claudia:subagent:pm-goal_1', tasks: [] }],
-        condos: [{ id: 'condo_1' }],
+        goals: [{ id: 'goal_1', strandId: 'strand_1', pmSessionKey: 'agent:claudia:subagent:pm-goal_1', tasks: [] }],
+        strands: [{ id: 'strand_1' }],
         config: { agentRoles: { pm: 'claudia' } },
         sessionIndex: { 'agent:claudia:subagent:pm-goal_1': { goalId: 'goal_1' } },
       };
@@ -224,8 +224,8 @@ describe('agent-roles', () => {
 
     it('uses configured PM agent ID from config.agentRoles.pm', () => {
       const data = {
-        goals: [{ id: 'goal_2', condoId: 'condo_1', tasks: [] }],
-        condos: [{ id: 'condo_1' }],
+        goals: [{ id: 'goal_2', strandId: 'strand_1', tasks: [] }],
+        strands: [{ id: 'strand_1' }],
         config: { agentRoles: { pm: 'my-pm-agent' } },
         sessionIndex: {},
       };
@@ -240,8 +240,8 @@ describe('agent-roles', () => {
 
     it('falls back to default PM agent (main) when no config', () => {
       const data = {
-        goals: [{ id: 'goal_3', condoId: 'condo_1', tasks: [] }],
-        condos: [{ id: 'condo_1' }],
+        goals: [{ id: 'goal_3', strandId: 'strand_1', tasks: [] }],
+        strands: [{ id: 'strand_1' }],
         config: {},
         sessionIndex: {},
       };
@@ -257,7 +257,7 @@ describe('agent-roles', () => {
     it('throws for unknown goal', () => {
       const data = {
         goals: [],
-        condos: [],
+        strands: [],
         config: {},
         sessionIndex: {},
       };
@@ -271,8 +271,8 @@ describe('agent-roles', () => {
 
     it('initializes sessionIndex if missing', () => {
       const data = {
-        goals: [{ id: 'goal_4', condoId: 'condo_1', tasks: [] }],
-        condos: [{ id: 'condo_1' }],
+        goals: [{ id: 'goal_4', strandId: 'strand_1', tasks: [] }],
+        strands: [{ id: 'strand_1' }],
         config: {},
       };
       const store = {
@@ -290,14 +290,14 @@ describe('agent-roles', () => {
     it('recognizes webchat PM session keys (new format)', () => {
       expect(isPmSession('agent:main:webchat:pm-goal_1')).toBe(true);
       expect(isPmSession('agent:claudia:webchat:pm-goal_abc')).toBe(true);
-      expect(isPmSession('agent:main:webchat:pm-condo-condo_1')).toBe(true);
-      expect(isPmSession('agent:claudia:webchat:pm-condo-abc')).toBe(true);
+      expect(isPmSession('agent:main:webchat:pm-strand-strand_1')).toBe(true);
+      expect(isPmSession('agent:claudia:webchat:pm-strand-abc')).toBe(true);
     });
 
     it('recognizes legacy subagent PM session keys (backward compat)', () => {
       expect(isPmSession('agent:main:subagent:pm-goal_1')).toBe(true);
       expect(isPmSession('agent:claudia:subagent:pm-goal_abc')).toBe(true);
-      expect(isPmSession('agent:main:subagent:pm-condo-condo_1')).toBe(true);
+      expect(isPmSession('agent:main:subagent:pm-strand-strand_1')).toBe(true);
     });
 
     it('rejects worker/task subagent keys', () => {
@@ -325,44 +325,44 @@ describe('agent-roles', () => {
     });
   });
 
-  describe('getOrCreatePmSessionForCondo', () => {
-    it('creates a condo PM session on first call with webchat key format', () => {
+  describe('getOrCreatePmSessionForStrand', () => {
+    it('creates a strand PM session on first call with webchat key format', () => {
       let savedData = null;
       const data = {
         goals: [],
-        condos: [{ id: 'condo_1', name: 'Test Condo' }],
+        strands: [{ id: 'strand_1', name: 'Test Strand' }],
         config: { agentRoles: { pm: 'claudia' } },
-        sessionCondoIndex: {},
+        sessionStrandIndex: {},
       };
       const store = {
         load: () => data,
         save: (d) => { savedData = d; },
       };
 
-      const result = getOrCreatePmSessionForCondo(store, 'condo_1');
+      const result = getOrCreatePmSessionForStrand(store, 'strand_1');
 
-      expect(result.pmSessionKey).toBe('agent:claudia:webchat:pm-condo-condo_1');
+      expect(result.pmSessionKey).toBe('agent:claudia:webchat:pm-strand-strand_1');
       expect(result.created).toBe(true);
-      expect(data.condos[0].pmCondoSessionKey).toBe('agent:claudia:webchat:pm-condo-condo_1');
-      expect(data.sessionCondoIndex['agent:claudia:webchat:pm-condo-condo_1']).toBe('condo_1');
+      expect(data.strands[0].pmStrandSessionKey).toBe('agent:claudia:webchat:pm-strand-strand_1');
+      expect(data.sessionStrandIndex['agent:claudia:webchat:pm-strand-strand_1']).toBe('strand_1');
       expect(savedData).toBe(data);
     });
 
     it('returns existing webchat session on subsequent calls (created: false)', () => {
       const data = {
         goals: [],
-        condos: [{ id: 'condo_1', name: 'Test Condo', pmCondoSessionKey: 'agent:claudia:webchat:pm-condo-condo_1' }],
+        strands: [{ id: 'strand_1', name: 'Test Strand', pmStrandSessionKey: 'agent:claudia:webchat:pm-strand-strand_1' }],
         config: { agentRoles: { pm: 'claudia' } },
-        sessionCondoIndex: { 'agent:claudia:webchat:pm-condo-condo_1': 'condo_1' },
+        sessionStrandIndex: { 'agent:claudia:webchat:pm-strand-strand_1': 'strand_1' },
       };
       const store = {
         load: () => data,
         save: vi.fn(),
       };
 
-      const result = getOrCreatePmSessionForCondo(store, 'condo_1');
+      const result = getOrCreatePmSessionForStrand(store, 'strand_1');
 
-      expect(result.pmSessionKey).toBe('agent:claudia:webchat:pm-condo-condo_1');
+      expect(result.pmSessionKey).toBe('agent:claudia:webchat:pm-strand-strand_1');
       expect(result.created).toBe(false);
       expect(store.save).not.toHaveBeenCalled();
     });
@@ -370,75 +370,75 @@ describe('agent-roles', () => {
     it('migrates old subagent key to webchat format', () => {
       const data = {
         goals: [],
-        condos: [{ id: 'condo_1', name: 'Test Condo', pmCondoSessionKey: 'agent:claudia:subagent:pm-condo-condo_1' }],
+        strands: [{ id: 'strand_1', name: 'Test Strand', pmStrandSessionKey: 'agent:claudia:subagent:pm-strand-strand_1' }],
         config: { agentRoles: { pm: 'claudia' } },
-        sessionCondoIndex: { 'agent:claudia:subagent:pm-condo-condo_1': 'condo_1' },
+        sessionStrandIndex: { 'agent:claudia:subagent:pm-strand-strand_1': 'strand_1' },
       };
       const store = {
         load: () => data,
         save: vi.fn(),
       };
 
-      const result = getOrCreatePmSessionForCondo(store, 'condo_1');
+      const result = getOrCreatePmSessionForStrand(store, 'strand_1');
 
       // Should create new webchat key and clean up old subagent key
-      expect(result.pmSessionKey).toBe('agent:claudia:webchat:pm-condo-condo_1');
+      expect(result.pmSessionKey).toBe('agent:claudia:webchat:pm-strand-strand_1');
       expect(result.created).toBe(true);
-      expect(data.sessionCondoIndex['agent:claudia:subagent:pm-condo-condo_1']).toBeUndefined();
-      expect(data.sessionCondoIndex['agent:claudia:webchat:pm-condo-condo_1']).toBe('condo_1');
+      expect(data.sessionStrandIndex['agent:claudia:subagent:pm-strand-strand_1']).toBeUndefined();
+      expect(data.sessionStrandIndex['agent:claudia:webchat:pm-strand-strand_1']).toBe('strand_1');
     });
 
     it('uses configured PM agent ID from config.agentRoles.pm', () => {
       const data = {
         goals: [],
-        condos: [{ id: 'condo_2', name: 'Another Condo' }],
+        strands: [{ id: 'strand_2', name: 'Another Strand' }],
         config: { agentRoles: { pm: 'my-pm-agent' } },
-        sessionCondoIndex: {},
+        sessionStrandIndex: {},
       };
       const store = {
         load: () => data,
         save: () => {},
       };
 
-      const result = getOrCreatePmSessionForCondo(store, 'condo_2');
-      expect(result.pmSessionKey).toBe('agent:my-pm-agent:webchat:pm-condo-condo_2');
+      const result = getOrCreatePmSessionForStrand(store, 'strand_2');
+      expect(result.pmSessionKey).toBe('agent:my-pm-agent:webchat:pm-strand-strand_2');
     });
 
     it('falls back to default PM agent (main) when no config', () => {
       const data = {
         goals: [],
-        condos: [{ id: 'condo_3', name: 'Third Condo' }],
+        strands: [{ id: 'strand_3', name: 'Third Strand' }],
         config: {},
-        sessionCondoIndex: {},
+        sessionStrandIndex: {},
       };
       const store = {
         load: () => data,
         save: () => {},
       };
 
-      const result = getOrCreatePmSessionForCondo(store, 'condo_3');
-      expect(result.pmSessionKey).toBe('agent:main:webchat:pm-condo-condo_3');
+      const result = getOrCreatePmSessionForStrand(store, 'strand_3');
+      expect(result.pmSessionKey).toBe('agent:main:webchat:pm-strand-strand_3');
     });
 
-    it('throws for unknown condo', () => {
+    it('throws for unknown strand', () => {
       const data = {
         goals: [],
-        condos: [],
+        strands: [],
         config: {},
-        sessionCondoIndex: {},
+        sessionStrandIndex: {},
       };
       const store = {
         load: () => data,
         save: () => {},
       };
 
-      expect(() => getOrCreatePmSessionForCondo(store, 'nonexistent')).toThrow('Condo nonexistent not found');
+      expect(() => getOrCreatePmSessionForStrand(store, 'nonexistent')).toThrow('Strand nonexistent not found');
     });
 
-    it('initializes sessionCondoIndex if missing', () => {
+    it('initializes sessionStrandIndex if missing', () => {
       const data = {
         goals: [],
-        condos: [{ id: 'condo_4', name: 'Fourth Condo' }],
+        strands: [{ id: 'strand_4', name: 'Fourth Strand' }],
         config: {},
       };
       const store = {
@@ -446,9 +446,9 @@ describe('agent-roles', () => {
         save: () => {},
       };
 
-      const result = getOrCreatePmSessionForCondo(store, 'condo_4');
-      expect(data.sessionCondoIndex).toBeDefined();
-      expect(data.sessionCondoIndex[result.pmSessionKey]).toBe('condo_4');
+      const result = getOrCreatePmSessionForStrand(store, 'strand_4');
+      expect(data.sessionStrandIndex).toBeDefined();
+      expect(data.sessionStrandIndex[result.pmSessionKey]).toBe('strand_4');
     });
   });
 });

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Full E2E Pipeline Test: From zero to deployed project, all via condos.
+ * Full E2E Pipeline Test: From zero to deployed project, all via strands.
  *
- * 1. condos.create   → GitHub repo created, initial commit pushed
+ * 1. strands.create   → GitHub repo created, initial commit pushed
  * 2. goals.create    → worktrees created, branches pushed to GitHub
  * 3. goals.addTask   → tasks registered
  * 4. [implement]     → real code written + committed in each worktree
@@ -12,25 +12,25 @@
  * 8. [verify]        → project on main, all files, GitHub up to date
  */
 
-import { createGoalsStore } from '../clawcondos/condo-management/lib/goals-store.js';
-import { createCondoHandlers } from '../clawcondos/condo-management/lib/condos-handlers.js';
-import { createGoalHandlers } from '../clawcondos/condo-management/lib/goals-handlers.js';
-import * as workspaceManager from '../clawcondos/condo-management/lib/workspace-manager.js';
-import { pushBranch } from '../clawcondos/condo-management/lib/github.js';
+import { createGoalsStore } from '../plugins/helix-goals/lib/goals-store.js';
+import { createStrandHandlers } from '../plugins/helix-goals/lib/strands-handlers.js';
+import { createGoalHandlers } from '../plugins/helix-goals/lib/goals-handlers.js';
+import * as workspaceManager from '../plugins/helix-goals/lib/workspace-manager.js';
+import { pushBranch } from '../plugins/helix-goals/lib/github.js';
 import { existsSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
 import https from 'https';
 
-const WORKSPACES_DIR = process.env.CLAWCONDOS_WORKSPACES_DIR || '/home/clawdia/clawcondos-workspaces';
-const DATA_DIR = '/home/clawdia/clawcondos/clawcondos/condo-management/.data';
+const WORKSPACES_DIR = process.env.HELIX_WORKSPACES_DIR || '/home/clawdia/helix-workspaces';
+const DATA_DIR = '/home/clawdia/clawcond../plugins/helix-goals/.data';
 
 const GIT_ENV = {
   ...process.env,
   GIT_AUTHOR_NAME: 'Clawdia Agent',
-  GIT_AUTHOR_EMAIL: 'clawdia@clawcondos.dev',
+  GIT_AUTHOR_EMAIL: 'clawdia@helix.dev',
   GIT_COMMITTER_NAME: 'Clawdia Agent',
-  GIT_COMMITTER_EMAIL: 'clawdia@clawcondos.dev',
+  GIT_COMMITTER_EMAIL: 'clawdia@helix.dev',
 };
 
 function log(emoji, msg) { console.log(`${emoji}  ${msg}`); }
@@ -97,29 +97,29 @@ async function main() {
     warn: (msg) => logSub(`[warn] ${msg}`),
   };
 
-  const condoH = createCondoHandlers(store, { wsOps, logger });
+  const strandH = createStrandHandlers(store, { wsOps, logger });
   const goalH = createGoalHandlers(store, { wsOps, logger });
 
-  // ═══ PHASE 1: Create Condo ═══════════════════════════════════════
+  // ═══ PHASE 1: Create Strand ═══════════════════════════════════════
 
-  log('📦', 'Phase 1: Creating condo "Daily Quotes API"...');
+  log('📦', 'Phase 1: Creating strand "Daily Quotes API"...');
 
-  const condoRes = await rpc(condoH, 'condos.create', {
+  const strandRes = await rpc(strandH, 'strands.create', {
     name: 'Daily Quotes API',
     description: 'A lightweight REST API serving inspirational quotes with a minimal web frontend',
   });
-  assert(condoRes.ok, `condos.create failed: ${condoRes.error?.message}`);
-  const condo = condoRes.payload.condo;
-  const wsPath = condo.workspace?.path;
+  assert(strandRes.ok, `strands.create failed: ${strandRes.error?.message}`);
+  const strand = strandRes.payload.strand;
+  const wsPath = strand.workspace?.path;
 
   assert(wsPath, 'No workspace created');
-  assert(condo.workspace.repoUrl, 'No GitHub repo URL — repo creation failed');
+  assert(strand.workspace.repoUrl, 'No GitHub repo URL — repo creation failed');
 
-  log('✅', `Condo: ${condo.id}`);
+  log('✅', `Strand: ${strand.id}`);
   log('📁', `Workspace: ${wsPath}`);
-  log('🔗', `GitHub: ${condo.workspace.githubFullName}`);
+  log('🔗', `GitHub: ${strand.workspace.githubFullName}`);
 
-  const repoName = condo.workspace.githubRepoName;
+  const repoName = strand.workspace.githubRepoName;
 
   // ═══ PHASE 2: Create Goals + Tasks ═══════════════════════════════
 
@@ -161,7 +161,7 @@ async function main() {
   for (const def of goalDefs) {
     const res = await rpc(goalH, 'goals.create', {
       title: def.title,
-      condoId: condo.id,
+      strandId: strand.id,
       description: def.description,
     });
     assert(res.ok, `goals.create failed: ${res.error?.message}`);
@@ -814,13 +814,13 @@ CMD ["node", "server.js"]
     log('  👥', `Collaborator invite: ${invites.data[0].invitee?.login} (${invites.data[0].permissions})`);
   }
 
-  // 6e. Verify condo state in store
+  // 6e. Verify strand state in store
   const finalData = store.load();
-  const finalCondo = finalData.condos.find(c => c.id === condo.id);
-  const condoGoals = finalData.goals.filter(g => g.condoId === condo.id);
-  const allDone = condoGoals.every(g => g.status === 'done');
-  const totalTasks = condoGoals.reduce((n, g) => n + (g.tasks?.length || 0), 0);
-  const doneTasks = condoGoals.reduce((n, g) => n + (g.tasks?.filter(t => t.status === 'done')?.length || 0), 0);
+  const finalStrand = finalData.strands.find(c => c.id === strand.id);
+  const strandGoals = finalData.goals.filter(g => g.strandId === strand.id);
+  const allDone = strandGoals.every(g => g.status === 'done');
+  const totalTasks = strandGoals.reduce((n, g) => n + (g.tasks?.length || 0), 0);
+  const doneTasks = strandGoals.reduce((n, g) => n + (g.tasks?.filter(t => t.status === 'done')?.length || 0), 0);
 
   assert(allDone, 'Not all goals are done');
   assert(doneTasks === totalTasks, `${doneTasks}/${totalTasks} tasks done`);
@@ -832,10 +832,10 @@ CMD ["node", "server.js"]
   log('🎉', '  FULL E2E PIPELINE PASSED — Daily Quotes API complete!  ');
   log('🎉', '═══════════════════════════════════════════════════════════');
   log('', '');
-  log('📦', `Condo:      ${finalCondo.name}`);
-  log('🔗', `GitHub:     https://github.com/${condo.workspace.githubFullName}`);
+  log('📦', `Strand:      ${finalStrand.name}`);
+  log('🔗', `GitHub:     https://github.com/${strand.workspace.githubFullName}`);
   log('📁', `Workspace:  ${wsPath}`);
-  log('🎯', `Goals:      ${condoGoals.length} completed`);
+  log('🎯', `Goals:      ${strandGoals.length} completed`);
   log('📋', `Tasks:      ${doneTasks}/${totalTasks} done`);
   log('📄', `Files:      ${expectedFiles.length} on main`);
   log('🔀', `Merges:     ${goals.length} branches → ${mainBranch}`);

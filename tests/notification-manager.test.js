@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { createGoalsStore } from '../clawcondos/condo-management/lib/goals-store.js';
+import { createGoalsStore } from '../plugins/helix-goals/lib/goals-store.js';
 import {
   createNotification,
   markRead,
@@ -9,7 +9,7 @@ import {
   getUnreadCount,
   getNotifications,
   createNotificationHandlers,
-} from '../clawcondos/condo-management/lib/notification-manager.js';
+} from '../plugins/helix-goals/lib/notification-manager.js';
 
 const TEST_DIR = join(import.meta.dirname, '__fixtures__', 'notification-manager-test');
 

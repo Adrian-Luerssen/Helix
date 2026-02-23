@@ -4,7 +4,7 @@ Goals-first dashboard for AI agents. Use this skill when setting up Helix, opera
 
 ## What Helix Is
 
-Helix is a self-hosted web UI for orchestrating AI agent sessions organized into projects ("Condos") with goals and tasks. It connects to an OpenClaw gateway via WebSocket and provides real-time dashboards, agent coordination, and an embedded apps platform.
+Helix is a self-hosted web UI for orchestrating AI agent sessions organized into projects ("Strands") with goals and tasks. It connects to an OpenClaw gateway via WebSocket and provides real-time dashboards, agent coordination, and an embedded apps platform.
 
 ## Quick Setup
 
@@ -44,20 +44,20 @@ Set in your env file (e.g., `~/.config/helix.env`):
 | `GATEWAY_AUTH` | Bearer token for gateway auth |
 | `GATEWAY_WS_URL` | WebSocket URL for gateway |
 | `GATEWAY_HTTP_HOST` | HTTP host for gateway |
-| `CLAWCONDOS_WORKSPACES_DIR` | Base directory for condo git workspaces (disabled if not set) |
-| `CLAWCONDOS_AGENT_WORKSPACES` | JSON mapping agent IDs to workspace paths |
-| `CLAWCONDOS_SKILLS_DIRS` | Colon-separated skill directory paths |
-| `CLAWCONDOS_CLASSIFICATION` | Set to `off` to disable auto-classification |
+| `HELIX_WORKSPACES_DIR` | Base directory for strand git workspaces (disabled if not set) |
+| `HELIX_AGENT_WORKSPACES` | JSON mapping agent IDs to workspace paths |
+| `HELIX_SKILLS_DIRS` | Colon-separated skill directory paths |
+| `HELIX_CLASSIFICATION` | Set to `off` to disable auto-classification |
 
-### Condo Workspaces
+### Strand Workspaces
 
-Enable git workspace creation for condos and git worktrees for goals:
+Enable git workspace creation for strands and git worktrees for goals:
 
 ```bash
-export CLAWCONDOS_WORKSPACES_DIR=/home/youruser/clawcondos-workspaces
+export HELIX_WORKSPACES_DIR=/home/youruser/helix-workspaces
 ```
 
-Each condo gets a git-initialized workspace, and each goal gets a dedicated worktree (branch: `goal/<goalId>`).
+Each strand gets a git-initialized workspace, and each goal gets a dedicated worktree (branch: `goal/<goalId>`).
 
 ## Role System
 

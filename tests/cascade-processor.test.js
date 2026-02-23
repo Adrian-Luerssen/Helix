@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { processPmCascadeResponse } from '../clawcondos/condo-management/lib/cascade-processor.js';
+import { processPmCascadeResponse } from '../plugins/helix-goals/lib/cascade-processor.js';
 
 function createMockStore() {
   let idCounter = 0;
@@ -13,7 +13,7 @@ function createGoal(overrides = {}) {
     id: 'goal_1',
     title: 'Build auth',
     description: 'Authentication system',
-    condoId: 'condo_1',
+    strandId: 'strand_1',
     status: 'active',
     completed: false,
     tasks: [],

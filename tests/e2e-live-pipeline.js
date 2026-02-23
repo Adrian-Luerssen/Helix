@@ -3,12 +3,12 @@
  * Full end-to-end live pipeline test.
  *
  * Runs against the REAL OpenClaw gateway with REAL LLM agents.
- * Creates a condo, clones a repo, plans via PM, creates goals/tasks,
+ * Creates a strand, clones a repo, plans via PM, creates goals/tasks,
  * kicks off agents, waits for completion, and verifies results.
  *
  * Usage:
  *   node tests/e2e-live-pipeline.js                  # full run
- *   node tests/e2e-live-pipeline.js --resume <condoId>  # resume from existing condo
+ *   node tests/e2e-live-pipeline.js --resume <strandId>  # resume from existing strand
  */
 
 import WebSocket from 'ws';
@@ -34,7 +34,7 @@ const PASSWORD = (() => {
   } catch { return ''; }
 })();
 
-const REPO_URL = 'https://github.com/Adrian-Luerssen/clawcondos-test-project.git';
+const REPO_URL = 'https://github.com/Adrian-Luerssen/helix-test-project.git';
 const PROJECT_DESC = `A recipe box — a personal web app to store, browse, and search your recipes.
 Add recipes with a title, ingredients list, step-by-step instructions, prep/cook time, and tags (cuisine, meal type, dietary).
 Browse by tag, search by ingredient or name, and mark favorites.
@@ -49,7 +49,7 @@ const PM_TIMEOUT_MS = 5 * 60 * 1000;     // 5 min for PM
 // ── CLI args ────────────────────────────────────────────────
 const args = process.argv.slice(2);
 const resumeIdx = args.indexOf('--resume');
-const RESUME_CONDO_ID = resumeIdx >= 0 ? args[resumeIdx + 1] : null;
+const RESUME_STRAND_ID = resumeIdx >= 0 ? args[resumeIdx + 1] : null;
 
 // ── Helpers ─────────────────────────────────────────────────
 let reqCounter = 0;
@@ -225,7 +225,7 @@ async function run() {
   log('═══════════════════════════════════════════════════');
   log('  Full E2E Pipeline — Recipe Box');
   log('═══════════════════════════════════════════════════');
-  if (RESUME_CONDO_ID) log(`  Resuming from condo: ${RESUME_CONDO_ID}`);
+  if (RESUME_STRAND_ID) log(`  Resuming from strand: ${RESUME_STRAND_ID}`);
   log('');
 
   // ── Step 1: Connect ──
@@ -233,33 +233,33 @@ async function run() {
   await connect();
   logOk('Connected and authenticated');
 
-  let condoId;
-  let condoWsPath;
+  let strandId;
+  let strandWsPath;
 
-  if (RESUME_CONDO_ID) {
+  if (RESUME_STRAND_ID) {
     // ── Resume mode: skip creation and PM ──
-    condoId = RESUME_CONDO_ID;
-    const { condo } = await sendRpc('condos.get', { id: condoId });
-    condoWsPath = condo.workspace?.path;
-    logOk(`Resumed condo: ${condo.name} (${condoId})`);
-    if (condoWsPath) logOk(`Workspace: ${condoWsPath}`);
+    strandId = RESUME_STRAND_ID;
+    const { strand } = await sendRpc('strands.get', { id: strandId });
+    strandWsPath = strand.workspace?.path;
+    logOk(`Resumed strand: ${strand.name} (${strandId})`);
+    if (strandWsPath) logOk(`Workspace: ${strandWsPath}`);
   } else {
-    // ── Step 2: Create condo with repo ──
+    // ── Step 2: Create strand with repo ──
     log('');
-    log('Step 2: Creating condo with repo clone...');
-    const { condo } = await sendRpc('condos.create', {
+    log('Step 2: Creating strand with repo clone...');
+    const { strand } = await sendRpc('strands.create', {
       name: 'Recipe Box',
       description: PROJECT_DESC,
       repoUrl: REPO_URL,
       autonomyMode: 'full',
     }, 120_000);
 
-    condoId = condo.id;
-    condoWsPath = condo.workspace?.path;
-    logOk(`Condo created: ${condo.name} (${condoId})`);
-    if (condoWsPath) {
-      logOk(`Workspace: ${condoWsPath}`);
-      logOk(`Repo cloned from: ${condo.workspace.repoUrl}`);
+    strandId = strand.id;
+    strandWsPath = strand.workspace?.path;
+    logOk(`Strand created: ${strand.name} (${strandId})`);
+    if (strandWsPath) {
+      logOk(`Workspace: ${strandWsPath}`);
+      logOk(`Repo cloned from: ${strand.workspace.repoUrl}`);
     } else {
       logErr('No workspace created!');
     }
@@ -267,8 +267,8 @@ async function run() {
     // ── Step 3: PM planning ──
     log('');
     log('Step 3: Sending project to PM for planning...');
-    const pmResult = await sendRpc('pm.condoChat', {
-      condoId,
+    const pmResult = await sendRpc('pm.strandChat', {
+      strandId,
       message: PROJECT_DESC,
     }, 30_000);
 
@@ -289,8 +289,8 @@ async function run() {
     // ── Step 4: Save PM response ──
     log('');
     log('Step 4: Saving PM response...');
-    const saveResult = await sendRpc('pm.condoSaveResponse', {
-      condoId,
+    const saveResult = await sendRpc('pm.strandSaveResponse', {
+      strandId,
       content: pmResponse,
     }, 15_000);
     logOk(`Plan saved (hasPlan: ${saveResult.hasPlan})`);
@@ -298,7 +298,7 @@ async function run() {
     // ── Step 5: Create goals from plan ──
     log('');
     log('Step 5: Creating goals from plan...');
-    const goalsResult = await sendRpc('pm.condoCreateGoals', { condoId }, 30_000);
+    const goalsResult = await sendRpc('pm.strandCreateGoals', { strandId }, 30_000);
     logOk(`Created ${goalsResult.goalsCreated} goals:`);
     for (const g of goalsResult.goals) {
       log(`  • ${g.title} (${g.id}) — ${g.taskCount} tasks`);
@@ -308,16 +308,16 @@ async function run() {
   // From here on, works for both fresh and resumed runs
   try {
     // ── Fetch current goals ──
-    const condoData = await sendRpc('condos.get', { id: condoId });
-    condoWsPath = condoData.condo.workspace?.path;
+    const strandData = await sendRpc('strands.get', { id: strandId });
+    strandWsPath = strandData.strand.workspace?.path;
 
     const allGoals = await sendRpc('goals.list', {});
-    const condoGoals = (allGoals.goals || []).filter(g => g.condoId === condoId);
-    const goalIds = condoGoals.map(g => g.id);
+    const strandGoals = (allGoals.goals || []).filter(g => g.strandId === strandId);
+    const goalIds = strandGoals.map(g => g.id);
 
     log('');
-    log(`Goals for condo: ${condoGoals.length}`);
-    for (const g of condoGoals) {
+    log(`Goals for strand: ${strandGoals.length}`);
+    for (const g of strandGoals) {
       log(`  • ${g.title} — ${(g.tasks || []).length} tasks, status: ${g.status}`);
     }
 
@@ -423,29 +423,29 @@ async function run() {
     log(`All done: ${allDone ? 'YES ✅' : 'NO ❌ (timed out)'}`);
 
     // Show workspace
-    if (condoWsPath && existsSync(condoWsPath)) {
+    if (strandWsPath && existsSync(strandWsPath)) {
       log('');
-      log('Workspace: ' + condoWsPath);
+      log('Workspace: ' + strandWsPath);
       try {
-        const branches = execSync('git branch --list', { cwd: condoWsPath, encoding: 'utf-8' }).trim();
+        const branches = execSync('git branch --list', { cwd: strandWsPath, encoding: 'utf-8' }).trim();
         log('Git branches:\n' + branches);
         log('');
-        const worktrees = execSync('git worktree list', { cwd: condoWsPath, encoding: 'utf-8' }).trim();
+        const worktrees = execSync('git worktree list', { cwd: strandWsPath, encoding: 'utf-8' }).trim();
         log('Git worktrees:\n' + worktrees);
       } catch {}
     }
 
     log('');
-    log('Condo ID: ' + condoId);
-    log('To resume: node tests/e2e-live-pipeline.js --resume ' + condoId);
+    log('Strand ID: ' + strandId);
+    log('To resume: node tests/e2e-live-pipeline.js --resume ' + strandId);
     log('Done.');
 
   } catch (err) {
     logErr('Pipeline failed: ' + err.message);
     console.error(err);
     log('');
-    log('Condo ID: ' + condoId);
-    log('To resume: node tests/e2e-live-pipeline.js --resume ' + condoId);
+    log('Strand ID: ' + strandId);
+    log('To resume: node tests/e2e-live-pipeline.js --resume ' + strandId);
   } finally {
     ws.close();
   }

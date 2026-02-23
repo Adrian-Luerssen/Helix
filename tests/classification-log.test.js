@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { createClassificationLog } from '../clawcondos/condo-management/lib/classification-log.js';
+import { createClassificationLog } from '../plugins/helix-goals/lib/classification-log.js';
 
 const TEST_DIR = join(import.meta.dirname, '__fixtures__', 'classification-log-test');
 
@@ -28,7 +28,7 @@ describe('ClassificationLog', () => {
     const entry = log.append({
       sessionKey: 'agent:main:telegram:123',
       tier: 1,
-      predictedCondo: 'condo:subastas',
+      predictedStrand: 'strand:subastas',
       confidence: 0.9,
       reasoning: 'kw:subastas',
     });
@@ -37,25 +37,25 @@ describe('ClassificationLog', () => {
 
     const data = log.load();
     expect(data.entries).toHaveLength(1);
-    expect(data.entries[0].predictedCondo).toBe('condo:subastas');
+    expect(data.entries[0].predictedStrand).toBe('strand:subastas');
   });
 
   it('records feedback on an entry', () => {
     const entry = log.append({
       sessionKey: 's1',
       tier: 1,
-      predictedCondo: 'condo:a',
+      predictedStrand: 'strand:a',
       confidence: 0.8,
     });
-    const updated = log.recordFeedback(entry.id, { accepted: false, correctedTo: 'condo:b' });
+    const updated = log.recordFeedback(entry.id, { accepted: false, correctedTo: 'strand:b' });
     expect(updated.accepted).toBe(false);
-    expect(updated.correctedTo).toBe('condo:b');
+    expect(updated.correctedTo).toBe('strand:b');
     expect(updated.feedbackMs).toBeTypeOf('number');
   });
 
   it('getCorrections returns only corrected entries', () => {
-    log.append({ sessionKey: 's1', tier: 1, predictedCondo: 'a', confidence: 0.8 });
-    const e2 = log.append({ sessionKey: 's2', tier: 1, predictedCondo: 'a', confidence: 0.7 });
+    log.append({ sessionKey: 's1', tier: 1, predictedStrand: 'a', confidence: 0.8 });
+    const e2 = log.append({ sessionKey: 's2', tier: 1, predictedStrand: 'a', confidence: 0.7 });
     log.recordFeedback(e2.id, { accepted: false, correctedTo: 'b' });
 
     const corrections = log.getCorrections();
@@ -64,9 +64,9 @@ describe('ClassificationLog', () => {
   });
 
   it('getStats computes accuracy', () => {
-    const e1 = log.append({ sessionKey: 's1', tier: 1, predictedCondo: 'a', confidence: 0.9 });
-    const e2 = log.append({ sessionKey: 's2', tier: 1, predictedCondo: 'a', confidence: 0.8 });
-    const e3 = log.append({ sessionKey: 's3', tier: 1, predictedCondo: 'a', confidence: 0.7 });
+    const e1 = log.append({ sessionKey: 's1', tier: 1, predictedStrand: 'a', confidence: 0.9 });
+    const e2 = log.append({ sessionKey: 's2', tier: 1, predictedStrand: 'a', confidence: 0.8 });
+    const e3 = log.append({ sessionKey: 's3', tier: 1, predictedStrand: 'a', confidence: 0.7 });
     log.recordFeedback(e1.id, { accepted: true });
     log.recordFeedback(e2.id, { accepted: true });
     log.recordFeedback(e3.id, { accepted: false, correctedTo: 'b' });
@@ -81,7 +81,7 @@ describe('ClassificationLog', () => {
 
   it('trims entries beyond max', () => {
     for (let i = 0; i < 105; i++) {
-      log.append({ sessionKey: `s${i}`, tier: 1, predictedCondo: 'a', confidence: 0.5 });
+      log.append({ sessionKey: `s${i}`, tier: 1, predictedStrand: 'a', confidence: 0.5 });
     }
     // Default max is 1000, but let's check it doesn't blow up
     const data = log.load();
@@ -89,7 +89,7 @@ describe('ClassificationLog', () => {
   });
 
   it('persists across reload', () => {
-    log.append({ sessionKey: 's1', tier: 1, predictedCondo: 'a', confidence: 0.8 });
+    log.append({ sessionKey: 's1', tier: 1, predictedStrand: 'a', confidence: 0.8 });
     const fresh = createClassificationLog(TEST_DIR);
     expect(fresh.load().entries).toHaveLength(1);
   });
@@ -99,52 +99,52 @@ describe('ClassificationLog', () => {
       const entry = log.append({
         sessionKey: 'agent:main:telegram:123',
         tier: 1,
-        predictedCondo: 'condo:old',
+        predictedStrand: 'strand:old',
         confidence: 0.85,
         reasoning: 'kw:test',
       });
 
-      const updated = log.recordReclassification('agent:main:telegram:123', 'condo:old', 'condo:new');
+      const updated = log.recordReclassification('agent:main:telegram:123', 'strand:old', 'strand:new');
       expect(updated.id).toBe(entry.id);
       expect(updated.accepted).toBe(false);
-      expect(updated.correctedTo).toBe('condo:new');
+      expect(updated.correctedTo).toBe('strand:new');
       expect(updated.feedbackMs).toBeTypeOf('number');
 
       // Verify persisted
       const data = log.load();
       const persisted = data.entries.find(e => e.id === entry.id);
       expect(persisted.accepted).toBe(false);
-      expect(persisted.correctedTo).toBe('condo:new');
+      expect(persisted.correctedTo).toBe('strand:new');
     });
 
     it('finds the most recent matching entry (not the first)', () => {
       log.append({
         sessionKey: 'agent:main:telegram:123',
         tier: 1,
-        predictedCondo: 'condo:old',
+        predictedStrand: 'strand:old',
         confidence: 0.7,
         reasoning: 'first',
       });
       const second = log.append({
         sessionKey: 'agent:main:telegram:123',
         tier: 1,
-        predictedCondo: 'condo:old',
+        predictedStrand: 'strand:old',
         confidence: 0.9,
         reasoning: 'second',
       });
 
-      const updated = log.recordReclassification('agent:main:telegram:123', 'condo:old', 'condo:new');
+      const updated = log.recordReclassification('agent:main:telegram:123', 'strand:old', 'strand:new');
       expect(updated.id).toBe(second.id);
       expect(updated.reasoning).toBe('second');
     });
 
     it('creates synthetic correction entry when no match found', () => {
       // No entries for this session
-      const synth = log.recordReclassification('agent:new:session', 'condo:old', 'condo:new');
+      const synth = log.recordReclassification('agent:new:session', 'strand:old', 'strand:new');
       expect(synth.id).toMatch(/^clf_/);
       expect(synth.tier).toBe(0);
-      expect(synth.predictedCondo).toBe('condo:old');
-      expect(synth.correctedTo).toBe('condo:new');
+      expect(synth.predictedStrand).toBe('strand:old');
+      expect(synth.correctedTo).toBe('strand:new');
       expect(synth.accepted).toBe(false);
       expect(synth.reasoning).toBe('reclassification');
 
@@ -154,18 +154,18 @@ describe('ClassificationLog', () => {
       expect(data.entries[0].tier).toBe(0);
     });
 
-    it('creates synthetic when session exists but predicted condo does not match', () => {
+    it('creates synthetic when session exists but predicted strand does not match', () => {
       log.append({
         sessionKey: 'agent:main:telegram:123',
         tier: 1,
-        predictedCondo: 'condo:other',
+        predictedStrand: 'strand:other',
         confidence: 0.9,
       });
 
-      const synth = log.recordReclassification('agent:main:telegram:123', 'condo:old', 'condo:new');
-      // Should not match the existing entry (different predictedCondo)
+      const synth = log.recordReclassification('agent:main:telegram:123', 'strand:old', 'strand:new');
+      // Should not match the existing entry (different predictedStrand)
       expect(synth.tier).toBe(0); // synthetic
-      expect(synth.predictedCondo).toBe('condo:old');
+      expect(synth.predictedStrand).toBe('strand:old');
 
       const data = log.load();
       expect(data.entries).toHaveLength(2); // original + synthetic
@@ -173,16 +173,16 @@ describe('ClassificationLog', () => {
   });
 
   it('recordFeedback returns null for missing entry', () => {
-    log.append({ sessionKey: 's1', tier: 1, predictedCondo: 'a', confidence: 0.8 });
+    log.append({ sessionKey: 's1', tier: 1, predictedStrand: 'a', confidence: 0.8 });
     const result = log.recordFeedback('clf_nonexistent', { accepted: true });
     expect(result).toBeNull();
   });
 
   it('getCorrections filters by sinceMs', () => {
-    const e1 = log.append({ sessionKey: 's1', tier: 1, predictedCondo: 'a', confidence: 0.8 });
+    const e1 = log.append({ sessionKey: 's1', tier: 1, predictedStrand: 'a', confidence: 0.8 });
     log.recordFeedback(e1.id, { accepted: false, correctedTo: 'b' });
 
-    const e2 = log.append({ sessionKey: 's2', tier: 1, predictedCondo: 'a', confidence: 0.7 });
+    const e2 = log.append({ sessionKey: 's2', tier: 1, predictedStrand: 'a', confidence: 0.7 });
     log.recordFeedback(e2.id, { accepted: false, correctedTo: 'c' });
 
     // All corrections (sinceMs=0)
@@ -219,7 +219,7 @@ describe('ClassificationLog', () => {
       const entry = log.append({
         sessionKey: 's1',
         tier: 0,
-        predictedCondo: null,
+        predictedStrand: null,
         confidence: 0,
       });
       expect(entry.tier).toBe(0);
@@ -229,7 +229,7 @@ describe('ClassificationLog', () => {
       const entry = log.append({
         sessionKey: 's1',
         tier: 1,
-        predictedCondo: 'a',
+        predictedStrand: 'a',
         confidence: 0,
       });
       expect(entry.confidence).toBe(0);
@@ -239,7 +239,7 @@ describe('ClassificationLog', () => {
       const entry = log.append({
         sessionKey: 's1',
         tier: 1,
-        predictedCondo: 'a',
+        predictedStrand: 'a',
         confidence: 0.5,
         reasoning: '',
       });

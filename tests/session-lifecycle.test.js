@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createSessionLifecycleHandlers, collectGoalSessionKeys, collectCondoSessionKeys } from '../clawcondos/condo-management/lib/session-lifecycle.js';
+import { createSessionLifecycleHandlers, collectGoalSessionKeys, collectStrandSessionKeys } from '../plugins/helix-goals/lib/session-lifecycle.js';
 
 function createMockStore(data) {
   return {
@@ -32,16 +32,16 @@ describe('session-lifecycle', () => {
     });
   });
 
-  describe('collectCondoSessionKeys', () => {
-    it('collects from sessionCondoIndex and goals', () => {
+  describe('collectStrandSessionKeys', () => {
+    it('collects from sessionStrandIndex and goals', () => {
       const data = {
-        sessionCondoIndex: { 'sk:pm': 'condo_1', 'sk:other': 'condo_2' },
+        sessionStrandIndex: { 'sk:pm': 'strand_1', 'sk:other': 'strand_2' },
         goals: [
-          { condoId: 'condo_1', sessions: ['sk:goal1'], tasks: [{ sessionKey: 'sk:task1' }] },
-          { condoId: 'condo_2', sessions: ['sk:goal2'], tasks: [] },
+          { strandId: 'strand_1', sessions: ['sk:goal1'], tasks: [{ sessionKey: 'sk:task1' }] },
+          { strandId: 'strand_2', sessions: ['sk:goal2'], tasks: [] },
         ],
       };
-      const keys = collectCondoSessionKeys(data, 'condo_1');
+      const keys = collectStrandSessionKeys(data, 'strand_1');
       expect(keys).toContain('sk:pm');
       expect(keys).toContain('sk:goal1');
       expect(keys).toContain('sk:task1');
@@ -69,8 +69,8 @@ describe('session-lifecycle', () => {
           ],
           updatedAtMs: 0,
         }],
-        condos: [],
-        sessionCondoIndex: {},
+        strands: [],
+        sessionStrandIndex: {},
         sessionIndex: {},
       };
 
@@ -96,7 +96,7 @@ describe('session-lifecycle', () => {
     });
 
     it('returns error for non-existent goal', async () => {
-      const store = createMockStore({ goals: [], condos: [], sessionCondoIndex: {}, sessionIndex: {} });
+      const store = createMockStore({ goals: [], strands: [], sessionStrandIndex: {}, sessionIndex: {} });
       const handlers = createSessionLifecycleHandlers(store, { rpcCall: vi.fn() });
 
       let result;
@@ -110,17 +110,17 @@ describe('session-lifecycle', () => {
     });
   });
 
-  describe('sessions.killForCondo', () => {
-    it('aborts all sessions across all goals in condo', async () => {
+  describe('sessions.killForStrand', () => {
+    it('aborts all sessions across all goals in strand', async () => {
       const mockRpcCall = vi.fn(async () => ({}));
 
       const data = {
-        condos: [{ id: 'condo_1', name: 'Test' }],
+        strands: [{ id: 'strand_1', name: 'Test' }],
         goals: [
-          { id: 'g1', condoId: 'condo_1', sessions: [], tasks: [{ id: 't1', sessionKey: 'sk:a', status: 'in-progress', updatedAtMs: 0 }], updatedAtMs: 0 },
-          { id: 'g2', condoId: 'condo_1', sessions: ['sk:b'], tasks: [], updatedAtMs: 0 },
+          { id: 'g1', strandId: 'strand_1', sessions: [], tasks: [{ id: 't1', sessionKey: 'sk:a', status: 'in-progress', updatedAtMs: 0 }], updatedAtMs: 0 },
+          { id: 'g2', strandId: 'strand_1', sessions: ['sk:b'], tasks: [], updatedAtMs: 0 },
         ],
-        sessionCondoIndex: { 'sk:pm': 'condo_1' },
+        sessionStrandIndex: { 'sk:pm': 'strand_1' },
         sessionIndex: {},
       };
 
@@ -128,8 +128,8 @@ describe('session-lifecycle', () => {
       const handlers = createSessionLifecycleHandlers(store, { rpcCall: mockRpcCall });
 
       let result;
-      await handlers['sessions.killForCondo']({
-        params: { condoId: 'condo_1' },
+      await handlers['sessions.killForStrand']({
+        params: { strandId: 'strand_1' },
         respond: (ok, d) => { result = { ok, data: d }; },
       });
 
@@ -139,13 +139,13 @@ describe('session-lifecycle', () => {
     });
   });
 
-  describe('sessions.listForCondo', () => {
+  describe('sessions.listForStrand', () => {
     it('lists all sessions with task status', () => {
       const data = {
-        condos: [{ id: 'condo_1', name: 'Test' }],
+        strands: [{ id: 'strand_1', name: 'Test' }],
         goals: [{
           id: 'g1',
-          condoId: 'condo_1',
+          strandId: 'strand_1',
           title: 'Goal 1',
           sessions: [],
           tasks: [
@@ -153,20 +153,20 @@ describe('session-lifecycle', () => {
             { id: 't2', text: 'Task 2', sessionKey: null, status: 'pending' },
           ],
         }],
-        sessionCondoIndex: { 'sk:pm': 'condo_1' },
+        sessionStrandIndex: { 'sk:pm': 'strand_1' },
       };
 
       const store = createMockStore(data);
       const handlers = createSessionLifecycleHandlers(store, { rpcCall: vi.fn() });
 
       let result;
-      handlers['sessions.listForCondo']({
-        params: { condoId: 'condo_1' },
+      handlers['sessions.listForStrand']({
+        params: { strandId: 'strand_1' },
         respond: (ok, d) => { result = { ok, data: d }; },
       });
 
       expect(result.ok).toBe(true);
-      expect(result.data.count).toBe(2); // sk:1 (task) + sk:pm (condo session)
+      expect(result.data.count).toBe(2); // sk:1 (task) + sk:pm (strand session)
       expect(result.data.sessions.find(s => s.sessionKey === 'sk:1').taskStatus).toBe('in-progress');
     });
   });

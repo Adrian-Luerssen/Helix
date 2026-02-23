@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync, chmodSync } from 'fs';
 import { join } from 'path';
-import register from '../clawcondos/condo-management/index.js';
-import { CLASSIFIER_CONFIG } from '../clawcondos/condo-management/lib/classifier.js';
+import register from '../plugins/helix-goals/index.js';
+import { CLASSIFIER_CONFIG } from '../plugins/helix-goals/lib/classifier.js';
 
 const TEST_DIR = join(import.meta.dirname, '__fixtures__', 'plugin-index-test');
 
@@ -48,12 +48,12 @@ describe('Plugin index.js', () => {
         // Goals handlers
         'goals.list', 'goals.create', 'goals.get', 'goals.update', 'goals.delete',
         'goals.addSession', 'goals.removeSession', 'goals.sessionLookup',
-        'goals.setSessionCondo', 'goals.getSessionCondo', 'goals.listSessionCondos',
-        'goals.removeSessionCondo',
+        'goals.setSessionStrand', 'goals.getSessionStrand', 'goals.listSessionStrands',
+        'goals.removeSessionStrand',
         'goals.addTask', 'goals.updateTask', 'goals.deleteTask',
         'goals.addFiles', 'goals.removeFile', 'goals.updatePlan',
-        // Condo handlers
-        'condos.create', 'condos.list', 'condos.get', 'condos.update', 'condos.delete',
+        // Strand handlers
+        'strands.create', 'strands.list', 'strands.get', 'strands.update', 'strands.delete',
         // Task spawn + kickoff
         'goals.spawnTaskSession', 'goals.kickoff',
         // Plan handlers
@@ -63,9 +63,9 @@ describe('Plugin index.js', () => {
         'pm.chat', 'pm.getConfig', 'pm.setConfig', 'pm.getAgent',
         'pm.getHistory', 'pm.clearHistory', 'pm.saveResponse',
         'pm.createTasksFromPlan', 'pm.regenerateTasks', 'pm.detectPlan',
-        // Condo PM handlers
-        'pm.condoChat', 'pm.condoSaveResponse', 'pm.condoGetHistory',
-        'pm.condoCreateGoals', 'pm.condoCascade', 'pm.goalCascade',
+        // Strand PM handlers
+        'pm.strandChat', 'pm.strandSaveResponse', 'pm.strandGetHistory',
+        'pm.strandCreateGoals', 'pm.strandCascade', 'pm.goalCascade',
         // Config handlers
         'config.get', 'config.set', 'config.setRole', 'config.getRole', 'config.listRoles',
         'config.getServices', 'config.setService', 'config.deleteService', 'config.verifyGitHub',
@@ -77,11 +77,11 @@ describe('Plugin index.js', () => {
         // Notification handlers
         'notifications.list', 'notifications.markRead', 'notifications.dismiss', 'notifications.unreadCount',
         // Autonomy handlers
-        'autonomy.getTaskInfo', 'autonomy.setTask', 'autonomy.setCondo', 'autonomy.modes',
+        'autonomy.getTaskInfo', 'autonomy.setTask', 'autonomy.setStrand', 'autonomy.modes',
         // Classification
         'classification.stats', 'classification.learningReport', 'classification.applyLearning',
         // Session lifecycle
-        'sessions.killForGoal', 'sessions.killForCondo', 'sessions.cleanupStale', 'sessions.listForCondo',
+        'sessions.killForGoal', 'sessions.killForStrand', 'sessions.cleanupStale', 'sessions.listForStrand',
         // Conflict detection
         'goals.checkConflicts',
         // Close goal
@@ -106,14 +106,14 @@ describe('Plugin index.js', () => {
     it('registers 9 tool factories', () => {
       expect(api._toolFactories).toHaveLength(9);
       expect(api._getToolFactory('goal_update')).toBeTypeOf('function');
-      expect(api._getToolFactory('condo_bind')).toBeTypeOf('function');
-      expect(api._getToolFactory('condo_create_goal')).toBeTypeOf('function');
-      expect(api._getToolFactory('condo_add_task')).toBeTypeOf('function');
-      expect(api._getToolFactory('condo_spawn_task')).toBeTypeOf('function');
-      expect(api._getToolFactory('condo_list')).toBeTypeOf('function');
-      expect(api._getToolFactory('condo_status')).toBeTypeOf('function');
-      expect(api._getToolFactory('condo_pm_chat')).toBeTypeOf('function');
-      expect(api._getToolFactory('condo_pm_kickoff')).toBeTypeOf('function');
+      expect(api._getToolFactory('strand_bind')).toBeTypeOf('function');
+      expect(api._getToolFactory('strand_create_goal')).toBeTypeOf('function');
+      expect(api._getToolFactory('strand_add_task')).toBeTypeOf('function');
+      expect(api._getToolFactory('strand_spawn_task')).toBeTypeOf('function');
+      expect(api._getToolFactory('strand_list')).toBeTypeOf('function');
+      expect(api._getToolFactory('strand_status')).toBeTypeOf('function');
+      expect(api._getToolFactory('strand_pm_chat')).toBeTypeOf('function');
+      expect(api._getToolFactory('strand_pm_kickoff')).toBeTypeOf('function');
     });
   });
 
@@ -155,24 +155,24 @@ describe('Plugin index.js', () => {
       expect(result).toBeUndefined();
     });
 
-    it('includes project summary when goal has condoId', async () => {
-      // Create condo and goal in it
-      let condoResult;
-      api._methods['condos.create']({
-        params: { name: 'Summary Condo' },
-        respond: (ok, payload) => { condoResult = payload; },
+    it('includes project summary when goal has strandId', async () => {
+      // Create strand and goal in it
+      let strandResult;
+      api._methods['strands.create']({
+        params: { name: 'Summary Strand' },
+        respond: (ok, payload) => { strandResult = payload; },
       });
-      const condoId = condoResult.condo.id;
+      const strandId = strandResult.strand.id;
 
       let goalResult;
       api._methods['goals.create']({
-        params: { title: 'Condo Goal A', condoId },
+        params: { title: 'Strand Goal A', strandId },
         respond: (ok, payload) => { goalResult = payload; },
       });
       const goalId = goalResult.goal.id;
 
       api._methods['goals.create']({
-        params: { title: 'Condo Goal B', condoId },
+        params: { title: 'Strand Goal B', strandId },
         respond: () => {},
       });
 
@@ -185,13 +185,13 @@ describe('Plugin index.js', () => {
         context: { sessionKey: 'agent:main:summary' },
       });
       expect(result.prependContext).toContain('<project');
-      expect(result.prependContext).toContain('Summary Condo');
-      expect(result.prependContext).toContain('Condo Goal A');
-      expect(result.prependContext).toContain('Condo Goal B');
+      expect(result.prependContext).toContain('Summary Strand');
+      expect(result.prependContext).toContain('Strand Goal A');
+      expect(result.prependContext).toContain('Strand Goal B');
       expect(result.prependContext).toContain('<goal');
     });
 
-    it('no project summary when goal has no condoId', async () => {
+    it('no project summary when goal has no strandId', async () => {
       const goalId = seedGoal();
       const result = await api._hooks['before_agent_start']({
         context: { sessionKey: 'agent:main:main' },
@@ -201,43 +201,43 @@ describe('Plugin index.js', () => {
     });
   });
 
-  describe('before_agent_start hook (condo path)', () => {
-    function seedCondo() {
-      let condoResult;
-      api._methods['condos.create']({
-        params: { name: 'Test Condo', description: 'Condo desc' },
-        respond: (ok, payload) => { condoResult = payload; },
+  describe('before_agent_start hook (strand path)', () => {
+    function seedStrand() {
+      let strandResult;
+      api._methods['strands.create']({
+        params: { name: 'Test Strand', description: 'Strand desc' },
+        respond: (ok, payload) => { strandResult = payload; },
       });
-      const condoId = condoResult.condo.id;
+      const strandId = strandResult.strand.id;
 
-      // Create a goal in this condo
+      // Create a goal in this strand
       let goalResult;
       api._methods['goals.create']({
-        params: { title: 'Condo Goal', condoId },
+        params: { title: 'Strand Goal', strandId },
         respond: (ok, payload) => { goalResult = payload; },
       });
 
-      // Bind session to condo
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:main:telegram:123', condoId },
+      // Bind session to strand
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:main:telegram:123', strandId },
         respond: () => {},
       });
 
-      return condoId;
+      return strandId;
     }
 
-    it('returns condo context for bound session', async () => {
-      seedCondo();
+    it('returns strand context for bound session', async () => {
+      seedStrand();
       const result = await api._hooks['before_agent_start']({
         context: { sessionKey: 'agent:main:telegram:123' },
       });
       expect(result).toHaveProperty('prependContext');
-      expect(result.prependContext).toContain('Test Condo');
-      expect(result.prependContext).toContain('Condo Goal');
+      expect(result.prependContext).toContain('Test Strand');
+      expect(result.prependContext).toContain('Strand Goal');
     });
 
-    it('condo path takes priority over goal path', async () => {
-      seedCondo();
+    it('strand path takes priority over goal path', async () => {
+      seedStrand();
       // Also assign session to a different goal via sessionIndex
       let goalResult;
       api._methods['goals.create']({
@@ -252,8 +252,8 @@ describe('Plugin index.js', () => {
       const result = await api._hooks['before_agent_start']({
         context: { sessionKey: 'agent:main:telegram:123' },
       });
-      // Should get condo context, not direct goal context
-      expect(result.prependContext).toContain('Test Condo');
+      // Should get strand context, not direct goal context
+      expect(result.prependContext).toContain('Test Strand');
       expect(result.prependContext).not.toContain('# Direct Goal');
     });
   });
@@ -314,22 +314,22 @@ describe('Plugin index.js', () => {
       expect(result).toBeUndefined();
     });
 
-    it('updates condo timestamp for condo-bound session', async () => {
-      let condoResult;
-      api._methods['condos.create']({
-        params: { name: 'Tracked Condo' },
-        respond: (ok, payload) => { condoResult = payload; },
+    it('updates strand timestamp for strand-bound session', async () => {
+      let strandResult;
+      api._methods['strands.create']({
+        params: { name: 'Tracked Strand' },
+        respond: (ok, payload) => { strandResult = payload; },
       });
-      const condoId = condoResult.condo.id;
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:main:telegram:123', condoId },
+      const strandId = strandResult.strand.id;
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:main:telegram:123', strandId },
         respond: () => {},
       });
 
-      let condoBefore;
-      api._methods['condos.get']({
-        params: { id: condoId },
-        respond: (ok, payload) => { condoBefore = payload.condo; },
+      let strandBefore;
+      api._methods['strands.get']({
+        params: { id: strandId },
+        respond: (ok, payload) => { strandBefore = payload.strand; },
       });
 
       await new Promise(r => setTimeout(r, 5));
@@ -339,12 +339,12 @@ describe('Plugin index.js', () => {
         success: true,
       });
 
-      let condoAfter;
-      api._methods['condos.get']({
-        params: { id: condoId },
-        respond: (ok, payload) => { condoAfter = payload.condo; },
+      let strandAfter;
+      api._methods['strands.get']({
+        params: { id: strandId },
+        respond: (ok, payload) => { strandAfter = payload.strand; },
       });
-      expect(condoAfter.updatedAtMs).toBeGreaterThan(condoBefore.updatedAtMs);
+      expect(strandAfter.updatedAtMs).toBeGreaterThan(strandBefore.updatedAtMs);
     });
   });
 
@@ -407,106 +407,106 @@ describe('Plugin index.js', () => {
     });
   });
 
-  describe('condo_bind tool factory', () => {
+  describe('strand_bind tool factory', () => {
     it('returns null for already-bound session', () => {
-      let condoResult;
-      api._methods['condos.create']({
-        params: { name: 'Bound Condo' },
-        respond: (ok, payload) => { condoResult = payload; },
+      let strandResult;
+      api._methods['strands.create']({
+        params: { name: 'Bound Strand' },
+        respond: (ok, payload) => { strandResult = payload; },
       });
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:main:telegram:123', condoId: condoResult.condo.id },
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:main:telegram:123', strandId: strandResult.strand.id },
         respond: () => {},
       });
 
-      const factory = api._getToolFactory('condo_bind');
+      const factory = api._getToolFactory('strand_bind');
       expect(factory({ sessionKey: 'agent:main:telegram:123' })).toBeNull();
     });
 
     it('returns tool definition for unbound session', () => {
-      const factory = api._getToolFactory('condo_bind');
+      const factory = api._getToolFactory('strand_bind');
       const tool = factory({ sessionKey: 'agent:main:telegram:456' });
       expect(tool).not.toBeNull();
-      expect(tool.name).toBe('condo_bind');
+      expect(tool.name).toBe('strand_bind');
     });
 
-    it('tool execute creates new condo and binds when name provided', async () => {
-      const factory = api._getToolFactory('condo_bind');
+    it('tool execute creates new strand and binds when name provided', async () => {
+      const factory = api._getToolFactory('strand_bind');
       const tool = factory({ sessionKey: 'agent:main:telegram:new' });
-      const result = await tool.execute('call1', { name: 'Brand New Condo', description: 'Created via bind' });
-      expect(result.content[0].text).toContain('Brand New Condo');
+      const result = await tool.execute('call1', { name: 'Brand New Strand', description: 'Created via bind' });
+      expect(result.content[0].text).toContain('Brand New Strand');
 
-      // Verify condo was created
+      // Verify strand was created
       let listResult;
-      api._methods['condos.list']({
+      api._methods['strands.list']({
         params: {},
         respond: (ok, payload) => { listResult = payload; },
       });
-      const condo = listResult.condos.find(c => c.name === 'Brand New Condo');
-      expect(condo).toBeTruthy();
+      const strand = listResult.strands.find(c => c.name === 'Brand New Strand');
+      expect(strand).toBeTruthy();
 
       // Verify session binding persisted
       let mappingResult;
-      api._methods['goals.getSessionCondo']({
+      api._methods['goals.getSessionStrand']({
         params: { sessionKey: 'agent:main:telegram:new' },
         respond: (ok, payload) => { mappingResult = payload; },
       });
-      expect(mappingResult.condoId).toBe(condo.id);
+      expect(mappingResult.strandId).toBe(strand.id);
     });
 
-    it('tool execute binds session to condo', async () => {
-      let condoResult;
-      api._methods['condos.create']({
-        params: { name: 'Bindable Condo' },
-        respond: (ok, payload) => { condoResult = payload; },
+    it('tool execute binds session to strand', async () => {
+      let strandResult;
+      api._methods['strands.create']({
+        params: { name: 'Bindable Strand' },
+        respond: (ok, payload) => { strandResult = payload; },
       });
 
-      const factory = api._getToolFactory('condo_bind');
+      const factory = api._getToolFactory('strand_bind');
       const tool = factory({ sessionKey: 'agent:main:telegram:789' });
-      const result = await tool.execute('call1', { condoId: condoResult.condo.id });
-      expect(result.content[0].text).toContain('Bindable Condo');
+      const result = await tool.execute('call1', { strandId: strandResult.strand.id });
+      expect(result.content[0].text).toContain('Bindable Strand');
 
       // Verify binding persisted
       let mappingResult;
-      api._methods['goals.getSessionCondo']({
+      api._methods['goals.getSessionStrand']({
         params: { sessionKey: 'agent:main:telegram:789' },
         respond: (ok, payload) => { mappingResult = payload; },
       });
-      expect(mappingResult.condoId).toBe(condoResult.condo.id);
+      expect(mappingResult.strandId).toBe(strandResult.strand.id);
     });
   });
 
-  describe('condo_create_goal tool factory', () => {
-    function seedCondoBound() {
-      let condoResult;
-      api._methods['condos.create']({
-        params: { name: 'Goal Condo' },
-        respond: (ok, payload) => { condoResult = payload; },
+  describe('strand_create_goal tool factory', () => {
+    function seedStrandBound() {
+      let strandResult;
+      api._methods['strands.create']({
+        params: { name: 'Goal Strand' },
+        respond: (ok, payload) => { strandResult = payload; },
       });
-      const condoId = condoResult.condo.id;
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:main:telegram:123', condoId },
+      const strandId = strandResult.strand.id;
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:main:telegram:123', strandId },
         respond: () => {},
       });
-      return condoId;
+      return strandId;
     }
 
     it('returns null for unbound session', () => {
-      const factory = api._getToolFactory('condo_create_goal');
+      const factory = api._getToolFactory('strand_create_goal');
       expect(factory({ sessionKey: 'agent:unbound:main' })).toBeNull();
     });
 
     it('returns tool definition for bound session', () => {
-      seedCondoBound();
-      const factory = api._getToolFactory('condo_create_goal');
+      seedStrandBound();
+      const factory = api._getToolFactory('strand_create_goal');
       const tool = factory({ sessionKey: 'agent:main:telegram:123' });
       expect(tool).not.toBeNull();
-      expect(tool.name).toBe('condo_create_goal');
+      expect(tool.name).toBe('strand_create_goal');
     });
 
     it('tool execute creates goal end-to-end', async () => {
-      const condoId = seedCondoBound();
-      const factory = api._getToolFactory('condo_create_goal');
+      const strandId = seedStrandBound();
+      const factory = api._getToolFactory('strand_create_goal');
       const tool = factory({ sessionKey: 'agent:main:telegram:123' });
       const result = await tool.execute('call1', { title: 'New Goal', tasks: ['Task A', 'Task B'] });
       expect(result.content[0].text).toContain('New Goal');
@@ -519,54 +519,54 @@ describe('Plugin index.js', () => {
       });
       const goal = listResult.goals.find(g => g.title === 'New Goal');
       expect(goal).toBeTruthy();
-      expect(goal.condoId).toBe(condoId);
+      expect(goal.strandId).toBe(strandId);
       expect(goal.tasks).toHaveLength(2);
     });
   });
 
-  describe('condo_add_task tool factory', () => {
+  describe('strand_add_task tool factory', () => {
     it('returns null for unbound session', () => {
-      const factory = api._getToolFactory('condo_add_task');
+      const factory = api._getToolFactory('strand_add_task');
       expect(factory({ sessionKey: 'agent:unbound:main' })).toBeNull();
     });
   });
 
-  describe('condo_spawn_task tool factory', () => {
+  describe('strand_spawn_task tool factory', () => {
     it('returns null for unbound session', () => {
-      const factory = api._getToolFactory('condo_spawn_task');
+      const factory = api._getToolFactory('strand_spawn_task');
       expect(factory({ sessionKey: 'agent:unbound:main' })).toBeNull();
     });
 
     it('returns tool definition for bound session', () => {
-      let condoResult;
-      api._methods['condos.create']({
-        params: { name: 'Spawn Condo' },
-        respond: (ok, payload) => { condoResult = payload; },
+      let strandResult;
+      api._methods['strands.create']({
+        params: { name: 'Spawn Strand' },
+        respond: (ok, payload) => { strandResult = payload; },
       });
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:main:telegram:123', condoId: condoResult.condo.id },
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:main:telegram:123', strandId: strandResult.strand.id },
         respond: () => {},
       });
 
-      const factory = api._getToolFactory('condo_spawn_task');
+      const factory = api._getToolFactory('strand_spawn_task');
       const tool = factory({ sessionKey: 'agent:main:telegram:123' });
       expect(tool).not.toBeNull();
-      expect(tool.name).toBe('condo_spawn_task');
+      expect(tool.name).toBe('strand_spawn_task');
     });
   });
 
   describe('before_agent_start hook (classification)', () => {
-    function seedCondoWithKeywords(name, keywords, telegramTopicIds = []) {
-      let condoResult;
-      api._methods['condos.create']({
+    function seedStrandWithKeywords(name, keywords, telegramTopicIds = []) {
+      let strandResult;
+      api._methods['strands.create']({
         params: { name, keywords, telegramTopicIds },
-        respond: (ok, payload) => { condoResult = payload; },
+        respond: (ok, payload) => { strandResult = payload; },
       });
-      return condoResult.condo;
+      return strandResult.strand;
     }
 
     it('auto-routes by Telegram topic binding', async () => {
-      const condo = seedCondoWithKeywords('Infra', ['deploy'], [2212]);
+      const strand = seedStrandWithKeywords('Infra', ['deploy'], [2212]);
       const result = await api._hooks['before_agent_start']({
         context: { sessionKey: 'agent:main:telegram:group:-100xxx:topic:2212' },
         messages: [{ role: 'user', content: 'something random' }],
@@ -578,59 +578,59 @@ describe('Plugin index.js', () => {
     it('auto-routes by keyword match above threshold', async () => {
       // Need name match (0.3) + 4 keywords (0.45) = 0.75, still below 0.8
       // name match (0.3) + keyword max (0.45) = 0.75 < 0.8
-      // So we need explicit @condo mention or topic for auto-route
-      // Actually, let's use @condo:infra for guaranteed auto-route
-      seedCondoWithKeywords('Infra', ['deploy', 'server', 'docker', 'kubernetes']);
+      // So we need explicit @strand mention or topic for auto-route
+      // Actually, let's use @strand:infra for guaranteed auto-route
+      seedStrandWithKeywords('Infra', ['deploy', 'server', 'docker', 'kubernetes']);
       const result = await api._hooks['before_agent_start']({
         context: { sessionKey: 'agent:main:telegram:group:-100xxx:topic:9999' },
-        messages: [{ role: 'user', content: 'We need to @condo:infra deploy the server' }],
+        messages: [{ role: 'user', content: 'We need to @strand:infra deploy the server' }],
       });
       expect(result).toHaveProperty('prependContext');
       expect(result.prependContext).toContain('Infra');
     });
 
     it('skips classification for already-bound session', async () => {
-      const condo = seedCondoWithKeywords('Infra', ['deploy']);
-      // Bind session to condo manually
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:bound:session', condoId: condo.id },
+      const strand = seedStrandWithKeywords('Infra', ['deploy']);
+      // Bind session to strand manually
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:bound:session', strandId: strand.id },
         respond: () => {},
       });
       const result = await api._hooks['before_agent_start']({
         context: { sessionKey: 'agent:bound:session' },
         messages: [{ role: 'user', content: 'deploy the server infrastructure now' }],
       });
-      // Should get condo context via normal path, not classification
+      // Should get strand context via normal path, not classification
       expect(result).toHaveProperty('prependContext');
       expect(result.prependContext).toContain('Infra');
     });
 
     it('skips classification for greeting messages', async () => {
-      seedCondoWithKeywords('Infra', ['deploy']);
+      seedStrandWithKeywords('Infra', ['deploy']);
       const result = await api._hooks['before_agent_start']({
         context: { sessionKey: 'agent:new:session' },
         messages: [{ role: 'user', content: 'hello' }],
       });
-      // No condos bound, no goals, greeting skipped → undefined
+      // No strands bound, no goals, greeting skipped → undefined
       expect(result).toBeUndefined();
     });
 
-    it('injects condo menu for low-confidence classification', async () => {
-      seedCondoWithKeywords('Infra', ['deploy']);
-      seedCondoWithKeywords('Frontend', ['react']);
+    it('injects strand menu for low-confidence classification', async () => {
+      seedStrandWithKeywords('Infra', ['deploy']);
+      seedStrandWithKeywords('Frontend', ['react']);
       const result = await api._hooks['before_agent_start']({
         context: { sessionKey: 'agent:new:session' },
         messages: [{ role: 'user', content: 'Can you help me with something?' }],
       });
-      // No keyword match → low confidence → condo menu
+      // No keyword match → low confidence → strand menu
       expect(result).toHaveProperty('prependContext');
       expect(result.prependContext).toContain('Session Not Yet Assigned');
       expect(result.prependContext).toContain('Infra');
       expect(result.prependContext).toContain('Frontend');
-      expect(result.prependContext).toContain('condo_bind');
+      expect(result.prependContext).toContain('strand_bind');
     });
 
-    it('returns undefined when no condos exist and no match', async () => {
+    it('returns undefined when no strands exist and no match', async () => {
       const result = await api._hooks['before_agent_start']({
         context: { sessionKey: 'agent:new:session' },
         messages: [{ role: 'user', content: 'Can you help me with something?' }],
@@ -638,16 +638,16 @@ describe('Plugin index.js', () => {
       expect(result).toBeUndefined();
     });
 
-    it('persists auto-bind in sessionCondoIndex', async () => {
-      const condo = seedCondoWithKeywords('Infra', ['deploy']);
+    it('persists auto-bind in sessionStrandIndex', async () => {
+      const strand = seedStrandWithKeywords('Infra', ['deploy']);
       await api._hooks['before_agent_start']({
         context: { sessionKey: 'agent:topic:telegram:group:-100xxx:topic:2212' },
         messages: [{ role: 'user', content: 'deploy the server' }],
       });
 
-      // Subsequent call should use condo path (sessionCondoIndex), not classification
-      // Seed a topic-bound condo so auto-route fires
-      seedCondoWithKeywords('TopicCondo', ['topicword'], [2212]);
+      // Subsequent call should use strand path (sessionStrandIndex), not classification
+      // Seed a topic-bound strand so auto-route fires
+      seedStrandWithKeywords('TopicStrand', ['topicword'], [2212]);
       await api._hooks['before_agent_start']({
         context: { sessionKey: 'agent:persist:telegram:group:-100xxx:topic:2212' },
         messages: [{ role: 'user', content: 'topicword message' }],
@@ -655,15 +655,15 @@ describe('Plugin index.js', () => {
 
       // Verify binding persisted via RPC
       let mappingResult;
-      api._methods['goals.getSessionCondo']({
+      api._methods['goals.getSessionStrand']({
         params: { sessionKey: 'agent:persist:telegram:group:-100xxx:topic:2212' },
         respond: (ok, payload) => { mappingResult = payload; },
       });
-      expect(mappingResult.condoId).toBeTruthy();
+      expect(mappingResult.strandId).toBeTruthy();
     });
 
     it('appends goal intent hint for structured messages', async () => {
-      seedCondoWithKeywords('Infra', ['deploy'], [5555]);
+      seedStrandWithKeywords('Infra', ['deploy'], [5555]);
       const result = await api._hooks['before_agent_start']({
         context: { sessionKey: 'agent:goal:telegram:group:-100xxx:topic:5555' },
         messages: [{
@@ -672,11 +672,11 @@ describe('Plugin index.js', () => {
         }],
       });
       expect(result).toHaveProperty('prependContext');
-      expect(result.prependContext).toContain('condo_create_goal');
+      expect(result.prependContext).toContain('strand_create_goal');
     });
 
     it('does not crash on classification error, logs it', async () => {
-      seedCondoWithKeywords('Infra', ['deploy']);
+      seedStrandWithKeywords('Infra', ['deploy']);
       // Corrupt the classification log file to force append() to throw
       writeFileSync(join(TEST_DIR, 'classification-log.json'), '{corrupt');
       const result = await api._hooks['before_agent_start']({
@@ -694,7 +694,7 @@ describe('Plugin index.js', () => {
       const original = CLASSIFIER_CONFIG.enabled;
       try {
         CLASSIFIER_CONFIG.enabled = false;
-        seedCondoWithKeywords('Infra', ['deploy'], [7777]);
+        seedStrandWithKeywords('Infra', ['deploy'], [7777]);
         const result = await api._hooks['before_agent_start']({
           context: { sessionKey: 'agent:kill:telegram:group:-100xxx:topic:7777' },
           messages: [{ role: 'user', content: 'deploy the server now' }],
@@ -751,26 +751,26 @@ describe('Plugin index.js', () => {
   });
 
   describe('reclassification tracking', () => {
-    it('logs correction when setSessionCondo changes condo', () => {
-      let condoA, condoB;
-      api._methods['condos.create']({
-        params: { name: 'Condo A' },
-        respond: (ok, payload) => { condoA = payload.condo; },
+    it('logs correction when setSessionStrand changes strand', () => {
+      let strandA, strandB;
+      api._methods['strands.create']({
+        params: { name: 'Strand A' },
+        respond: (ok, payload) => { strandA = payload.strand; },
       });
-      api._methods['condos.create']({
-        params: { name: 'Condo B' },
-        respond: (ok, payload) => { condoB = payload.condo; },
+      api._methods['strands.create']({
+        params: { name: 'Strand B' },
+        respond: (ok, payload) => { strandB = payload.strand; },
       });
 
       // First bind
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:reclass:test', condoId: condoA.id },
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:reclass:test', strandId: strandA.id },
         respond: () => {},
       });
 
-      // Rebind to different condo → should log reclassification
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:reclass:test', condoId: condoB.id },
+      // Rebind to different strand → should log reclassification
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:reclass:test', strandId: strandB.id },
         respond: () => {},
       });
 
@@ -782,20 +782,20 @@ describe('Plugin index.js', () => {
       expect(result.stats.corrected).toBeGreaterThanOrEqual(1);
     });
 
-    it('does not log correction when rebinding to same condo', () => {
-      let condo;
-      api._methods['condos.create']({
-        params: { name: 'Same Condo' },
-        respond: (ok, payload) => { condo = payload.condo; },
+    it('does not log correction when rebinding to same strand', () => {
+      let strand;
+      api._methods['strands.create']({
+        params: { name: 'Same Strand' },
+        respond: (ok, payload) => { strand = payload.strand; },
       });
 
-      // Bind twice to the same condo
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:same:test', condoId: condo.id },
+      // Bind twice to the same strand
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:same:test', strandId: strand.id },
         respond: () => {},
       });
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:same:test', condoId: condo.id },
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:same:test', strandId: strand.id },
         respond: () => {},
       });
 
@@ -807,19 +807,19 @@ describe('Plugin index.js', () => {
     });
 
     it('reclassification log error does not block rebinding', () => {
-      let condoA, condoB;
-      api._methods['condos.create']({
-        params: { name: 'Condo X' },
-        respond: (ok, payload) => { condoA = payload.condo; },
+      let strandA, strandB;
+      api._methods['strands.create']({
+        params: { name: 'Strand X' },
+        respond: (ok, payload) => { strandA = payload.strand; },
       });
-      api._methods['condos.create']({
-        params: { name: 'Condo Y' },
-        respond: (ok, payload) => { condoB = payload.condo; },
+      api._methods['strands.create']({
+        params: { name: 'Strand Y' },
+        respond: (ok, payload) => { strandB = payload.strand; },
       });
 
       // First bind
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:errlog:test', condoId: condoA.id },
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:errlog:test', strandId: strandA.id },
         respond: () => {},
       });
 
@@ -828,19 +828,19 @@ describe('Plugin index.js', () => {
 
       // Rebind should still succeed despite log error
       let rebindResult;
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:errlog:test', condoId: condoB.id },
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:errlog:test', strandId: strandB.id },
         respond: (ok, payload) => { rebindResult = { ok, payload }; },
       });
       expect(rebindResult.ok).toBe(true);
 
       // Verify binding took effect
       let mapping;
-      api._methods['goals.getSessionCondo']({
+      api._methods['goals.getSessionStrand']({
         params: { sessionKey: 'agent:errlog:test' },
         respond: (ok, payload) => { mapping = payload; },
       });
-      expect(mapping.condoId).toBe(condoB.id);
+      expect(mapping.strandId).toBe(strandB.id);
 
       // Error should have been logged
       expect(api.logger.error).toHaveBeenCalledWith(
@@ -851,25 +851,25 @@ describe('Plugin index.js', () => {
 
   describe('goals.kickoff with goal-level dependencies', () => {
     it('blocks kickoff when goal dependsOn are not done', async () => {
-      // Create condo
-      let condoResult;
-      api._methods['condos.create']({
-        params: { name: 'Phase Condo' },
-        respond: (ok, payload) => { condoResult = payload; },
+      // Create strand
+      let strandResult;
+      api._methods['strands.create']({
+        params: { name: 'Phase Strand' },
+        respond: (ok, payload) => { strandResult = payload; },
       });
-      const condoId = condoResult.condo.id;
+      const strandId = strandResult.strand.id;
 
       // Create phase 1 goal
       let goal1Result;
       api._methods['goals.create']({
-        params: { title: 'Foundation', condoId },
+        params: { title: 'Foundation', strandId },
         respond: (ok, payload) => { goal1Result = payload; },
       });
 
       // Create phase 2 goal that depends on phase 1
       let goal2Result;
       api._methods['goals.create']({
-        params: { title: 'Features', condoId },
+        params: { title: 'Features', strandId },
         respond: (ok, payload) => { goal2Result = payload; },
       });
       const goal2Id = goal2Result.goal.id;
@@ -1048,14 +1048,14 @@ describe('Plugin index.js', () => {
 
   describe('agent_end hook (error handling)', () => {
     it('catches errors and logs them without crashing', async () => {
-      // Create a condo and bind session (condo path calls save immediately)
-      let condoResult;
-      api._methods['condos.create']({
-        params: { name: 'Error Condo' },
-        respond: (ok, payload) => { condoResult = payload; },
+      // Create a strand and bind session (strand path calls save immediately)
+      let strandResult;
+      api._methods['strands.create']({
+        params: { name: 'Error Strand' },
+        respond: (ok, payload) => { strandResult = payload; },
       });
-      api._methods['goals.setSessionCondo']({
-        params: { sessionKey: 'agent:end:error', condoId: condoResult.condo.id },
+      api._methods['goals.setSessionStrand']({
+        params: { sessionKey: 'agent:end:error', strandId: strandResult.strand.id },
         respond: () => {},
       });
 

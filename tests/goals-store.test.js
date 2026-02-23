@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { createGoalsStore } from '../clawcondos/condo-management/lib/goals-store.js';
+import { createGoalsStore } from '../plugins/helix-goals/lib/goals-store.js';
 
 const TEST_DIR = join(import.meta.dirname, '__fixtures__', 'goals-store-test');
 
@@ -23,18 +23,18 @@ describe('GoalsStore', () => {
       const data = store.load();
       expect(data.version).toBe(2);
       expect(data.goals).toEqual([]);
-      expect(data.condos).toEqual([]);
+      expect(data.strands).toEqual([]);
       expect(data.sessionIndex).toEqual({});
-      expect(data.sessionCondoIndex).toEqual({});
+      expect(data.sessionStrandIndex).toEqual({});
     });
 
-    it('round-trips condos through save and load', () => {
+    it('round-trips strands through save and load', () => {
       const data = store.load();
-      data.condos.push({ id: 'condo_test1', name: 'Test Condo', description: '', color: null });
+      data.strands.push({ id: 'strand_test1', name: 'Test Strand', description: '', color: null });
       store.save(data);
       const loaded = store.load();
-      expect(loaded.condos).toHaveLength(1);
-      expect(loaded.condos[0].name).toBe('Test Condo');
+      expect(loaded.strands).toHaveLength(1);
+      expect(loaded.strands[0].name).toBe('Test Strand');
     });
 
     it('round-trips data through save and load', () => {
@@ -44,7 +44,7 @@ describe('GoalsStore', () => {
         description: '',
         status: 'active',
         completed: false,
-        condoId: null,
+        strandId: null,
         priority: null,
         deadline: null,
         notes: '',
@@ -87,7 +87,7 @@ describe('GoalsStore', () => {
       expect(data.goals[0].completed).toBe(true);
       expect(data.goals[0].description).toBe('some notes');
       expect(data.goals[0].sessions).toEqual([]);
-      expect(data.goals[0].condoId).toBeNull();
+      expect(data.goals[0].strandId).toBeNull();
     });
   });
 

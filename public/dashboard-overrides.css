@@ -9,21 +9,21 @@
   box-shadow: none;
 }
 
-/* Condo Status section header */
-#condoStatusSection .grid-title-row {
+/* Strand Status section header */
+#strandStatusSection .grid-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
-#condoStatusSection .grid-title {
+#strandStatusSection .grid-title {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   color: var(--text-muted);
   letter-spacing: 0.08em;
 }
-#condoStatusSection .uncategorized-count {
+#strandStatusSection .uncategorized-count {
   font-size: 11px;
   padding: 4px 10px;
   border-radius: 999px;
@@ -32,8 +32,8 @@
   color: var(--red);
 }
 
-/* Condo status board */
-#condoStatusBoard .condo-status-card {
+/* Strand status board */
+#strandStatusBoard .strand-status-card {
   box-shadow: none;
 }
-#condoStatusBoard .goal-status-row { cursor: pointer; }
+#strandStatusBoard .goal-status-row { cursor: pointer; }

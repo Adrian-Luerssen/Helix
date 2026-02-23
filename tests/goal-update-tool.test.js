@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { createGoalsStore } from '../clawcondos/condo-management/lib/goals-store.js';
-import { createGoalUpdateExecutor } from '../clawcondos/condo-management/lib/goal-update-tool.js';
+import { createGoalsStore } from '../plugins/helix-goals/lib/goals-store.js';
+import { createGoalUpdateExecutor } from '../plugins/helix-goals/lib/goal-update-tool.js';
 
 const TEST_DIR = join(import.meta.dirname, '__fixtures__', 'goal-update-test');
 
@@ -23,7 +23,7 @@ describe('goal_update tool', () => {
         { id: 'task_1', text: 'Build API', done: false },
         { id: 'task_2', text: 'Write tests', done: false },
       ],
-      condoId: null, priority: null, deadline: null, description: '', notes: '',
+      strandId: null, priority: null, deadline: null, description: '', notes: '',
       createdAtMs: Date.now(), updatedAtMs: Date.now(),
     });
     data.sessionIndex['agent:main:main'] = { goalId: 'goal_1' };
@@ -368,7 +368,7 @@ describe('goal_update tool', () => {
   });
 });
 
-describe('goal_update tool with goalId (condo path)', () => {
+describe('goal_update tool with goalId (strand path)', () => {
   let store, execute;
 
   beforeEach(() => {
@@ -377,10 +377,10 @@ describe('goal_update tool with goalId (condo path)', () => {
     store = createGoalsStore(TEST_DIR);
     execute = createGoalUpdateExecutor(store);
 
-    // Seed: condo-bound session with two goals
+    // Seed: strand-bound session with two goals
     const data = store.load();
-    data.condos.push({
-      id: 'condo_1', name: 'Project', description: '',
+    data.strands.push({
+      id: 'strand_1', name: 'Project', description: '',
       color: null, createdAtMs: Date.now(), updatedAtMs: Date.now(),
     });
     data.goals.push({
@@ -388,7 +388,7 @@ describe('goal_update tool with goalId (condo path)', () => {
       sessions: [], tasks: [
         { id: 'task_1', text: 'Build API', done: false },
       ],
-      condoId: 'condo_1', priority: null, deadline: null, description: '', notes: '',
+      strandId: 'strand_1', priority: null, deadline: null, description: '', notes: '',
       createdAtMs: Date.now(), updatedAtMs: Date.now(),
     });
     data.goals.push({
@@ -396,16 +396,16 @@ describe('goal_update tool with goalId (condo path)', () => {
       sessions: [], tasks: [
         { id: 'task_2', text: 'Keywords', done: false },
       ],
-      condoId: 'condo_1', priority: null, deadline: null, description: '', notes: '',
+      strandId: 'strand_1', priority: null, deadline: null, description: '', notes: '',
       createdAtMs: Date.now(), updatedAtMs: Date.now(),
     });
     data.goals.push({
-      id: 'goal_other', title: 'Other Condo Goal', status: 'active', completed: false,
+      id: 'goal_other', title: 'Other Strand Goal', status: 'active', completed: false,
       sessions: [], tasks: [],
-      condoId: 'condo_other', priority: null, deadline: null, description: '', notes: '',
+      strandId: 'strand_other', priority: null, deadline: null, description: '', notes: '',
       createdAtMs: Date.now(), updatedAtMs: Date.now(),
     });
-    data.sessionCondoIndex['agent:main:telegram:123'] = 'condo_1';
+    data.sessionStrandIndex['agent:main:telegram:123'] = 'strand_1';
     store.save(data);
   });
 
@@ -429,7 +429,7 @@ describe('goal_update tool with goalId (condo path)', () => {
     expect(task.summary).toBe('All endpoints built');
   });
 
-  it('can update different goals in same condo', async () => {
+  it('can update different goals in same strand', async () => {
     await execute('call1', {
       sessionKey: 'agent:main:telegram:123',
       goalId: 'goal_2',
@@ -452,7 +452,7 @@ describe('goal_update tool with goalId (condo path)', () => {
     expect(result.content[0].text).toContain('not found');
   });
 
-  it('returns error when goalId does not belong to bound condo', async () => {
+  it('returns error when goalId does not belong to bound strand', async () => {
     const result = await execute('call1', {
       sessionKey: 'agent:main:telegram:123',
       goalId: 'goal_other',
@@ -461,7 +461,7 @@ describe('goal_update tool with goalId (condo path)', () => {
     expect(result.content[0].text).toContain('does not belong');
   });
 
-  it('condo orchestrator can set goalStatus on any goal in condo', async () => {
+  it('strand orchestrator can set goalStatus on any goal in strand', async () => {
     // Mark all tasks done on goal_1
     const data = store.load();
     data.goals[0].tasks[0].done = true;
@@ -477,7 +477,7 @@ describe('goal_update tool with goalId (condo path)', () => {
     expect(store.load().goals[0].status).toBe('done');
   });
 
-  it('condo orchestrator can set nextTask on any goal in condo', async () => {
+  it('strand orchestrator can set nextTask on any goal in strand', async () => {
     const result = await execute('call1', {
       sessionKey: 'agent:main:telegram:123',
       goalId: 'goal_2',
@@ -511,11 +511,11 @@ describe('goal_update cross-goal boundaries', () => {
     store = createGoalsStore(TEST_DIR);
     execute = createGoalUpdateExecutor(store);
 
-    // Session owns goal_1, goals 1 & 2 in same condo, goal_3 in different condo, goal_4 is done
+    // Session owns goal_1, goals 1 & 2 in same strand, goal_3 in different strand, goal_4 is done
     const data = store.load();
-    data.condos.push(
-      { id: 'condo_1', name: 'Project A', description: '', color: null, createdAtMs: Date.now(), updatedAtMs: Date.now() },
-      { id: 'condo_2', name: 'Project B', description: '', color: null, createdAtMs: Date.now(), updatedAtMs: Date.now() },
+    data.strands.push(
+      { id: 'strand_1', name: 'Project A', description: '', color: null, createdAtMs: Date.now(), updatedAtMs: Date.now() },
+      { id: 'strand_2', name: 'Project B', description: '', color: null, createdAtMs: Date.now(), updatedAtMs: Date.now() },
     );
     data.goals.push(
       {
@@ -523,7 +523,7 @@ describe('goal_update cross-goal boundaries', () => {
         sessions: ['agent:main:main'], tasks: [
           { id: 'task_1', text: 'My task', done: false },
         ],
-        condoId: 'condo_1', priority: null, deadline: null, description: '', notes: '',
+        strandId: 'strand_1', priority: null, deadline: null, description: '', notes: '',
         createdAtMs: Date.now(), updatedAtMs: Date.now(),
       },
       {
@@ -531,19 +531,19 @@ describe('goal_update cross-goal boundaries', () => {
         sessions: [], tasks: [
           { id: 'task_2', text: 'Sibling task', done: false },
         ],
-        condoId: 'condo_1', priority: null, deadline: null, description: '', notes: '',
+        strandId: 'strand_1', priority: null, deadline: null, description: '', notes: '',
         createdAtMs: Date.now(), updatedAtMs: Date.now(),
       },
       {
-        id: 'goal_3', title: 'Other Condo Goal', status: 'active', completed: false,
+        id: 'goal_3', title: 'Other Strand Goal', status: 'active', completed: false,
         sessions: [], tasks: [],
-        condoId: 'condo_2', priority: null, deadline: null, description: '', notes: '',
+        strandId: 'strand_2', priority: null, deadline: null, description: '', notes: '',
         createdAtMs: Date.now(), updatedAtMs: Date.now(),
       },
       {
         id: 'goal_4', title: 'Done Sibling', status: 'done', completed: true,
         sessions: [], tasks: [{ id: 'task_4', text: 'Done task', done: true }],
-        condoId: 'condo_1', priority: null, deadline: null, description: '', notes: '',
+        strandId: 'strand_1', priority: null, deadline: null, description: '', notes: '',
         createdAtMs: Date.now(), updatedAtMs: Date.now(),
       },
     );
@@ -555,7 +555,7 @@ describe('goal_update cross-goal boundaries', () => {
     rmSync(TEST_DIR, { recursive: true, force: true });
   });
 
-  it('allows addTasks on sibling in same condo', async () => {
+  it('allows addTasks on sibling in same strand', async () => {
     const result = await execute('call1', {
       sessionKey: 'agent:main:main',
       goalId: 'goal_2',
@@ -566,7 +566,7 @@ describe('goal_update cross-goal boundaries', () => {
     expect(data.goals[1].tasks).toHaveLength(2);
   });
 
-  it('allows notes on sibling in same condo', async () => {
+  it('allows notes on sibling in same strand', async () => {
     const result = await execute('call1', {
       sessionKey: 'agent:main:main',
       goalId: 'goal_2',
@@ -610,7 +610,7 @@ describe('goal_update cross-goal boundaries', () => {
     expect(result.content[0].text).toContain('cross-goal');
   });
 
-  it('blocks operations on different condo', async () => {
+  it('blocks operations on different strand', async () => {
     const result = await execute('call1', {
       sessionKey: 'agent:main:main',
       goalId: 'goal_3',
@@ -657,7 +657,7 @@ describe('goal_update file tracking', () => {
         { id: 'task_2', text: 'Write tests', done: false },
       ],
       files: [],
-      condoId: null, priority: null, deadline: null, description: '', notes: '',
+      strandId: null, priority: null, deadline: null, description: '', notes: '',
       createdAtMs: Date.now(), updatedAtMs: Date.now(),
     });
     data.sessionIndex['agent:main:main'] = { goalId: 'goal_1' };

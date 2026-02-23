@@ -5178,11 +5178,11 @@ a:focus-visible {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SIDEBAR CONDO GROUPS (collapsible condo > goal tree)
+   SIDEBAR STRAND GROUPS (collapsible strand > goal tree)
    ═══════════════════════════════════════════════════════════════ */
 
-/* Single-condo flat label */
-.condo-label {
+/* Single-strand flat label */
+.strand-label {
   padding: 6px 16px 2px;
   font-size: 0.68rem;
   font-weight: 700;
@@ -5191,11 +5191,11 @@ a:focus-visible {
   color: var(--text-muted);
 }
 
-.condo-group {
+.strand-group {
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.condo-group-header {
+.strand-group-header {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
@@ -5205,30 +5205,30 @@ a:focus-visible {
   font-weight: 600;
 }
 
-.condo-group-header:hover {
+.strand-group-header:hover {
   background: var(--bg-hover);
 }
 
-.condo-group-header .group-expand-icon {
+.strand-group-header .group-expand-icon {
   font-size: 0.7rem;
   color: var(--text-dim);
   width: 12px;
   transition: transform var(--transition-fast);
 }
 
-.condo-group.expanded .group-expand-icon {
+.strand-group.expanded .group-expand-icon {
   transform: rotate(90deg);
 }
 
-.condo-group.condo-active > .condo-group-header {
+.strand-group.strand-active > .strand-group-header {
   background: var(--bg-active);
   border-left: 3px solid var(--accent);
 }
-.condo-group.condo-active > .condo-group-header .condo-group-name {
+.strand-group.strand-active > .strand-group-header .strand-group-name {
   color: var(--text);
 }
 
-.condo-group-name {
+.strand-group-name {
   flex: 1;
   font-size: 0.82rem;
   white-space: nowrap;
@@ -5237,7 +5237,7 @@ a:focus-visible {
   color: var(--text);
 }
 
-.condo-active-badge {
+.strand-active-badge {
   font-size: 0.62rem;
   font-weight: 600;
   color: var(--green);
@@ -5247,9 +5247,9 @@ a:focus-visible {
   white-space: nowrap;
 }
 
-/* Condo header action buttons (sidebar) */
-.condo-add-goal-btn,
-.condo-delete-btn {
+/* Strand header action buttons (sidebar) */
+.strand-add-goal-btn,
+.strand-delete-btn {
   background: none;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -5261,20 +5261,20 @@ a:focus-visible {
   transition: color 0.15s, border-color 0.15s, background 0.15s;
   margin-left: 2px;
 }
-.condo-add-goal-btn:hover {
+.strand-add-goal-btn:hover {
   color: var(--text);
   border-color: rgba(255,255,255,.2);
 }
-.condo-delete-btn:hover {
+.strand-delete-btn:hover {
   color: var(--error, #ef4444);
   border-color: rgba(239,68,68,.3);
 }
 
-.condo-group-items {
+.strand-group-items {
   background: rgba(0, 0, 0, 0.1);
 }
 
-.goal-item.condo-nested {
+.goal-item.strand-nested {
   padding-left: 40px;
 }
 
@@ -5311,16 +5311,16 @@ a:focus-visible {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   DASHBOARD CONDO STATUS BOARD
+   DASHBOARD STRAND STATUS BOARD
    ═══════════════════════════════════════════════════════════════ */
 
-#condoStatusBoard {
+#strandStatusBoard {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
 }
 
-.condo-status-card {
+.strand-status-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -5328,23 +5328,23 @@ a:focus-visible {
   transition: all var(--transition-smooth);
 }
 
-.condo-status-card:hover {
+.strand-status-card:hover {
   border-color: rgba(129, 140, 248, 0.15);
   box-shadow: 0 0 15px rgba(255, 255, 255, 0.05);
   transform: scale(1.015);
 }
 
-.condo-status-card.condo-attention-needs-input {
+.strand-status-card.strand-attention-needs-input {
   border-left: 2px solid var(--yellow);
   box-shadow: 0 0 10px rgba(255, 214, 0, 0.05);
 }
 
-.condo-status-card.condo-attention-unread {
+.strand-status-card.strand-attention-unread {
   border-left: 2px solid var(--accent);
   box-shadow: var(--shadow-sm);
 }
 
-.condo-status-header {
+.strand-status-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5353,14 +5353,14 @@ a:focus-visible {
   background: rgba(0, 0, 0, 0.12);
 }
 
-.condo-status-header-left {
+.strand-status-header-left {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
   min-width: 0;
 }
 
-.condo-status-name {
+.strand-status-name {
   font-weight: 700;
   font-size: 0.95rem;
   color: var(--text);
@@ -5369,7 +5369,7 @@ a:focus-visible {
   text-overflow: ellipsis;
 }
 
-.condo-running-badge {
+.strand-running-badge {
   font-size: 0.65rem;
   font-weight: 600;
   color: var(--green);
@@ -5385,19 +5385,19 @@ a:focus-visible {
   50% { opacity: 0.7; }
 }
 
-.condo-status-count {
+.strand-status-count {
   font-size: 0.72rem;
   color: var(--text-dim);
   font-weight: 500;
   white-space: nowrap;
 }
 
-.condo-status-goals {
+.strand-status-goals {
   display: flex;
   flex-direction: column;
 }
 
-.condo-done-summary {
+.strand-done-summary {
   padding: 8px var(--space-lg);
   font-size: 0.75rem;
   color: var(--text-muted);
@@ -5519,11 +5519,11 @@ a:focus-visible {
 
 /* ═══════════════════════════════════════════════════════════════
    GOALS (Helix) - overview cards + detail view
-   Distinctive 'condo lobby' aesthetic
+   Distinctive 'strand lobby' aesthetic
    ═══════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════
-   GOALS GRID (Condos)
+   GOALS GRID (Strands)
    ═══════════════════════════════════════════════════════════════ */
 
 .goals-grid {
@@ -7970,15 +7970,15 @@ a:focus-visible {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   CONDO CONTEXT VIEW
+   STRAND CONTEXT VIEW
    ═══════════════════════════════════════════════════════════════ */
-.condo-context {
+.strand-context {
   padding: var(--space-xl) var(--space-2xl);
   overflow-y: auto;
   flex: 1;
 }
 
-.condo-context-header {
+.strand-context-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -7986,32 +7986,32 @@ a:focus-visible {
   gap: var(--space-lg);
 }
 
-.condo-context-header-left {
+.strand-context-header-left {
   display: flex;
   align-items: baseline;
   gap: var(--space-md);
   min-width: 0;
 }
 
-.condo-context-title {
+.strand-context-title {
   font-size: 1.4rem;
   font-weight: 700;
   letter-spacing: -0.03em;
 }
 
-.condo-context-subtitle {
+.strand-context-subtitle {
   font-size: 0.78rem;
   color: var(--text-dim);
   font-family: var(--font-mono);
 }
 
-.condo-context-actions {
+.strand-context-actions {
   display: flex;
   gap: var(--space-sm);
   flex-shrink: 0;
 }
 
-.condo-context-body {
+.strand-context-body {
   display: grid;
   grid-template-columns: 1fr 1.2fr;
   gap: var(--space-xl);
@@ -8019,28 +8019,28 @@ a:focus-visible {
 }
 
 @media (max-width: 1000px) {
-  .condo-context-body {
+  .strand-context-body {
     grid-template-columns: 1fr;
   }
 }
 
-.condo-context-left,
-.condo-context-right {
+.strand-context-left,
+.strand-context-right {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
 }
 
-/* Condo info panel */
-.condo-info-panel,
-.condo-workspace-panel {
+/* Strand info panel */
+.strand-info-panel,
+.strand-workspace-panel {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: var(--space-lg);
 }
 
-.condo-info-title {
+.strand-info-title {
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-dim);
@@ -8049,51 +8049,51 @@ a:focus-visible {
   margin-bottom: var(--space-md);
 }
 
-.condo-info-grid {
+.strand-info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-md);
 }
 
-.condo-info-item {
+.strand-info-item {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.condo-info-label {
+.strand-info-label {
   font-size: 0.72rem;
   color: var(--text-muted);
   font-weight: 500;
 }
 
-.condo-info-value {
+.strand-info-value {
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 
-.condo-overall-progress {
+.strand-overall-progress {
   margin-top: var(--space-md);
   padding-top: var(--space-md);
   border-top: 1px solid var(--border-subtle);
 }
 
-.condo-overall-progress-label {
+.strand-overall-progress-label {
   font-size: 0.72rem;
   color: var(--text-muted);
   margin-bottom: 4px;
 }
 
-.condo-progress-pct {
+.strand-progress-pct {
   font-size: 0.82rem;
   font-weight: 700;
   color: var(--text);
   margin-top: 4px;
 }
 
-.condo-workspace-path {
+.strand-workspace-path {
   font-family: var(--font-mono);
   font-size: 0.82rem;
   color: var(--text-secondary);
@@ -8103,31 +8103,31 @@ a:focus-visible {
   word-break: break-all;
 }
 
-.condo-workspace-repo {
+.strand-workspace-repo {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--text-dim);
   margin-top: 8px;
 }
 
-.condo-workspace-none {
+.strand-workspace-none {
   font-size: 0.85rem;
   color: var(--text-muted);
 }
 
-/* Condo name clickable */
-.condo-clickable {
+/* Strand name clickable */
+.strand-clickable {
   cursor: pointer;
   transition: color var(--transition-fast);
 }
-.condo-clickable:hover {
+.strand-clickable:hover {
   color: var(--accent);
 }
 
 /* ═══════════════════════════════════════════════════════════════
    TASK GRAPH VISUALIZATION
    ═══════════════════════════════════════════════════════════════ */
-.condo-goals-graph {
+.strand-goals-graph {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -8277,7 +8277,7 @@ a:focus-visible {
 /* ═══════════════════════════════════════════════════════════════
    TIMELINE
    ═══════════════════════════════════════════════════════════════ */
-.condo-timeline {
+.strand-timeline {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -8359,9 +8359,9 @@ a:focus-visible {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   ENHANCED OVERVIEW - Condo Status Board on Dashboard
+   ENHANCED OVERVIEW - Strand Status Board on Dashboard
    ═══════════════════════════════════════════════════════════════ */
-#condoStatusSection {
+#strandStatusSection {
   margin-top: var(--space-xl);
 }
 
@@ -8888,16 +8888,16 @@ a:focus-visible {
   box-shadow: 0 2px 8px rgba(129, 140, 248, 0.3);
 }
 
-.settings-condo-picker {
+.settings-strand-picker {
   margin-bottom: var(--space-lg);
   display: none;
 }
 
-.settings-condo-picker.visible {
+.settings-strand-picker.visible {
   display: block;
 }
 
-.settings-condo-picker select {
+.settings-strand-picker select {
   background: var(--bg-input);
   border: 1px solid var(--border);
   color: var(--text);
@@ -8996,25 +8996,25 @@ a:focus-visible {
   margin-left: 4px;
 }
 
-/* Services summary in condo context */
-.condo-services-panel {
+/* Services summary in strand context */
+.strand-services-panel {
   margin-top: var(--space-lg);
 }
 
-.condo-services-title {
+.strand-services-title {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: var(--space-sm);
 }
 
-.condo-services-list {
+.strand-services-list {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-sm);
 }
 
-.condo-service-chip {
+.strand-service-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -9026,7 +9026,7 @@ a:focus-visible {
   color: var(--text-secondary);
 }
 
-.condo-service-chip.active {
+.strand-service-chip.active {
   border-color: var(--green);
   color: var(--green);
   background: var(--green-dim);

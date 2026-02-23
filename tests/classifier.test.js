@@ -7,7 +7,7 @@ import {
   isSkippableMessage,
   detectGoalIntent,
   CLASSIFIER_CONFIG,
-} from '../clawcondos/condo-management/lib/classifier.js';
+} from '../plugins/helix-goals/lib/classifier.js';
 
 // ─── extractLastUserMessage ─────────────────────────────────────
 
@@ -107,55 +107,55 @@ describe('isSkippableMessage', () => {
 // ─── tier1Classify ─────────────────────────────────────────────
 
 describe('tier1Classify', () => {
-  const condos = [
+  const strands = [
     {
-      id: 'condo:investor-crm',
+      id: 'strand:investor-crm',
       name: 'Investor CRM',
       keywords: ['investor', 'pipeline', 'fundraising', 'series'],
       telegramTopicIds: [2212],
     },
     {
-      id: 'condo:subastas',
+      id: 'strand:subastas',
       name: 'Subastas',
       keywords: ['subastas', 'auction', 'scraper', 'murcia'],
       telegramTopicIds: [3001],
     },
     {
-      id: 'condo:moltcourt',
+      id: 'strand:moltcourt',
       name: 'MoltCourt',
       keywords: ['moltcourt', 'landing', 'court'],
       telegramTopicIds: [],
     },
   ];
 
-  describe('explicit @condo mention', () => {
-    it('matches @condo:investor-crm', () => {
+  describe('explicit @strand mention', () => {
+    it('matches @strand:investor-crm', () => {
       const result = tier1Classify(
-        '@condo:investor-crm check the pipeline',
+        '@strand:investor-crm check the pipeline',
         { topicId: null },
-        condos,
+        strands,
       );
-      expect(result.condoId).toBe('condo:investor-crm');
+      expect(result.strandId).toBe('strand:investor-crm');
       expect(result.confidence).toBe(1.0);
       expect(result.tier).toBe(1);
     });
 
-    it('returns null for unknown @condo mention', () => {
-      const result = tier1Classify('@condo:nonexistent hello', { topicId: null }, condos);
-      expect(result.condoId).toBeNull();
+    it('returns null for unknown @strand mention', () => {
+      const result = tier1Classify('@strand:nonexistent hello', { topicId: null }, strands);
+      expect(result.strandId).toBeNull();
     });
   });
 
   describe('Telegram topic matching', () => {
     it('matches by topic ID', () => {
-      const result = tier1Classify('any message', { topicId: 2212 }, condos);
-      expect(result.condoId).toBe('condo:investor-crm');
+      const result = tier1Classify('any message', { topicId: 2212 }, strands);
+      expect(result.strandId).toBe('strand:investor-crm');
       expect(result.confidence).toBe(0.95);
     });
 
     it('returns null for unknown topic ID', () => {
-      const result = tier1Classify('any message', { topicId: 9999 }, condos);
-      expect(result.condoId).toBeNull();
+      const result = tier1Classify('any message', { topicId: 9999 }, strands);
+      expect(result.strandId).toBeNull();
     });
   });
 
@@ -164,66 +164,66 @@ describe('tier1Classify', () => {
       const result = tier1Classify(
         'Update the investor pipeline contacts',
         { topicId: null },
-        condos,
+        strands,
       );
-      expect(result.condoId).toBe('condo:investor-crm');
+      expect(result.strandId).toBe('strand:investor-crm');
       expect(result.confidence).toBeGreaterThan(0);
     });
 
-    it('scores condo name appearing in message', () => {
+    it('scores strand name appearing in message', () => {
       const result = tier1Classify(
         'Build a landing page for MoltCourt',
         { topicId: null },
-        condos,
+        strands,
       );
-      expect(result.condoId).toBe('condo:moltcourt');
+      expect(result.strandId).toBe('strand:moltcourt');
     });
 
-    it('picks highest scoring condo', () => {
+    it('picks highest scoring strand', () => {
       const result = tier1Classify(
         'Check subastas auction scraper',
         { topicId: null },
-        condos,
+        strands,
       );
-      expect(result.condoId).toBe('condo:subastas');
+      expect(result.strandId).toBe('strand:subastas');
     });
 
     it('returns null for message with no keyword matches', () => {
       const result = tier1Classify(
         'What is the weather today?',
         { topicId: null },
-        condos,
+        strands,
       );
-      expect(result.condoId).toBeNull();
+      expect(result.strandId).toBeNull();
     });
 
     it('requires minimum confidence gap between top two', () => {
-      // If two condos score nearly the same, result should be low confidence
-      const ambiguousCondos = [
+      // If two strands score nearly the same, result should be low confidence
+      const ambiguousStrands = [
         { id: 'a', name: 'Alpha', keywords: ['shared'], telegramTopicIds: [] },
         { id: 'b', name: 'Beta', keywords: ['shared'], telegramTopicIds: [] },
       ];
-      const result = tier1Classify('check shared thing', { topicId: null }, ambiguousCondos);
+      const result = tier1Classify('check shared thing', { topicId: null }, ambiguousStrands);
       // Both score the same - confidence should be low
       expect(result.confidence).toBeLessThan(CLASSIFIER_CONFIG.autoRouteThreshold);
     });
   });
 
   describe('empty/edge cases', () => {
-    it('returns null for no condos', () => {
+    it('returns null for no strands', () => {
       const result = tier1Classify('hello', { topicId: null }, []);
-      expect(result.condoId).toBeNull();
+      expect(result.strandId).toBeNull();
     });
 
     it('returns null for empty message', () => {
-      const result = tier1Classify('', { topicId: null }, condos);
-      expect(result.condoId).toBeNull();
+      const result = tier1Classify('', { topicId: null }, strands);
+      expect(result.strandId).toBeNull();
     });
 
-    it('handles condos with no keywords', () => {
+    it('handles strands with no keywords', () => {
       const bare = [{ id: 'c1', name: 'Bare', keywords: [], telegramTopicIds: [] }];
       const result = tier1Classify('test', { topicId: null }, bare);
-      expect(result.condoId).toBeNull();
+      expect(result.strandId).toBeNull();
     });
   });
 });

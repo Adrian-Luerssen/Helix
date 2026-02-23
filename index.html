@@ -46,7 +46,7 @@
   <div class="modal-overlay hidden" id="createGoalModal">
     <div class="modal">
       <h2 class="modal-title">New Goal</h2>
-      <p class="modal-desc">Create a new condo (goal). You can attach sessions and spawn agents inside it.</p>
+      <p class="modal-desc">Create a new strand (goal). You can attach sessions and spawn agents inside it.</p>
       <div class="form-group">
         <label class="form-label">Title</label>
         <input type="text" class="form-input" id="createGoalTitle" placeholder="e.g., Rebrand Dashboard" 
@@ -70,7 +70,7 @@
   <div class="modal-overlay hidden" id="attachSessionModal">
     <div class="modal" style="max-width: 520px;">
       <h2 class="modal-title">Attach session to goal</h2>
-      <p class="modal-desc">Pick a condo. This moves the session (removes it from any other condo).</p>
+      <p class="modal-desc">Pick a strand. This moves the session (removes it from any other strand).</p>
       <div class="form-group">
         <label class="form-label">Session</label>
         <div class="session-pill" id="attachSessionPill">—</div>
@@ -264,10 +264,10 @@
     </button>
 
     <div class="sidebar-content">
-      <!-- Condos (Goals) -->
+      <!-- Strands (Goals) -->
       <div class="section">
         <div class="section-header">
-          <span class="section-title">Condos</span>
+          <span class="section-title">Strands</span>
           <div class="goal-time-filter">
             <select id="goalTimeFilterSelect" onchange="setGoalTimeFilter(this.value)">
               <option value="1">24h</option>
@@ -282,14 +282,14 @@
         </div>
         <div id="goalsList" style="padding: 4px 0;"></div>
         <div id="uncategorizedLink" style="display: none;">
-          <div class="condo-group expanded">
-            <div class="condo-group-header" onclick="toggleCondoExpanded('__uncat_sessions__')">
+          <div class="strand-group expanded">
+            <div class="strand-group-header" onclick="toggleStrandExpanded('__uncat_sessions__')">
               <span class="group-expand-icon">&#9654;</span>
               <div class="goal-item-dot none"></div>
-              <span class="condo-group-name" id="uncatSessionsLabel">Uncategorized</span>
+              <span class="strand-group-name" id="uncatSessionsLabel">Uncategorized</span>
               <span class="group-count" id="uncatSessionsCount">0</span>
             </div>
-            <div class="condo-group-items" id="uncatSessionsList"></div>
+            <div class="strand-group-items" id="uncatSessionsList"></div>
           </div>
         </div>
         <div id="sessionsList" style="display: none;"></div>
@@ -362,13 +362,13 @@
             </div>
           </div>
 
-          <!-- Condo Status Board -->
-          <div class="grid-section" id="condoStatusSection">
+          <!-- Strand Status Board -->
+          <div class="grid-section" id="strandStatusSection">
             <div class="grid-header">
               <h2 class="grid-title">Projects</h2>
-              <span class="grid-count" id="condoCount">0</span>
+              <span class="grid-count" id="strandCount">0</span>
             </div>
-            <div id="condoStatusBoard"></div>
+            <div id="strandStatusBoard"></div>
           </div>
 
           <!-- Recent Sessions -->
@@ -420,7 +420,7 @@
               <div>
                 <div class="goal-right-title" id="goalHeroTitle">Goal</div>
                 <div class="goal-right-meta">
-                  <span id="goalCondoName">Condo</span>
+                  <span id="goalStrandName">Strand</span>
                   <span>·</span>
                   <span>Updated: <b id="goalLastUpdated">—</b></span>
                 </div>
@@ -587,28 +587,28 @@
         </div>
       </div>
 
-      <!-- Condo Context View -->
-      <div class="view" id="condoContextView">
-        <div class="condo-context">
-          <div class="condo-context-header">
-            <div class="condo-context-header-left">
-              <h2 class="condo-context-title" id="condoContextTitle">Condo</h2>
-              <span class="condo-context-subtitle" id="condoContextSubtitle"></span>
+      <!-- Strand Context View -->
+      <div class="view" id="strandContextView">
+        <div class="strand-context">
+          <div class="strand-context-header">
+            <div class="strand-context-header-left">
+              <h2 class="strand-context-title" id="strandContextTitle">Strand</h2>
+              <span class="strand-context-subtitle" id="strandContextSubtitle"></span>
             </div>
-            <div class="condo-context-actions">
-              <button class="btn btn-secondary btn-sm" onclick="checkCondoConflicts()">Check Conflicts</button>
-              <button class="btn btn-secondary btn-sm" onclick="killCondoSessionsFromContext()">Stop All</button>
+            <div class="strand-context-actions">
+              <button class="btn btn-secondary btn-sm" onclick="checkStrandConflicts()">Check Conflicts</button>
+              <button class="btn btn-secondary btn-sm" onclick="killStrandSessionsFromContext()">Stop All</button>
               <button class="btn btn-ghost btn-sm" onclick="showOverview()">Back</button>
             </div>
           </div>
-          <div class="condo-context-body">
-            <div class="condo-context-left">
-              <div class="condo-info-panel" id="condoInfoPanel"></div>
-              <div class="condo-workspace-panel" id="condoWorkspacePanel"></div>
+          <div class="strand-context-body">
+            <div class="strand-context-left">
+              <div class="strand-info-panel" id="strandInfoPanel"></div>
+              <div class="strand-workspace-panel" id="strandWorkspacePanel"></div>
             </div>
-            <div class="condo-context-right">
-              <div class="condo-goals-graph" id="condoGoalsGraph"></div>
-              <div class="condo-timeline" id="condoTimeline"></div>
+            <div class="strand-context-right">
+              <div class="strand-goals-graph" id="strandGoalsGraph"></div>
+              <div class="strand-timeline" id="strandTimeline"></div>
             </div>
           </div>
         </div>
@@ -649,7 +649,7 @@
     // ═══════════════════════════════════════════════════════════════
     
     // Get configuration (from config.js)
-    const config = window.ClawCondosConfig ? window.ClawCondosConfig.getConfig() : {};
+    const config = window.HelixConfig ? window.HelixConfig.getConfig() : {};
     
     const state = {
       // Data
@@ -778,9 +778,9 @@
       activeTools: new Map(),  // Map<toolCallId, { name, args, output, startedAt, status }>
       toolActivityExpanded: false,
 
-      // Condos
-      condos: [],
-      condoExpanded: JSON.parse(localStorage.getItem('sharp_condo_expanded') || '{}'),
+      // Strands
+      strands: [],
+      strandExpanded: JSON.parse(localStorage.getItem('sharp_strand_expanded') || '{}'),
     };
     
     // ═══════════════════════════════════════════════════════════════
@@ -2121,7 +2121,7 @@
         console.log('[Helix] About to call syncActiveRunsFromServer...');
         await syncActiveRunsFromServer();
         console.log('[Helix] syncActiveRunsFromServer completed');
-        await Promise.all([loadCondos(), loadGoals(), loadSessions(), loadApps(), loadAgents()]);
+        await Promise.all([loadStrands(), loadGoals(), loadSessions(), loadApps(), loadAgents()]);
         updateOverview();
         updateStatsGrid();
 
@@ -2207,26 +2207,26 @@
         console.warn('[Helix] Failed to load goals:', err);
       }
       renderGoals();
-      renderCondoStatusBoard();
+      renderStrandStatusBoard();
       updateUncategorizedCount();
     }
 
-    async function loadCondos() {
+    async function loadStrands() {
       try {
-        const data = await rpcCall('condos.list', {});
-        state.condos = data?.condos || [];
+        const data = await rpcCall('strands.list', {});
+        state.strands = data?.strands || [];
       } catch (err) {
-        console.warn('[Helix] Failed to load condos:', err);
+        console.warn('[Helix] Failed to load strands:', err);
       }
     }
 
-    function groupGoalsByCondoId() {
+    function groupGoalsByStrandId() {
       const grouped = {};
       const uncategorized = [];
       for (const g of state.goals) {
-        if (g.condoId) {
-          if (!grouped[g.condoId]) grouped[g.condoId] = [];
-          grouped[g.condoId].push(g);
+        if (g.strandId) {
+          if (!grouped[g.strandId]) grouped[g.strandId] = [];
+          grouped[g.strandId].push(g);
         } else {
           uncategorized.push(g);
         }
@@ -2234,7 +2234,7 @@
       return { grouped, uncategorized };
     }
 
-    function getCondoAttention(condo, goals) {
+    function getStrandAttention(strand, goals) {
       let worst = 'none';
       const priority = { 'none': 0, 'done': 1, 'read': 2, 'unread': 3, 'needs-input': 4 };
       for (const g of goals) {
@@ -2244,8 +2244,8 @@
       return worst;
     }
 
-    function getCondoLatestActivity(condo, goals) {
-      let latest = condo?.updatedAtMs || condo?.createdAtMs || 0;
+    function getStrandLatestActivity(strand, goals) {
+      let latest = strand?.updatedAtMs || strand?.createdAtMs || 0;
       for (const g of goals) {
         const t = getGoalLatestActivity(g);
         if (t > latest) latest = t;
@@ -2253,9 +2253,9 @@
       return latest;
     }
 
-    function toggleCondoExpanded(condoId) {
-      state.condoExpanded[condoId] = !state.condoExpanded[condoId];
-      localStorage.setItem('sharp_condo_expanded', JSON.stringify(state.condoExpanded));
+    function toggleStrandExpanded(strandId) {
+      state.strandExpanded[strandId] = !state.strandExpanded[strandId];
+      localStorage.setItem('sharp_strand_expanded', JSON.stringify(state.strandExpanded));
       renderGoals();
     }
 
@@ -2400,24 +2400,24 @@
         }
       }
 
-      const { grouped, uncategorized } = groupGoalsByCondoId();
+      const { grouped, uncategorized } = groupGoalsByStrandId();
       // Filter grouped goals by time filter
       const filteredGrouped = {};
-      for (const [condoId, goals] of Object.entries(grouped)) {
+      for (const [strandId, goals] of Object.entries(grouped)) {
         const filtered = goals.filter(g => allGoals.some(ag => ag.id === g.id));
-        if (filtered.length > 0) filteredGrouped[condoId] = filtered;
+        if (filtered.length > 0) filteredGrouped[strandId] = filtered;
       }
       const filteredUncat = uncategorized.filter(g => allGoals.some(ag => ag.id === g.id));
 
-      // Build sorted condo list
-      const condos = (state.condos || [])
+      // Build sorted strand list
+      const strands = (state.strands || [])
         .filter(c => filteredGrouped[c.id])
-        .map(c => ({ condo: c, goals: filteredGrouped[c.id] }))
-        .sort((a, b) => getCondoLatestActivity(b.condo, b.goals) - getCondoLatestActivity(a.condo, a.goals));
+        .map(c => ({ strand: c, goals: filteredGrouped[c.id] }))
+        .sort((a, b) => getStrandLatestActivity(b.strand, b.goals) - getStrandLatestActivity(a.strand, a.goals));
 
       // Flatten all goals for counting
       const allFilteredGoals = [];
-      condos.forEach(({ goals }) => allFilteredGoals.push(...goals));
+      strands.forEach(({ goals }) => allFilteredGoals.push(...goals));
       allFilteredGoals.push(...filteredUncat);
 
       if (!allFilteredGoals.length) {
@@ -2429,11 +2429,11 @@
       // All user-generated content is escaped via escapeHtml() before insertion
       const html = [];
 
-      // Always use condo tree so action buttons are accessible
-      for (const { condo, goals } of condos) {
+      // Always use strand tree so action buttons are accessible
+      for (const { strand, goals } of strands) {
         goals.sort((a, b) => getGoalLatestActivity(b) - getGoalLatestActivity(a));
-        const expanded = state.condoExpanded[condo.id] !== false; // default expanded
-        const attention = getCondoAttention(condo, goals);
+        const expanded = state.strandExpanded[strand.id] !== false; // default expanded
+        const attention = getStrandAttention(strand, goals);
         const activeCount = goals.filter(g => {
           const s = getGoalLatestSession(g);
           return s && getAgentStatus(s.key) === 'thinking';
@@ -2443,15 +2443,15 @@
           ? '<div style="padding: 8px 16px 12px; color: var(--text-dim); font-size: 0.8rem;">No goals yet</div>'
           : renderGoalItems(goals, true);
         html.push(
-          '<div class="condo-group ' + (expanded ? 'expanded' : '') + '">' +
-            '<div class="condo-group-header" onclick="toggleCondoExpanded(\'' + escapeHtml(condo.id) + '\')">' +
+          '<div class="strand-group ' + (expanded ? 'expanded' : '') + '">' +
+            '<div class="strand-group-header" onclick="toggleStrandExpanded(\'' + escapeHtml(strand.id) + '\')">' +
               '<span class="group-expand-icon">&#9654;</span>' +
               '<div class="goal-item-dot ' + attention + '"></div>' +
-              '<span class="condo-group-name">' + escapeHtml(condo.name || 'Unnamed condo') + '</span>' +
-              (activeCount > 0 ? '<span class="condo-active-badge">' + activeCount + ' active</span>' : '') +
+              '<span class="strand-group-name">' + escapeHtml(strand.name || 'Unnamed strand') + '</span>' +
+              (activeCount > 0 ? '<span class="strand-active-badge">' + activeCount + ' active</span>' : '') +
               '<span class="group-count">' + goals.length + '</span>' +
             '</div>' +
-            (expanded ? '<div class="condo-group-items">' + emptyState + '</div>' : '') +
+            (expanded ? '<div class="strand-group-items">' + emptyState + '</div>' : '') +
           '</div>'
         );
       }
@@ -2459,16 +2459,16 @@
       // Uncategorized goals
       if (filteredUncat.length) {
         filteredUncat.sort((a, b) => getGoalLatestActivity(b) - getGoalLatestActivity(a));
-        const expanded = state.condoExpanded['__uncategorized__'] !== false;
+        const expanded = state.strandExpanded['__uncategorized__'] !== false;
         html.push(
-          '<div class="condo-group ' + (expanded ? 'expanded' : '') + '">' +
-            '<div class="condo-group-header" onclick="toggleCondoExpanded(\'__uncategorized__\')">' +
+          '<div class="strand-group ' + (expanded ? 'expanded' : '') + '">' +
+            '<div class="strand-group-header" onclick="toggleStrandExpanded(\'__uncategorized__\')">' +
               '<span class="group-expand-icon">&#9654;</span>' +
               '<div class="goal-item-dot none"></div>' +
-              '<span class="condo-group-name">Uncategorized</span>' +
+              '<span class="strand-group-name">Uncategorized</span>' +
               '<span class="group-count">' + filteredUncat.length + '</span>' +
             '</div>' +
-            (expanded ? '<div class="condo-group-items">' + renderGoalItems(filteredUncat, true) + '</div>' : '') +
+            (expanded ? '<div class="strand-group-items">' + renderGoalItems(filteredUncat, true) + '</div>' : '') +
           '</div>'
         );
       }
@@ -2494,7 +2494,7 @@
         const nextTask = (g.nextTask || '').trim();
 
         const classes = ['goal-item'];
-        if (nested) classes.push('condo-nested');
+        if (nested) classes.push('strand-nested');
         if (isActive) classes.push('active');
         if (isDone) classes.push('goal-done');
         if (isThinking) classes.push('goal-thinking');
@@ -2551,8 +2551,8 @@
         const countEl = document.getElementById('uncatSessionsCount');
         if (countEl) countEl.textContent = uncatSessions.length;
 
-        const expanded = state.condoExpanded['__uncat_sessions__'] !== false;
-        const group = el.querySelector('.condo-group');
+        const expanded = state.strandExpanded['__uncat_sessions__'] !== false;
+        const group = el.querySelector('.strand-group');
         if (group) {
           if (expanded) group.classList.add('expanded');
           else group.classList.remove('expanded');
@@ -2666,8 +2666,8 @@
       renderGoalView();
     }
 
-    async function killCondoSessions(condoId) {
-      await rpcCall('sessions.killForCondo', { condoId });
+    async function killStrandSessions(strandId) {
+      await rpcCall('sessions.killForStrand', { strandId });
       await loadGoals();
       renderGoalView();
     }
@@ -2813,87 +2813,87 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // CONDO CONTEXT VIEW
+    // STRAND CONTEXT VIEW
     // ═══════════════════════════════════════════════════════════════
-    function showCondoContext(condoId, opts) {
+    function showStrandContext(strandId, opts) {
       if (!(opts && opts.fromRouter)) {
-        navigateTo('condo/' + encodeURIComponent(condoId));
+        navigateTo('strand/' + encodeURIComponent(strandId));
         return;
       }
-      state.currentView = 'condoContext';
-      state.currentCondoContextId = condoId;
+      state.currentView = 'strandContext';
+      state.currentStrandContextId = strandId;
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      document.getElementById('condoContextView').classList.add('active');
+      document.getElementById('strandContextView').classList.add('active');
       document.querySelector('.main-content').classList.remove('split-view');
-      document.getElementById('mainTitle').textContent = 'Condo';
+      document.getElementById('mainTitle').textContent = 'Strand';
       document.getElementById('mainSubtitle').textContent = '';
       document.getElementById('headerAction').style.display = 'none';
       document.getElementById('headerStatusIndicator').style.display = 'none';
-      renderCondoContext();
+      renderStrandContext();
       closeSidebar();
     }
 
-    function killCondoSessionsFromContext() {
-      if (state.currentCondoContextId) killCondoSessions(state.currentCondoContextId);
+    function killStrandSessionsFromContext() {
+      if (state.currentStrandContextId) killStrandSessions(state.currentStrandContextId);
     }
 
-    async function checkCondoConflicts() {
-      if (!state.currentCondoContextId) return;
+    async function checkStrandConflicts() {
+      if (!state.currentStrandContextId) return;
       try {
-        const result = await rpcCall('goals.checkConflicts', { condoId: state.currentCondoContextId });
+        const result = await rpcCall('goals.checkConflicts', { strandId: state.currentStrandContextId });
         showToast(JSON.stringify(result, null, 2).slice(0, 200), 'info');
       } catch (err) {
         showToast('Conflict check failed: ' + err.message, 'error');
       }
     }
 
-    function renderCondoContext() {
-      const condoId = state.currentCondoContextId;
-      const condo = (state.condos || []).find(function(c) { return c.id === condoId; });
-      if (!condo) return;
+    function renderStrandContext() {
+      const strandId = state.currentStrandContextId;
+      const strand = (state.strands || []).find(function(c) { return c.id === strandId; });
+      if (!strand) return;
 
-      const goals = (state.goals || []).filter(function(g) { return g.condoId === condoId; });
+      const goals = (state.goals || []).filter(function(g) { return g.strandId === strandId; });
 
-      document.getElementById('condoContextTitle').textContent = condo.name || 'Unnamed Condo';
-      document.getElementById('condoContextSubtitle').textContent = condoId;
+      document.getElementById('strandContextTitle').textContent = strand.name || 'Unnamed Strand';
+      document.getElementById('strandContextSubtitle').textContent = strandId;
 
       // Info panel
-      const infoPanel = document.getElementById('condoInfoPanel');
+      const infoPanel = document.getElementById('strandInfoPanel');
       const totalTasks = goals.reduce(function(n, g) { return n + (g.tasks || []).length; }, 0);
       const doneTasks = goals.reduce(function(n, g) { return n + (g.tasks || []).filter(function(t) { return t.done || t.status === 'done'; }).length; }, 0);
       const activeSessions = goals.reduce(function(n, g) { return n + (g.sessions || []).filter(function(sk) { return getAgentStatus(sk) === 'thinking'; }).length; }, 0);
       const totalSessions = goals.reduce(function(n, g) { return n + (g.sessions || []).length; }, 0);
 
       infoPanel.innerHTML =
-        '<div class="condo-info-title">Project Info</div>' +
-        '<div class="condo-info-grid">' +
-          '<div class="condo-info-item"><span class="condo-info-label">Goals</span><span class="condo-info-value">' + goals.length + '</span></div>' +
-          '<div class="condo-info-item"><span class="condo-info-label">Tasks</span><span class="condo-info-value">' + doneTasks + ' / ' + totalTasks + '</span></div>' +
-          '<div class="condo-info-item"><span class="condo-info-label">Sessions</span><span class="condo-info-value">' + activeSessions + ' active / ' + totalSessions + '</span></div>' +
-          '<div class="condo-info-item"><span class="condo-info-label">Created</span><span class="condo-info-value">' + timeAgo(condo.createdAtMs || Date.now()) + '</span></div>' +
+        '<div class="strand-info-title">Project Info</div>' +
+        '<div class="strand-info-grid">' +
+          '<div class="strand-info-item"><span class="strand-info-label">Goals</span><span class="strand-info-value">' + goals.length + '</span></div>' +
+          '<div class="strand-info-item"><span class="strand-info-label">Tasks</span><span class="strand-info-value">' + doneTasks + ' / ' + totalTasks + '</span></div>' +
+          '<div class="strand-info-item"><span class="strand-info-label">Sessions</span><span class="strand-info-value">' + activeSessions + ' active / ' + totalSessions + '</span></div>' +
+          '<div class="strand-info-item"><span class="strand-info-label">Created</span><span class="strand-info-value">' + timeAgo(strand.createdAtMs || Date.now()) + '</span></div>' +
         '</div>' +
-        (totalTasks > 0 ? '<div class="condo-overall-progress"><div class="condo-overall-progress-label">Overall Progress</div><div class="goal-progress-bar"><div class="segment done" style="width:' + ((doneTasks / totalTasks) * 100).toFixed(1) + '%"></div><div class="segment pending" style="width:' + (((totalTasks - doneTasks) / totalTasks) * 100).toFixed(1) + '%"></div></div><div class="condo-progress-pct">' + Math.round((doneTasks / totalTasks) * 100) + '%</div></div>' : '');
+        (totalTasks > 0 ? '<div class="strand-overall-progress"><div class="strand-overall-progress-label">Overall Progress</div><div class="goal-progress-bar"><div class="segment done" style="width:' + ((doneTasks / totalTasks) * 100).toFixed(1) + '%"></div><div class="segment pending" style="width:' + (((totalTasks - doneTasks) / totalTasks) * 100).toFixed(1) + '%"></div></div><div class="strand-progress-pct">' + Math.round((doneTasks / totalTasks) * 100) + '%</div></div>' : '');
 
       // Workspace panel
-      const wsPanel = document.getElementById('condoWorkspacePanel');
-      if (condo.workspace && condo.workspace.path) {
+      const wsPanel = document.getElementById('strandWorkspacePanel');
+      if (strand.workspace && strand.workspace.path) {
         wsPanel.innerHTML =
-          '<div class="condo-info-title">Workspace</div>' +
-          '<div class="condo-workspace-path">' + escapeHtml(condo.workspace.path) + '</div>' +
-          (condo.workspace.repoUrl ? '<div class="condo-workspace-repo">' + escapeHtml(condo.workspace.repoUrl) + '</div>' : '');
+          '<div class="strand-info-title">Workspace</div>' +
+          '<div class="strand-workspace-path">' + escapeHtml(strand.workspace.path) + '</div>' +
+          (strand.workspace.repoUrl ? '<div class="strand-workspace-repo">' + escapeHtml(strand.workspace.repoUrl) + '</div>' : '');
       } else {
-        wsPanel.innerHTML = '<div class="condo-info-title">Workspace</div><div class="condo-workspace-none">No workspace configured</div>';
+        wsPanel.innerHTML = '<div class="strand-info-title">Workspace</div><div class="strand-workspace-none">No workspace configured</div>';
       }
 
       // Goals graph (task dependency visualization)
       renderTaskGraph(goals);
 
       // Timeline
-      renderCondoTimeline(goals);
+      renderStrandTimeline(goals);
     }
 
     function renderTaskGraph(goals) {
-      const container = document.getElementById('condoGoalsGraph');
+      const container = document.getElementById('strandGoalsGraph');
       if (!container) return;
 
       if (!goals.length) {
@@ -2956,8 +2956,8 @@
       container.innerHTML = html;
     }
 
-    function renderCondoTimeline(goals) {
-      const container = document.getElementById('condoTimeline');
+    function renderStrandTimeline(goals) {
+      const container = document.getElementById('strandTimeline');
       if (!container) return;
 
       // Collect all task events sorted by time
@@ -3240,7 +3240,7 @@
       var goal = state.goals.find(function(g) { return g.id === goalId; });
       if (!goal) return;
       try {
-        var condoId = goal.condoId || null;
+        var strandId = goal.strandId || null;
         var result = await rpcCall('sessions.create', {
           agentId: 'main',
           channelId: 'main',
@@ -3249,8 +3249,8 @@
         var sessionKey = result && result.sessionKey;
         if (!sessionKey) { showToast('Failed to create session', 'error'); return; }
         await rpcCall('goals.addSession', { goalId: goalId, sessionKey: sessionKey });
-        if (condoId) {
-          await rpcCall('goals.setSessionCondo', { sessionKey: sessionKey, condoId: condoId });
+        if (strandId) {
+          await rpcCall('goals.setSessionStrand', { sessionKey: sessionKey, strandId: strandId });
         }
         // Send goal context as first message
         var msg = 'Goal: ' + (goal.title || '') + '\n';
@@ -3324,7 +3324,7 @@
 
       if (state.goalTab === 'context') {
         // Context tab — workspace, branch, sessions, merge status
-        var condo = goal.condoId ? (state.condos || []).find(function(c) { return c.id === goal.condoId; }) : null;
+        var strand = goal.strandId ? (state.strands || []).find(function(c) { return c.id === goal.strandId; }) : null;
         var wt = goal.worktree;
         var sessions = (goal.sessions || []).map(function(sk) {
           var s = (state.sessions || []).find(function(ss) { return ss.key === sk; });
@@ -3397,12 +3397,12 @@
         }
         html += '</div>';
 
-        // Condo section
-        if (condo) {
+        // Strand section
+        if (strand) {
           html += '<div class="goal-context-section">' +
-            '<div class="goal-context-section-title">Condo</div>' +
-            '<div class="goal-context-row"><span class="goal-context-label">Name</span><span class="goal-context-value condo-clickable" onclick="showCondoContext(\'' + escapeHtml(condo.id) + '\')">' + escapeHtml(condo.name || 'Unnamed') + '</span></div>' +
-            '<div class="goal-context-row"><span class="goal-context-label">ID</span><span class="goal-context-value mono" style="font-size:0.72rem;">' + escapeHtml(condo.id) + '</span></div>' +
+            '<div class="goal-context-section-title">Strand</div>' +
+            '<div class="goal-context-row"><span class="goal-context-label">Name</span><span class="goal-context-value strand-clickable" onclick="showStrandContext(\'' + escapeHtml(strand.id) + '\')">' + escapeHtml(strand.name || 'Unnamed') + '</span></div>' +
+            '<div class="goal-context-row"><span class="goal-context-label">ID</span><span class="goal-context-value mono" style="font-size:0.72rem;">' + escapeHtml(strand.id) + '</span></div>' +
           '</div>';
         }
 
@@ -3525,14 +3525,14 @@
       // Right panel header
       document.getElementById('goalHeroTitle').textContent = goal.title || 'Untitled goal';
 
-      var condoNameEl = document.getElementById('goalCondoName');
-      if (condoNameEl) {
-        var condoName = 'Condo';
-        if (goal.condoId) {
-          var condo = (state.condos || []).find(function(c) { return c.id === goal.condoId; });
-          condoName = condo ? (condo.name || goal.condoId) : (goal.condoId.split(':').pop() || 'Condo');
+      var strandNameEl = document.getElementById('goalStrandName');
+      if (strandNameEl) {
+        var strandName = 'Strand';
+        if (goal.strandId) {
+          var strand = (state.strands || []).find(function(c) { return c.id === goal.strandId; });
+          strandName = strand ? (strand.name || goal.strandId) : (goal.strandId.split(':').pop() || 'Strand');
         }
-        condoNameEl.textContent = condoName;
+        strandNameEl.textContent = strandName;
       }
 
       var lastEl = document.getElementById('goalLastUpdated');
@@ -3664,7 +3664,7 @@
         const idx = state.goals.findIndex(g => g.id === goalId);
         if (idx !== -1 && data?.goal) state.goals[idx] = data.goal;
         renderGoals();
-        renderCondoStatusBoard();
+        renderStrandStatusBoard();
         renderGoalView();
       } catch (e) {
         showToast('Failed to save goal', 'error');
@@ -3830,12 +3830,12 @@
       }
     }
 
-    const GOAL_TOOL_NAMES = new Set(['goal_update', 'condo_bind', 'condo_create_goal', 'condo_add_task', 'condo_spawn_task']);
+    const GOAL_TOOL_NAMES = new Set(['goal_update', 'strand_bind', 'strand_create_goal', 'strand_add_task', 'strand_spawn_task']);
     let goalRefreshTimer = null;
     function debouncedGoalRefresh() {
       clearTimeout(goalRefreshTimer);
       goalRefreshTimer = setTimeout(async () => {
-        await Promise.all([loadCondos(), loadGoals()]);
+        await Promise.all([loadStrands(), loadGoals()]);
         renderGoalView();
       }, 500);
     }
@@ -4690,7 +4690,7 @@ Response format:
       // Clean up stale runs periodically (in case we missed 'done' events)
       cleanStaleRuns();
       
-      await Promise.all([loadCondos(), loadSessions(), loadGoals()]);
+      await Promise.all([loadStrands(), loadSessions(), loadGoals()]);
       updateOverview();
       renderGoalView();
     }
@@ -6647,27 +6647,27 @@ Response format:
     }
 
 
-    function renderCondoStatusBoard() {
-      const container = document.getElementById('condoStatusBoard');
-      const countEl = document.getElementById('condoCount');
+    function renderStrandStatusBoard() {
+      const container = document.getElementById('strandStatusBoard');
+      const countEl = document.getElementById('strandCount');
       if (!container) return;
 
-      const { grouped, uncategorized } = groupGoalsByCondoId();
+      const { grouped, uncategorized } = groupGoalsByStrandId();
 
-      // Build condo entries with their goals
-      const condoEntries = (state.condos || [])
+      // Build strand entries with their goals
+      const strandEntries = (state.strands || [])
         .filter(c => grouped[c.id] && grouped[c.id].length)
-        .map(c => ({ condo: c, goals: grouped[c.id] }))
-        .sort((a, b) => getCondoLatestActivity(b.condo, b.goals) - getCondoLatestActivity(a.condo, a.goals));
+        .map(c => ({ strand: c, goals: grouped[c.id] }))
+        .sort((a, b) => getStrandLatestActivity(b.strand, b.goals) - getStrandLatestActivity(a.strand, a.goals));
 
-      const totalCondos = condoEntries.length + (uncategorized.length ? 1 : 0);
-      if (countEl) countEl.textContent = totalCondos;
+      const totalStrands = strandEntries.length + (uncategorized.length ? 1 : 0);
+      if (countEl) countEl.textContent = totalStrands;
 
-      if (!totalCondos && !state.goals.length) {
+      if (!totalStrands && !state.goals.length) {
         // All values escaped via escapeHtml()
         container.innerHTML =
-          '<div class="condo-status-card empty" onclick="showCreateGoalModal()" style="border-style: dashed; opacity: 0.6; cursor: pointer; padding: 24px; text-align: center;">' +
-            '<div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 4px;">Create your first condo</div>' +
+          '<div class="strand-status-card empty" onclick="showCreateGoalModal()" style="border-style: dashed; opacity: 0.6; cursor: pointer; padding: 24px; text-align: center;">' +
+            '<div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 4px;">Create your first strand</div>' +
             '<div style="color: var(--text-dim); font-size: 0.85rem;">Organize goals, tasks, and sessions into projects.</div>' +
           '</div>';
         return;
@@ -6676,10 +6676,10 @@ Response format:
       // All user-generated content is escaped via escapeHtml() before insertion
       const cards = [];
 
-      for (const { condo, goals } of condoEntries) {
+      for (const { strand, goals } of strandEntries) {
         goals.sort((a, b) => getGoalLatestActivity(b) - getGoalLatestActivity(a));
-        const attention = getCondoAttention(condo, goals);
-        // Count active sessions across all goals in this condo
+        const attention = getStrandAttention(strand, goals);
+        // Count active sessions across all goals in this strand
         var activeSessions = 0;
         var totalSessions = 0;
         goals.forEach(function(g) {
@@ -6688,7 +6688,7 @@ Response format:
             if (getAgentStatus(sk) === 'thinking') activeSessions++;
           });
         });
-        cards.push(renderCondoCard(condo.id, condo.name || 'Unnamed condo', goals, attention, activeSessions, totalSessions));
+        cards.push(renderStrandCard(strand.id, strand.name || 'Unnamed strand', goals, attention, activeSessions, totalSessions));
       }
 
       // Uncategorized goals
@@ -6702,15 +6702,15 @@ Response format:
             if (getAgentStatus(sk) === 'thinking') uncatActiveSessions++;
           });
         });
-        cards.push(renderCondoCard(null, 'Uncategorized', uncategorized, 'none', uncatActiveSessions, uncatTotalSessions));
+        cards.push(renderStrandCard(null, 'Uncategorized', uncategorized, 'none', uncatActiveSessions, uncatTotalSessions));
       }
 
       container.innerHTML = cards.join('');
     }
 
-    function renderCondoCard(condoId, condoName, goals, attention, activeSessions, totalSessions) {
-      const attentionBorder = attention === 'needs-input' ? ' condo-attention-needs-input'
-        : attention === 'unread' ? ' condo-attention-unread' : '';
+    function renderStrandCard(strandId, strandName, goals, attention, activeSessions, totalSessions) {
+      const attentionBorder = attention === 'needs-input' ? ' strand-attention-needs-input'
+        : attention === 'unread' ? ' strand-attention-unread' : '';
 
       // Separate active and done goals
       const activeGoals = goals.filter(function(g) { return g.status !== 'done'; });
@@ -6722,7 +6722,7 @@ Response format:
 
       // Done goals collapsed summary
       const doneSummary = doneGoals.length > 0
-        ? '<div class="condo-done-summary">' + doneGoals.length + ' completed goal' + (doneGoals.length !== 1 ? 's' : '') + '</div>'
+        ? '<div class="strand-done-summary">' + doneGoals.length + ' completed goal' + (doneGoals.length !== 1 ? 's' : '') + '</div>'
         : '';
 
       // Header stats
@@ -6731,17 +6731,17 @@ Response format:
       if (doneGoals.length) headerStats.push(doneGoals.length + ' done');
       if (activeSessions > 0) headerStats.push(activeSessions + ' running');
 
-      var condoClickHandler = condoId ? ' onclick="event.stopPropagation(); showCondoContext(\'' + escapeHtml(condoId) + '\')"' : '';
+      var strandClickHandler = strandId ? ' onclick="event.stopPropagation(); showStrandContext(\'' + escapeHtml(strandId) + '\')"' : '';
 
-      return '<div class="condo-status-card' + attentionBorder + '">' +
-        '<div class="condo-status-header">' +
-          '<div class="condo-status-header-left">' +
-            '<span class="condo-status-name condo-clickable"' + condoClickHandler + '>' + escapeHtml(condoName) + '</span>' +
-            (activeSessions > 0 ? '<span class="condo-running-badge">' + activeSessions + ' running</span>' : '') +
+      return '<div class="strand-status-card' + attentionBorder + '">' +
+        '<div class="strand-status-header">' +
+          '<div class="strand-status-header-left">' +
+            '<span class="strand-status-name strand-clickable"' + strandClickHandler + '>' + escapeHtml(strandName) + '</span>' +
+            (activeSessions > 0 ? '<span class="strand-running-badge">' + activeSessions + ' running</span>' : '') +
           '</div>' +
-          '<span class="condo-status-count">' + headerStats.join(' \u00b7 ') + '</span>' +
+          '<span class="strand-status-count">' + headerStats.join(' \u00b7 ') + '</span>' +
         '</div>' +
-        '<div class="condo-status-goals">' + goalRows + doneSummary + '</div>' +
+        '<div class="strand-status-goals">' + goalRows + doneSummary + '</div>' +
       '</div>';
     }
 
@@ -6808,10 +6808,10 @@ Response format:
         var needsInput = hasUnread && (agentStatus === 'idle' || agentStatus === 'error');
         var attentionClass = needsInput ? 'needs-input' : (hasUnread ? 'unread' : '');
 
-        // Show condo badge if session belongs to a goal
+        // Show strand badge if session belongs to a goal
         var goal = getGoalForSession(s.key);
-        var condoBadge = goal
-          ? '<span class="card-badge goal" onclick="event.stopPropagation(); openGoal(\'' + escapeHtml(goal.id) + '\')">' + escapeHtml(goal.condoName || goal.title || 'Goal') + '</span>'
+        var strandBadge = goal
+          ? '<span class="card-badge goal" onclick="event.stopPropagation(); openGoal(\'' + escapeHtml(goal.id) + '\')">' + escapeHtml(goal.strandName || goal.title || 'Goal') + '</span>'
           : '';
 
         return '<div class="session-card ' + (attentionClass ? 'card-attention-' + attentionClass : '') + '" onclick="openDetailPanel(\'' + escapeHtml(s.key) + '\')">' +
@@ -6826,7 +6826,7 @@ Response format:
           (preview ? '<div class="card-preview">' + escapeHtml(preview) + '</div>' : '') +
           '<div class="card-footer">' +
             '<span>' + timeAgo(s.updatedAt) + '</span>' +
-            '<span class="card-footer-right">' + condoBadge + '<span class="card-badge">' + (s.totalTokens || 0).toLocaleString() + ' tokens</span></span>' +
+            '<span class="card-footer-right">' + strandBadge + '<span class="card-badge">' + (s.totalTokens || 0).toLocaleString() + ' tokens</span></span>' +
           '</div>' +
         '</div>';
       }).join('');
@@ -7178,7 +7178,7 @@ Response format:
           var stats = goalTaskStats(g);
           var meta = [];
           if (stats.total > 0) meta.push(stats.done + '/' + stats.total + ' tasks');
-          if (g.condoName) meta.push('\uD83C\uDFE0 ' + g.condoName);
+          if (g.strandName) meta.push('\uD83C\uDFE0 ' + g.strandName);
           container.appendChild(buildSearchRow(idx,
             g.status === 'done' ? '\u2705' : '\uD83C\uDFAF',
             g.title || 'Untitled',
@@ -7383,7 +7383,7 @@ Response format:
       if (s.isSubagent) parts.push('\u26A1 subagent');
       var parentGoal = getGoalForSession(s.key);
       if (s.goalTitle || (parentGoal && parentGoal.title)) parts.push('\uD83C\uDFAF ' + (s.goalTitle || parentGoal.title));
-      if (s.condoName) parts.push('\uD83C\uDFE0 ' + s.condoName);
+      if (s.strandName) parts.push('\uD83C\uDFE0 ' + s.strandName);
       if (!parts.length) parts.push(s.label || s.key);
       return parts.join(' \u00B7 ');
     }
@@ -7669,11 +7669,11 @@ Response format:
           closeDetailPanel({ fromRouter: true });
           showAgentsOverview({ fromRouter: true });
           break;
-        case 'condo':
+        case 'strand':
           if (payload) {
-            var condoCtxId = decodeURIComponent(payload);
+            var strandCtxId = decodeURIComponent(payload);
             closeDetailPanel({ fromRouter: true });
-            showCondoContext(condoCtxId, { fromRouter: true });
+            showStrandContext(strandCtxId, { fromRouter: true });
           } else {
             showOverview({ fromRouter: true });
           }

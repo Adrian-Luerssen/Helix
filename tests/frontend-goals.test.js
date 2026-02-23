@@ -21,10 +21,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const GOAL_TOOL_NAMES = new Set([
   'goal_update',
-  'condo_bind',
-  'condo_create_goal',
-  'condo_add_task',
-  'condo_spawn_task',
+  'strand_bind',
+  'strand_create_goal',
+  'strand_add_task',
+  'strand_spawn_task',
 ]);
 
 function getFileIcon(ext) {
@@ -71,10 +71,10 @@ describe('GOAL_TOOL_NAMES', () => {
   it('contains all five goal-related tool names', () => {
     expect(GOAL_TOOL_NAMES.size).toBe(5);
     expect(GOAL_TOOL_NAMES.has('goal_update')).toBe(true);
-    expect(GOAL_TOOL_NAMES.has('condo_bind')).toBe(true);
-    expect(GOAL_TOOL_NAMES.has('condo_create_goal')).toBe(true);
-    expect(GOAL_TOOL_NAMES.has('condo_add_task')).toBe(true);
-    expect(GOAL_TOOL_NAMES.has('condo_spawn_task')).toBe(true);
+    expect(GOAL_TOOL_NAMES.has('strand_bind')).toBe(true);
+    expect(GOAL_TOOL_NAMES.has('strand_create_goal')).toBe(true);
+    expect(GOAL_TOOL_NAMES.has('strand_add_task')).toBe(true);
+    expect(GOAL_TOOL_NAMES.has('strand_spawn_task')).toBe(true);
   });
 
   it('does not match unrelated tool names', () => {

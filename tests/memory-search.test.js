@@ -6,7 +6,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import crypto from 'crypto';
 
-const TEST_DIR = join(tmpdir(), 'clawcondos-test-memory-' + crypto.randomBytes(4).toString('hex'));
+const TEST_DIR = join(tmpdir(), 'helix-test-memory-' + crypto.randomBytes(4).toString('hex'));
 const MEMORY_DIR = join(TEST_DIR, 'memory');
 
 function createTestDb(agentId, chunks = []) {

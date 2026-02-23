@@ -1,0 +1,35 @@
+{
+  "name": "helix-goals",
+  "version": "0.1.0",
+  "description": "Goals, tasks, and strands management plugin for Helix",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "./scripts/server.sh start",
+    "stop": "./scripts/server.sh stop",
+    "restart": "./scripts/server.sh restart",
+    "status": "./scripts/server.sh status",
+    "dev": "node index.js",
+    "test": "node --test tests/"
+  },
+  "license": "MIT",
+  "author": "Adrian Luerssen Medina",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Adrian-Luerssen/Helix",
+    "directory": "plugins/helix-goals"
+  },
+  "keywords": [
+    "openclaw",
+    "plugin",
+    "goals",
+    "tasks",
+    "strands",
+    "multi-agent"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ]
+  }
+}

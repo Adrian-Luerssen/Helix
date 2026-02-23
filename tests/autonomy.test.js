@@ -1,17 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { createGoalsStore } from '../clawcondos/condo-management/lib/goals-store.js';
+import { createGoalsStore } from '../plugins/helix-goals/lib/goals-store.js';
 import {
   AUTONOMY_MODES,
   DEFAULT_AUTONOMY_MODE,
   resolveAutonomyMode,
   buildAutonomyDirective,
   setTaskAutonomy,
-  setCondoAutonomy,
+  setStrandAutonomy,
   getTaskAutonomyInfo,
   createAutonomyHandlers,
-} from '../clawcondos/condo-management/lib/autonomy.js';
+} from '../plugins/helix-goals/lib/autonomy.js';
 
 const TEST_DIR = join(import.meta.dirname, '__fixtures__', 'autonomy-test');
 
@@ -42,7 +42,7 @@ describe('Autonomy Manager', () => {
   });
 
   describe('resolveAutonomyMode', () => {
-    it('returns default for null task and condo', () => {
+    it('returns default for null task and strand', () => {
       expect(resolveAutonomyMode(null, null)).toBe('plan');
     });
 
@@ -51,16 +51,16 @@ describe('Autonomy Manager', () => {
       expect(resolveAutonomyMode(task, null)).toBe('full');
     });
 
-    it('returns condo autonomyMode when task has none', () => {
+    it('returns strand autonomyMode when task has none', () => {
       const task = {};
-      const condo = { autonomyMode: 'supervised' };
-      expect(resolveAutonomyMode(task, condo)).toBe('supervised');
+      const strand = { autonomyMode: 'supervised' };
+      expect(resolveAutonomyMode(task, strand)).toBe('supervised');
     });
 
-    it('task mode overrides condo mode', () => {
+    it('task mode overrides strand mode', () => {
       const task = { autonomyMode: 'full' };
-      const condo = { autonomyMode: 'supervised' };
-      expect(resolveAutonomyMode(task, condo)).toBe('full');
+      const strand = { autonomyMode: 'supervised' };
+      expect(resolveAutonomyMode(task, strand)).toBe('full');
     });
 
     it('ignores invalid autonomy modes', () => {
@@ -154,57 +154,57 @@ describe('Autonomy Manager', () => {
     });
   });
 
-  describe('setCondoAutonomy', () => {
-    function seedCondo() {
+  describe('setStrandAutonomy', () => {
+    function seedStrand() {
       const data = store.load();
-      const condo = {
-        id: 'condo_test',
-        name: 'Test Condo',
+      const strand = {
+        id: 'strand_test',
+        name: 'Test Strand',
         createdAtMs: Date.now(),
         updatedAtMs: Date.now(),
       };
-      data.condos.push(condo);
+      data.strands.push(strand);
       store.save(data);
-      return condo;
+      return strand;
     }
 
-    it('sets autonomy mode on condo', () => {
-      seedCondo();
+    it('sets autonomy mode on strand', () => {
+      seedStrand();
       
-      const result = setCondoAutonomy(store, 'condo_test', 'step');
+      const result = setStrandAutonomy(store, 'strand_test', 'step');
       expect(result.success).toBe(true);
-      expect(result.condo.autonomyMode).toBe('step');
+      expect(result.strand.autonomyMode).toBe('step');
     });
 
     it('persists autonomy mode', () => {
-      seedCondo();
-      setCondoAutonomy(store, 'condo_test', 'supervised');
+      seedStrand();
+      setStrandAutonomy(store, 'strand_test', 'supervised');
       
       const data = store.load();
-      expect(data.condos[0].autonomyMode).toBe('supervised');
+      expect(data.strands[0].autonomyMode).toBe('supervised');
     });
 
     it('rejects invalid mode', () => {
-      seedCondo();
+      seedStrand();
       
-      const result = setCondoAutonomy(store, 'condo_test', 'invalid');
+      const result = setStrandAutonomy(store, 'strand_test', 'invalid');
       expect(result.success).toBe(false);
       expect(result.error).toContain('Invalid mode');
     });
 
-    it('returns error for unknown condo', () => {
-      const result = setCondoAutonomy(store, 'condo_unknown', 'full');
+    it('returns error for unknown strand', () => {
+      const result = setStrandAutonomy(store, 'strand_unknown', 'full');
       expect(result.success).toBe(false);
       expect(result.error).toContain('not found');
     });
   });
 
   describe('getTaskAutonomyInfo', () => {
-    function seedGoalWithTaskAndCondo() {
+    function seedGoalWithTaskAndStrand() {
       const data = store.load();
-      const condo = {
-        id: 'condo_test',
-        name: 'Test Condo',
+      const strand = {
+        id: 'strand_test',
+        name: 'Test Strand',
         autonomyMode: 'step',
         createdAtMs: Date.now(),
         updatedAtMs: Date.now(),
@@ -212,37 +212,37 @@ describe('Autonomy Manager', () => {
       const goal = {
         id: 'goal_test',
         title: 'Test Goal',
-        condoId: 'condo_test',
+        strandId: 'strand_test',
         tasks: [{ id: 'task_test', text: 'Test task' }],
         sessions: [],
         createdAtMs: Date.now(),
         updatedAtMs: Date.now(),
       };
-      data.condos.push(condo);
+      data.strands.push(strand);
       data.goals.push(goal);
       store.save(data);
-      return { goal, condo };
+      return { goal, strand };
     }
 
     it('returns autonomy info for a task', () => {
-      seedGoalWithTaskAndCondo();
+      seedGoalWithTaskAndStrand();
       
       const result = getTaskAutonomyInfo(store, 'goal_test', 'task_test');
       expect(result.success).toBe(true);
-      expect(result.mode).toBe('step'); // From condo
+      expect(result.mode).toBe('step'); // From strand
       expect(result.directive).toContain('Step-by-Step');
-      expect(result.condoMode).toBe('step');
+      expect(result.strandMode).toBe('step');
       expect(result.taskMode).toBeNull();
     });
 
-    it('task mode overrides condo mode', () => {
-      seedGoalWithTaskAndCondo();
+    it('task mode overrides strand mode', () => {
+      seedGoalWithTaskAndStrand();
       setTaskAutonomy(store, 'goal_test', 'task_test', 'full');
       
       const result = getTaskAutonomyInfo(store, 'goal_test', 'task_test');
       expect(result.mode).toBe('full');
       expect(result.taskMode).toBe('full');
-      expect(result.condoMode).toBe('step');
+      expect(result.strandMode).toBe('step');
     });
 
     it('returns error for unknown goal', () => {
@@ -266,11 +266,11 @@ describe('Autonomy Manager', () => {
       store.save(data);
     }
 
-    function seedCondo() {
+    function seedStrand() {
       const data = store.load();
-      data.condos.push({
-        id: 'condo_test',
-        name: 'Test Condo',
+      data.strands.push({
+        id: 'strand_test',
+        name: 'Test Strand',
         createdAtMs: Date.now(),
         updatedAtMs: Date.now(),
       });
@@ -303,12 +303,12 @@ describe('Autonomy Manager', () => {
       expect(result.payload.mode).toBe('full');
     });
 
-    it('autonomy.setCondo sets condo autonomy', () => {
-      seedCondo();
+    it('autonomy.setStrand sets strand autonomy', () => {
+      seedStrand();
       const handlers = createAutonomyHandlers(store);
       let result;
-      handlers['autonomy.setCondo']({
-        params: { condoId: 'condo_test', mode: 'supervised' },
+      handlers['autonomy.setStrand']({
+        params: { strandId: 'strand_test', mode: 'supervised' },
         respond: (ok, payload) => { result = { ok, payload }; },
       });
 

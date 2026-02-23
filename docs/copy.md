@@ -14,9 +14,9 @@ Stop managing AI chaos in chat threads. Helix gives your agents structured works
 
 ## Features
 
-### 🏠 Condos
+### 🏠 Strands
 **Workspaces that make sense**
-Group related work into dedicated spaces. Each condo is a self-contained project with its own goals, sessions, and context. No more agents stepping on each other's toes.
+Group related work into dedicated spaces. Each strand is a self-contained project with its own goals, sessions, and context. No more agents stepping on each other's toes.
 
 ### 🎯 Goals
 **Direction, not drift**
@@ -34,7 +34,7 @@ See what's running, what's blocked, and what's shipped—all in one view. Know e
 
 ## CTA
 
-**Primary:** Deploy Your First Condo →
+**Primary:** Deploy Your First Strand →
 
 **Secondary:** See It in Action
 

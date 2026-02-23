@@ -75,7 +75,7 @@ For complex tasks, create a plan before diving in:
 Your PM can see your task status in real-time. For questions:
 ```javascript
 team.send({
-  condoId: "condo_xxx",
+  strandId: "strand_xxx",
   targetAgent: "pm",
   message: "Question: should the deliverable include X or Y?"
 })
@@ -85,7 +85,7 @@ team.send({
 If you need input from another role:
 ```javascript
 team.send({
-  condoId: "condo_xxx",
+  strandId: "strand_xxx",
   targetAgent: "rolename",
   message: "My output is ready at /path — please review when you start your task"
 })

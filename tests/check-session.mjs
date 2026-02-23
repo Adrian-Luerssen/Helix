@@ -5,8 +5,8 @@ import os from 'os';
 const BEARER = readFileSync(os.homedir() + '/.config/systemd/user/openclaw-gateway.service', 'utf-8').match(/OPENCLAW_GATEWAY_TOKEN=(\S+)/)?.[1] || '';
 const PASSWORD = JSON.parse(readFileSync(os.homedir() + '/.openclaw/openclaw.json', 'utf-8'))?.gateway?.auth?.token || '';
 
-const condoId = process.argv[2];
-if (!condoId) { console.log('Usage: node /tmp/check-session.mjs <condoId>'); process.exit(1); }
+const strandId = process.argv[2];
+if (!strandId) { console.log('Usage: node /tmp/check-session.mjs <strandId>'); process.exit(1); }
 
 const ws = new WebSocket('ws://127.0.0.1:18789/ws', { headers: { Origin: 'http://127.0.0.1:18789', Authorization: 'Bearer ' + BEARER } });
 let reqId = 0;
@@ -43,10 +43,10 @@ ws.on('message', (raw) => {
 });
 
 async function run() {
-  // Get goals for this condo
-  const goalsResult = await sendRpc('goals.list', { condoId });
+  // Get goals for this strand
+  const goalsResult = await sendRpc('goals.list', { strandId });
   const goals = goalsResult.goals || [];
-  console.log(`\nCondo ${condoId}: ${goals.length} goals\n`);
+  console.log(`\nStrand ${strandId}: ${goals.length} goals\n`);
 
   for (const goal of goals) {
     console.log(`\n=== ${goal.title} (${goal.id}) ===`);

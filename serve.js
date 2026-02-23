@@ -25,7 +25,7 @@ import { createChatIndex } from './lib/chat-index.js';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // Auto-load env file (fills in any vars not already set in the environment)
-const ENV_FILE = join(process.env.HOME || '', '.config', 'clawcondos.env');
+const ENV_FILE = join(process.env.HOME || '', '.config', 'helix.env');
 if (existsSync(ENV_FILE)) {
   for (const line of readFileSync(ENV_FILE, 'utf-8').split('\n')) {
     const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
@@ -157,8 +157,8 @@ function whisperTranscribeLocal(filePath) {
   return new Promise((resolve, reject) => {
     const args = [
       filePath,
-      '--model', process.env.CLAWCONDOS_WHISPER_MODEL || 'base',
-      '--device', process.env.CLAWCONDOS_WHISPER_DEVICE || 'cpu',
+      '--model', process.env.HELIX_WHISPER_MODEL || 'base',
+      '--device', process.env.HELIX_WHISPER_DEVICE || 'cpu',
       '--output_format', 'txt',
       '--output_dir', join(__dirname, 'media', 'voice', 'transcripts')
     ];
@@ -168,7 +168,7 @@ function whisperTranscribeLocal(filePath) {
     let stdout = '';
     let timedOut = false;
 
-    const timeoutMs = Number(process.env.CLAWCONDOS_WHISPER_TIMEOUT_MS || 120_000);
+    const timeoutMs = Number(process.env.HELIX_WHISPER_TIMEOUT_MS || 120_000);
     const timer = setTimeout(() => {
       timedOut = true;
       try { p.kill('SIGKILL'); } catch {}
@@ -254,11 +254,11 @@ function safeReadFile(path, maxBytes = 200_000) {
   }
 }
 
-// Agent workspace mapping: set CLAWCONDOS_AGENT_WORKSPACES as JSON, e.g.
+// Agent workspace mapping: set HELIX_AGENT_WORKSPACES as JSON, e.g.
 //   {"main":"/path/to/main","caffeine":"/path/to/caffeine"}
 // Agents not in the map return null (introspection disabled for them).
 const AGENT_WORKSPACES = (() => {
-  try { return JSON.parse(process.env.CLAWCONDOS_AGENT_WORKSPACES || '{}'); } catch { return {}; }
+  try { return JSON.parse(process.env.HELIX_AGENT_WORKSPACES || '{}'); } catch { return {}; }
 })();
 
 function resolveAgentWorkspace(agentId) {
@@ -311,9 +311,9 @@ function buildAgentSummary(agentId) {
   };
 }
 
-// Skill directories: set CLAWCONDOS_SKILLS_DIRS as colon-separated paths, e.g.
+// Skill directories: set HELIX_SKILLS_DIRS as colon-separated paths, e.g.
 //   /usr/lib/node_modules/openclaw/skills:/home/user/skills
-const SKILLS_DIRS = (process.env.CLAWCONDOS_SKILLS_DIRS || '')
+const SKILLS_DIRS = (process.env.HELIX_SKILLS_DIRS || '')
   .split(':').map(s => s.trim()).filter(Boolean).map(s => resolvePath(s));
 
 function resolveSkills(ids) {
@@ -405,7 +405,7 @@ let wsConnectionCount = 0;
 // ── Real-time goal sync: watch goals.json and broadcast changes to all clients ──
 import { watchFile, unwatchFile } from 'fs';
 const connectedClients = new Set();
-const GOALS_FILE = join(__dirname, 'clawcondos/condo-management/.data/goals.json');
+const GOALS_FILE = join(__dirname, 'plugins/helix-goals/.data/goals.json');
 let lastGoalsMtime = 0;
 
 function broadcastGoalsChanged() {
@@ -444,7 +444,7 @@ function initGoalsWatcher() {
 initGoalsWatcher();
 
 // ── Kickoff event relay: plugin writes events to a file, serve.js broadcasts to clients ──
-const KICKOFF_FILE = join(__dirname, 'clawcondos/condo-management/.data/kickoff-events.json');
+const KICKOFF_FILE = join(__dirname, 'plugins/helix-goals/.data/kickoff-events.json');
 let lastKickoffMtime = 0;
 
 function broadcastKickoffEvents() {
@@ -517,7 +517,7 @@ const gatewayClient = createGatewayClient({
 
 // ── Deep search backends ──
 const embeddingProvider = createEmbeddingProvider({
-  provider: process.env.CLAWCONDOS_EMBEDDING_PROVIDER || 'openai',
+  provider: process.env.HELIX_EMBEDDING_PROVIDER || 'openai',
   apiKey: process.env.OPENAI_API_KEY,
 });
 
@@ -542,7 +542,7 @@ try {
   // Initial background sync (non-blocking)
   chatIndex.sync(gatewayClient).catch(err => console.error('[chat-index] Initial sync failed:', err.message));
   // Schedule recurring sync
-  const syncInterval = parseInt(process.env.CLAWCONDOS_SEARCH_SYNC_INTERVAL_MS) || 300000;
+  const syncInterval = parseInt(process.env.HELIX_SEARCH_SYNC_INTERVAL_MS) || 300000;
   chatIndex.startBackgroundSync(gatewayClient, syncInterval);
 } catch (err) {
   console.error('[chat-index] Init failed:', err.message);
@@ -579,7 +579,7 @@ const server = createServer(async (req, res) => {
   // CORS (dev-only)
   // SECURITY: this server can proxy to the OpenClaw gateway using an env Bearer token.
   // Never run with permissive CORS in production.
-  const DEV_CORS = process.env.CLAWCONDOS_DEV_CORS === '1';
+  const DEV_CORS = process.env.HELIX_DEV_CORS === '1';
   const origin = String(req.headers.origin || '');
   const isLocalOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
   if (DEV_CORS && isLocalOrigin) {
@@ -752,7 +752,7 @@ const server = createServer(async (req, res) => {
       if (goalsRes.status === 'rejected') console.error('[search] goals.list failed:', goalsRes.reason?.message);
       if (sessionsRes.status === 'rejected') console.error('[search] sessions.list failed:', sessionsRes.reason?.message);
 
-      // Enrich sessions with goal/condo info and worker/subagent detection
+      // Enrich sessions with goal/strand info and worker/subagent detection
       function enrichSession(s) {
         // Match both legacy subagent format and new webchat:task- format
         s.isSubagent = s.key.includes(':subagent:') || s.key.includes(':webchat:task-');
@@ -766,8 +766,8 @@ const server = createServer(async (req, res) => {
           if (Array.isArray(g.sessions) && g.sessions.includes(s.key)) {
             s.goalTitle = g.title;
             s.goalId = g.id;
-            s.condoId = g.condoId;
-            s.condoName = g.condoName;
+            s.strandId = g.strandId;
+            s.strandName = g.strandName;
             break;
           }
         }
@@ -981,7 +981,7 @@ const server = createServer(async (req, res) => {
       const p = url.searchParams.get('path') || '';
       if (!p) throw new Error('Missing path');
       const full = resolvePath(p);
-      const extraUploadDir = process.env.CLAWCONDOS_UPLOAD_DIR;
+      const extraUploadDir = process.env.HELIX_UPLOAD_DIR || '';
       const allowedRoots = [
         resolvePath(join(__dirname, 'media')),
         ...(extraUploadDir ? [resolvePath(extraUploadDir)] : []),
@@ -1036,7 +1036,7 @@ const server = createServer(async (req, res) => {
   // Static files
   //
   // Serve Helix's config module without colliding with Apps Gateway /lib/* handler
-  if (pathname === '/clawcondos-lib/config.js') {
+  if (pathname === '/helix-lib/config.js' || pathname === '/helix-lib/config.js') {
     const filePath = join(__dirname, 'lib', 'config.js');
     serveFile(res, filePath);
     return;
@@ -1123,11 +1123,11 @@ function tryHandleLocalServiceRpc(raw, clientWs) {
   try {
     const goalsPath = GOALS_FILE;
     const loadData = () => {
-      if (!existsSync(goalsPath)) return { config: {}, condos: [] };
+      if (!existsSync(goalsPath)) return { config: {}, strands: [] };
       return JSON.parse(readFileSync(goalsPath, 'utf-8'));
     };
     const persistData = (d) => {
-      const dir = join(__dirname, 'clawcondos/condo-management/.data');
+      const dir = join(__dirname, 'plugins/helix-goals/.data');
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
       writeFileSync(goalsPath, JSON.stringify(d, null, 2));
     };
@@ -1157,10 +1157,10 @@ function tryHandleLocalServiceRpc(raw, clientWs) {
     if (frame.method === 'config.getServices') {
       const data = loadData();
       const globalSvcs = data.config?.services || {};
-      if (params.condoId) {
-        const condo = (data.condos || []).find(c => c.id === params.condoId);
-        if (!condo) return respond(false, null, 'Condo not found'), true;
-        const overrides = condo.services || {};
+      if (params.strandId) {
+        const strand = (data.strands || []).find(c => c.id === params.strandId);
+        if (!strand) return respond(false, null, 'Strand not found'), true;
+        const overrides = strand.services || {};
         const merged = { ...globalSvcs };
         for (const [n, o] of Object.entries(overrides)) merged[n] = { ...(merged[n] || {}), ...o };
         respond(true, { services: maskAll(merged), overrides: maskAll(overrides) });
@@ -1171,16 +1171,16 @@ function tryHandleLocalServiceRpc(raw, clientWs) {
     }
 
     if (frame.method === 'config.setService') {
-      const { service, config: svcCfg, condoId } = params;
+      const { service, config: svcCfg, strandId } = params;
       if (!service || typeof service !== 'string') return respond(false, null, 'service name is required'), true;
       if (!svcCfg || typeof svcCfg !== 'object') return respond(false, null, 'config object is required'), true;
       const data = loadData();
-      if (condoId) {
-        const condo = (data.condos || []).find(c => c.id === condoId);
-        if (!condo) return respond(false, null, 'Condo not found'), true;
-        if (!condo.services) condo.services = {};
-        condo.services[service] = { ...(condo.services[service] || {}), ...svcCfg };
-        condo.updatedAtMs = Date.now();
+      if (strandId) {
+        const strand = (data.strands || []).find(c => c.id === strandId);
+        if (!strand) return respond(false, null, 'Strand not found'), true;
+        if (!strand.services) strand.services = {};
+        strand.services[service] = { ...(strand.services[service] || {}), ...svcCfg };
+        strand.updatedAtMs = Date.now();
       } else {
         if (!data.config) data.config = {};
         if (!data.config.services) data.config.services = {};
@@ -1193,17 +1193,17 @@ function tryHandleLocalServiceRpc(raw, clientWs) {
     }
 
     if (frame.method === 'config.deleteService') {
-      const { service, condoId } = params;
+      const { service, strandId } = params;
       if (!service || typeof service !== 'string') return respond(false, null, 'service name is required'), true;
       const data = loadData();
-      if (condoId) {
-        const condo = (data.condos || []).find(c => c.id === condoId);
-        if (!condo) return respond(false, null, 'Condo not found'), true;
-        if (condo.services) {
-          delete condo.services[service];
-          if (Object.keys(condo.services).length === 0) delete condo.services;
+      if (strandId) {
+        const strand = (data.strands || []).find(c => c.id === strandId);
+        if (!strand) return respond(false, null, 'Strand not found'), true;
+        if (strand.services) {
+          delete strand.services[service];
+          if (Object.keys(strand.services).length === 0) delete strand.services;
         }
-        condo.updatedAtMs = Date.now();
+        strand.updatedAtMs = Date.now();
       } else {
         if (data.config?.services) {
           delete data.config.services[service];
@@ -1217,17 +1217,17 @@ function tryHandleLocalServiceRpc(raw, clientWs) {
     }
 
     if (frame.method === 'config.verifyGitHub') {
-      const { token: rawToken, condoId, repoUrl } = params;
+      const { token: rawToken, strandId, repoUrl } = params;
 
       // Resolve token
       let tokenToVerify = rawToken;
       if (!tokenToVerify) {
         const data = loadData();
-        if (condoId) {
-          const condo = (data.condos || []).find(c => c.id === condoId);
-          const condoGh = condo?.services?.github;
-          if (condoGh?.agentToken) tokenToVerify = condoGh.agentToken;
-          else if (condoGh?.token) tokenToVerify = condoGh.token;
+        if (strandId) {
+          const strand = (data.strands || []).find(c => c.id === strandId);
+          const strandGh = strand?.services?.github;
+          if (strandGh?.agentToken) tokenToVerify = strandGh.agentToken;
+          else if (strandGh?.token) tokenToVerify = strandGh.token;
         }
         if (!tokenToVerify) {
           const gh = data.config?.services?.github;
@@ -1318,7 +1318,7 @@ function tryHandleLocalServiceRpc(raw, clientWs) {
 server.on('upgrade', (req, socket, head) => {
   try {
     const url = new URL(req.url, `http://localhost:${PORT}`);
-    if (url.pathname !== '/ws' && url.pathname !== '/clawcondos-ws') {
+    if (url.pathname !== '/ws' && url.pathname !== '/helix-ws') {
       socket.destroy();
       return;
     }

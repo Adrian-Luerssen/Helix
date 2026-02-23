@@ -7,11 +7,11 @@
 import { describe, it, expect } from 'vitest';
 import { setupBrowserMocks } from './setup.js';
 
-// Import the actual config module (attaches to window.ClawCondosConfig via IIFE)
+// Import the actual config module (attaches to window.HelixConfig via IIFE for backwards compat)
 import '../lib/config.js';
 
 function getConfigModule() {
-  return global.window?.ClawCondosConfig;
+  return global.window?.HelixConfig;
 }
 
 describe('Config Module (actual lib/config.js)', () => {
@@ -69,9 +69,9 @@ describe('Config Module (actual lib/config.js)', () => {
       expect(config.gatewayWsUrl).toMatch(/^ws:\/\//);
     });
 
-    it('should merge inline CLAWCONDOS_CONFIG overrides', () => {
+    it('should merge inline HELIX_CONFIG overrides', () => {
       setupBrowserMocks({ hostname: 'example.com', protocol: 'https:' });
-      global.window.CLAWCONDOS_CONFIG = {
+      global.window.HELIX_CONFIG = {
         gatewayWsUrl: 'wss://custom.gateway.com/',
         branding: { name: 'MyApp' }
       };

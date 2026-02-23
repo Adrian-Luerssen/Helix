@@ -8,9 +8,9 @@ const NOW = Date.now();
 const HOUR = 3600000;
 const DAY = 86400000;
 
-const MOCK_CONDOS = [
+const MOCK_STRANDS = [
   {
-    id: 'condo_helix01',
+    id: 'strand_helix01',
     name: 'Helix Dashboard',
     description: 'Main Helix multi-agent orchestration platform',
     color: '#818CF8',
@@ -19,7 +19,7 @@ const MOCK_CONDOS = [
     workspace: { path: '/home/dev/helix-workspaces/helix-dashboard-a1b2c3d4', repoUrl: 'https://github.com/Adrian-Luerssen/Helix', createdAtMs: NOW - 14 * DAY },
   },
   {
-    id: 'condo_recipe02',
+    id: 'strand_recipe02',
     name: 'Recipe Box',
     description: 'Full-stack recipe management application',
     color: '#22D3EE',
@@ -28,7 +28,7 @@ const MOCK_CONDOS = [
     workspace: { path: '/home/dev/helix-workspaces/recipe-box-9d5777ce', createdAtMs: NOW - 7 * DAY },
   },
   {
-    id: 'condo_devops03',
+    id: 'strand_devops03',
     name: 'DevOps Pipeline',
     description: 'CI/CD and infrastructure automation',
     color: '#F59E0B',
@@ -42,7 +42,7 @@ const MOCK_GOALS = [
   // Helix Dashboard goals
   {
     id: 'goal_redesign',
-    condoId: 'condo_helix01',
+    strandId: 'strand_helix01',
     title: 'Redesign CSS color system',
     status: 'done',
     phase: 1,
@@ -65,7 +65,7 @@ const MOCK_GOALS = [
   },
   {
     id: 'goal_voice',
-    condoId: 'condo_helix01',
+    strandId: 'strand_helix01',
     title: 'Add voice recording with Whisper',
     status: 'active',
     phase: 2,
@@ -82,12 +82,12 @@ const MOCK_GOALS = [
   },
   {
     id: 'goal_search',
-    condoId: 'condo_helix01',
+    strandId: 'strand_helix01',
     title: 'Implement global search (Ctrl+K)',
     status: 'active',
     phase: 2,
     priority: 'low',
-    notes: 'Add fuzzy search across sessions, goals, and condos with keyboard-driven navigation',
+    notes: 'Add fuzzy search across sessions, goals, and strands with keyboard-driven navigation',
     createdAtMs: NOW - 6 * DAY,
     updatedAtMs: NOW - 1 * DAY,
     sessions: ['agent:main:main'],
@@ -101,7 +101,7 @@ const MOCK_GOALS = [
   // Recipe Box goals
   {
     id: 'goal_recipe_api',
-    condoId: 'condo_recipe02',
+    strandId: 'strand_recipe02',
     title: 'Backend REST API',
     status: 'active',
     phase: 1,
@@ -118,7 +118,7 @@ const MOCK_GOALS = [
   },
   {
     id: 'goal_recipe_ui',
-    condoId: 'condo_recipe02',
+    strandId: 'strand_recipe02',
     title: 'Frontend recipe browser',
     status: 'active',
     phase: 2,
@@ -136,7 +136,7 @@ const MOCK_GOALS = [
   // DevOps goal
   {
     id: 'goal_cicd',
-    condoId: 'condo_devops03',
+    strandId: 'strand_devops03',
     title: 'GitHub Actions CI/CD pipeline',
     status: 'active',
     phase: 1,
@@ -184,7 +184,7 @@ const MOCK_AGENT_STATUS = {
 
 // Inject mock data into the app's global state and render a view
 function buildInjectScript(view, extras = {}) {
-  return { condos: MOCK_CONDOS, goals: MOCK_GOALS, sessions: MOCK_SESSIONS, agents: MOCK_AGENTS, agentStatus: MOCK_AGENT_STATUS, view, ...extras };
+  return { strands: MOCK_STRANDS, goals: MOCK_GOALS, sessions: MOCK_SESSIONS, agents: MOCK_AGENTS, agentStatus: MOCK_AGENT_STATUS, view, ...extras };
 }
 
 test.describe('Screenshots', () => {
@@ -208,7 +208,7 @@ test.describe('Screenshots', () => {
 
       // Inject data into global state
       if (typeof state !== 'undefined') {
-        state.condos = d.condos;
+        state.strands = d.strands;
         state.goals = d.goals;
         state.sessions = d.sessions;
         state.agents = d.agents;
@@ -232,7 +232,7 @@ test.describe('Screenshots', () => {
     // Render the overview components
     await page.evaluate(() => {
       if (typeof updateStatsGrid === 'function') updateStatsGrid();
-      if (typeof renderCondoStatusBoard === 'function') renderCondoStatusBoard();
+      if (typeof renderStrandStatusBoard === 'function') renderStrandStatusBoard();
       if (typeof renderGoals === 'function') renderGoals();
       if (typeof renderRecentSessions === 'function') renderRecentSessions();
     });
@@ -269,22 +269,22 @@ test.describe('Screenshots', () => {
     });
   });
 
-  test('condo context', async ({ page }) => {
-    const data = buildInjectScript('condoContext', { condoId: 'condo_helix01' });
+  test('strand context', async ({ page }) => {
+    const data = buildInjectScript('strandContext', { strandId: 'strand_helix01' });
     await loadAndInject(page, data);
 
-    // Activate condo context view
+    // Activate strand context view
     await page.evaluate((d) => {
-      state.currentCondoContextId = d.condoId;
+      state.currentStrandContextId = d.strandId;
       if (typeof deactivateAllViews === 'function') deactivateAllViews();
-      const condoView = document.getElementById('condoContextView');
-      if (condoView) condoView.classList.add('active');
-      if (typeof renderCondoContext === 'function') renderCondoContext();
+      const strandView = document.getElementById('strandContextView');
+      if (strandView) strandView.classList.add('active');
+      if (typeof renderStrandContext === 'function') renderStrandContext();
     }, data);
     await page.waitForTimeout(500);
 
     await page.screenshot({
-      path: join(SCREENSHOT_DIR, 'condo-context.png'),
+      path: join(SCREENSHOT_DIR, 'strand-context.png'),
       fullPage: false,
     });
   });
@@ -332,7 +332,7 @@ test.describe('Screenshots', () => {
     // Render the overview first so there's content behind the search overlay
     await page.evaluate(() => {
       if (typeof updateStatsGrid === 'function') updateStatsGrid();
-      if (typeof renderCondoStatusBoard === 'function') renderCondoStatusBoard();
+      if (typeof renderStrandStatusBoard === 'function') renderStrandStatusBoard();
       if (typeof renderGoals === 'function') renderGoals();
     });
     await page.waitForTimeout(300);

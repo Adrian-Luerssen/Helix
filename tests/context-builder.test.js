@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGoalContext, buildCondoContext, buildProjectSummary, buildCondoMenuContext } from '../clawcondos/condo-management/lib/context-builder.js';
+import { buildGoalContext, buildStrandContext, buildProjectSummary, buildStrandMenuContext } from '../plugins/helix-goals/lib/context-builder.js';
 
 describe('buildGoalContext', () => {
   const baseGoal = {
@@ -15,7 +15,7 @@ describe('buildGoalContext', () => {
       { id: 't3', text: 'Write tests', done: false },
     ],
     sessions: ['agent:main:main', 'agent:main:subagent:abc'],
-    condoId: 'condo:clawcondos',
+    strandId: 'strand:helix',
   };
 
   it('returns null if no goal provided', () => {
@@ -171,7 +171,7 @@ describe('buildGoalContext with sibling sessions', () => {
 });
 
 describe('buildProjectSummary', () => {
-  const condo = { id: 'condo_abc', name: 'Website Redesign' };
+  const strand = { id: 'strand_abc', name: 'Website Redesign' };
 
   const goals = [
     { id: 'goal_111', title: 'Design System', status: 'done', tasks: [{ id: 't1', text: 'x', done: true }] },
@@ -186,50 +186,50 @@ describe('buildProjectSummary', () => {
     { id: 'goal_555', title: 'Performance Audit', status: 'pending', tasks: [] },
   ];
 
-  it('returns null for null condo', () => {
+  it('returns null for null strand', () => {
     expect(buildProjectSummary(null, goals, 'goal_333')).toBeNull();
   });
 
   it('returns null for empty goals array', () => {
-    expect(buildProjectSummary(condo, [], 'goal_333')).toBeNull();
+    expect(buildProjectSummary(strand, [], 'goal_333')).toBeNull();
   });
 
-  it('includes condo name and id in <project> tag', () => {
-    const result = buildProjectSummary(condo, goals, 'goal_333');
-    expect(result).toContain('<project name="Website Redesign" id="condo_abc"');
+  it('includes strand name and id in <project> tag', () => {
+    const result = buildProjectSummary(strand, goals, 'goal_333');
+    expect(result).toContain('<project name="Website Redesign" id="strand_abc"');
     expect(result).toContain('</project>');
   });
 
   it('includes goal count in <project> tag', () => {
-    const result = buildProjectSummary(condo, goals, 'goal_333');
+    const result = buildProjectSummary(strand, goals, 'goal_333');
     expect(result).toContain('goals="5"');
   });
 
   it('marks currentGoalId with ← this goal', () => {
-    const result = buildProjectSummary(condo, goals, 'goal_333');
+    const result = buildProjectSummary(strand, goals, 'goal_333');
     expect(result).toContain('Ship feature (goal_333) ← this goal');
   });
 
   it('shows [done] and [active] status markers', () => {
-    const result = buildProjectSummary(condo, goals, 'goal_333');
+    const result = buildProjectSummary(strand, goals, 'goal_333');
     expect(result).toContain('[done] Design System');
     expect(result).toContain('[active] Ship Landing Page');
   });
 
   it('shows task progress for active goals (not current)', () => {
-    const result = buildProjectSummary(condo, goals, 'goal_333');
+    const result = buildProjectSummary(strand, goals, 'goal_333');
     expect(result).toContain('Ship Landing Page (goal_222) — 2/4 tasks');
   });
 
   it('does not show task progress for current goal', () => {
-    const result = buildProjectSummary(condo, goals, 'goal_333');
+    const result = buildProjectSummary(strand, goals, 'goal_333');
     // goal_333 should show ← this goal, not task count
     expect(result).toMatch(/Ship feature \(goal_333\) ← this goal/);
     expect(result).not.toMatch(/Ship feature \(goal_333\) —/);
   });
 
   it('shows numbered list', () => {
-    const result = buildProjectSummary(condo, goals, 'goal_333');
+    const result = buildProjectSummary(strand, goals, 'goal_333');
     expect(result).toContain('1. [done]');
     expect(result).toContain('5. [pending]');
   });
@@ -238,34 +238,34 @@ describe('buildProjectSummary', () => {
     const manyGoals = Array.from({ length: 20 }, (_, i) => ({
       id: `goal_${i}`, title: `Goal ${i}`, status: 'pending', tasks: [],
     }));
-    const result = buildProjectSummary(condo, manyGoals, 'goal_0');
+    const result = buildProjectSummary(strand, manyGoals, 'goal_0');
     expect(result).toContain('15. [pending]');
     expect(result).not.toContain('16.');
     expect(result).toContain('... and 5 more');
   });
 
   it('returns null for goals not in an array', () => {
-    expect(buildProjectSummary(condo, null, 'goal_1')).toBeNull();
+    expect(buildProjectSummary(strand, null, 'goal_1')).toBeNull();
   });
 
   it('defaults missing status to active (matching goal creation default)', () => {
     const goalsWithNoStatus = [
       { id: 'goal_x', title: 'No Status Goal', tasks: [] },
     ];
-    const result = buildProjectSummary(condo, goalsWithNoStatus, 'other');
+    const result = buildProjectSummary(strand, goalsWithNoStatus, 'other');
     expect(result).toContain('[active] No Status Goal');
   });
 
   it('handles currentGoalId that does not match any goal', () => {
-    const result = buildProjectSummary(condo, goals, 'nonexistent_goal');
+    const result = buildProjectSummary(strand, goals, 'nonexistent_goal');
     expect(result).not.toContain('← this goal');
     expect(result).toContain('Ship Landing Page');
   });
 });
 
-describe('buildCondoContext', () => {
-  const condo = {
-    id: 'condo_1',
+describe('buildStrandContext', () => {
+  const strand = {
+    id: 'strand_1',
     name: 'Website Redesign',
     description: 'Full redesign of the marketing site',
   };
@@ -290,33 +290,33 @@ describe('buildCondoContext', () => {
     },
   ];
 
-  it('returns null if no condo provided', () => {
-    expect(buildCondoContext(null, [])).toBeNull();
+  it('returns null if no strand provided', () => {
+    expect(buildStrandContext(null, [])).toBeNull();
   });
 
-  it('includes condo name and description', () => {
-    const ctx = buildCondoContext(condo, goals);
+  it('includes strand name and description', () => {
+    const ctx = buildStrandContext(strand, goals);
     expect(ctx).toContain('Website Redesign');
     expect(ctx).toContain('Full redesign of the marketing site');
   });
 
   it('includes all goals with tasks', () => {
-    const ctx = buildCondoContext(condo, goals);
+    const ctx = buildStrandContext(strand, goals);
     expect(ctx).toContain('Ship Landing Page');
     expect(ctx).toContain('SEO Optimization');
     expect(ctx).toContain('Design mockups');
     expect(ctx).toContain('Keyword research');
   });
 
-  it('renders goals as ### headings (nested under condo)', () => {
-    const ctx = buildCondoContext(condo, goals);
+  it('renders goals as ### headings (nested under strand)', () => {
+    const ctx = buildStrandContext(strand, goals);
     expect(ctx).toContain('### Ship Landing Page');
     // Should not have top-level "# " heading for goals (only ### inside goal blocks)
     expect(ctx).not.toMatch(/^# Ship Landing Page/m);
   });
 
   it('includes summary line', () => {
-    const ctx = buildCondoContext(condo, goals);
+    const ctx = buildStrandContext(strand, goals);
     expect(ctx).toContain('Active: 2 goals, 2 pending tasks');
     expect(ctx).toContain('Completed: 0 goals');
   });
@@ -326,43 +326,43 @@ describe('buildCondoContext', () => {
       { ...goals[0], status: 'done', tasks: [{ id: 't1', text: 'Done', done: true }] },
       goals[1],
     ];
-    const ctx = buildCondoContext(condo, mixed);
+    const ctx = buildStrandContext(strand, mixed);
     expect(ctx).toContain('Active: 1 goals, 1 pending tasks');
     expect(ctx).toContain('Completed: 1 goals');
   });
 
   it('includes tool usage instructions', () => {
-    const ctx = buildCondoContext(condo, goals);
-    expect(ctx).toContain('condo_pm_chat');
-    expect(ctx).toContain('condo_pm_kickoff');
-    expect(ctx).toContain('condo_status');
+    const ctx = buildStrandContext(strand, goals);
+    expect(ctx).toContain('strand_pm_chat');
+    expect(ctx).toContain('strand_pm_kickoff');
+    expect(ctx).toContain('strand_status');
     expect(ctx).toContain('goal_update');
   });
 
   it('handles empty goals list', () => {
-    const ctx = buildCondoContext(condo, []);
+    const ctx = buildStrandContext(strand, []);
     expect(ctx).toContain('Website Redesign');
     expect(ctx).toContain('Active: 0 goals, 0 pending tasks');
   });
 });
 
-describe('buildCondoMenuContext', () => {
-  it('builds menu from condos list', () => {
-    const condos = [
-      { id: 'condo:alpha', name: 'Alpha', description: 'Alpha project' },
-      { id: 'condo:beta', name: 'Beta', description: '' },
+describe('buildStrandMenuContext', () => {
+  it('builds menu from strands list', () => {
+    const strands = [
+      { id: 'strand:alpha', name: 'Alpha', description: 'Alpha project' },
+      { id: 'strand:beta', name: 'Beta', description: '' },
     ];
     const goals = [
-      { condoId: 'condo:alpha', title: 'Goal A', status: 'active', tasks: [] },
+      { strandId: 'strand:alpha', title: 'Goal A', status: 'active', tasks: [] },
     ];
-    const menu = buildCondoMenuContext(condos, goals);
+    const menu = buildStrandMenuContext(strands, goals);
     expect(menu).toContain('Alpha');
     expect(menu).toContain('Beta');
-    expect(menu).toContain('condo_bind');
+    expect(menu).toContain('strand_bind');
     expect(menu).toContain('Goal A');
   });
 
-  it('returns null for empty condos', () => {
-    expect(buildCondoMenuContext([], [])).toBeNull();
+  it('returns null for empty strands', () => {
+    expect(buildStrandMenuContext([], [])).toBeNull();
   });
 });

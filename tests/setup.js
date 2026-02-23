@@ -87,12 +87,12 @@ export function setupBrowserMocks(options = {}) {
     origin: `${protocol}//${hostname}${port ? ':' + port : ''}`
   };
 
-  // Mock window (preserve ClawCondosConfig from lib/config.js import)
-  const prevConfig = global.window?.ClawCondosConfig;
+  // Mock window (preserve HelixConfig from lib/config.js import)
+  const prevConfig = global.window?.HelixConfig;
   global.window = {
     location: global.location,
-    ClawCondosConfig: prevConfig || {},
-    CLAWCONDOS_CONFIG: null,
+    HelixConfig: prevConfig || {},
+    HELIX_CONFIG: null,
     localStorage: createMockLocalStorage(localStorage),
     addEventListener: vi.fn(),
     removeEventListener: vi.fn()

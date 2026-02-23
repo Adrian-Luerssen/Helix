@@ -4,46 +4,46 @@ import {
   parseTasksFromTable,
   parseTasksFromLists,
   detectPlan,
-  detectCondoPlan,
+  detectStrandPlan,
   parseGoalsFromPlan,
   normalizeAgentToRole,
   getSupportedRoles,
   convertPhasesToDependsOn,
-} from '../clawcondos/condo-management/lib/plan-parser.js';
+} from '../plugins/helix-goals/lib/plan-parser.js';
 
 describe('plan-parser', () => {
-  describe('detectCondoPlan', () => {
+  describe('detectStrandPlan', () => {
     it('detects ## Goals header', () => {
-      expect(detectCondoPlan('## Goals\n| # | Goal | Description |')).toBe(true);
+      expect(detectStrandPlan('## Goals\n| # | Goal | Description |')).toBe(true);
     });
 
     it('detects ## Milestones header', () => {
-      expect(detectCondoPlan('Here is my plan:\n## Milestones\n1. First milestone')).toBe(true);
+      expect(detectStrandPlan('Here is my plan:\n## Milestones\n1. First milestone')).toBe(true);
     });
 
     it('detects ## Objectives header', () => {
-      expect(detectCondoPlan('### Objectives\n- Objective one')).toBe(true);
+      expect(detectStrandPlan('### Objectives\n- Objective one')).toBe(true);
     });
 
     it('detects goal table with | Goal | column', () => {
-      expect(detectCondoPlan('| # | Goal | Description | Priority |\n|---|------|-------------|----------|')).toBe(true);
+      expect(detectStrandPlan('| # | Goal | Description | Priority |\n|---|------|-------------|----------|')).toBe(true);
     });
 
     it('detects goal table with | Milestone | column', () => {
-      expect(detectCondoPlan('| Milestone | Description |\n|-----------|-------------|')).toBe(true);
+      expect(detectStrandPlan('| Milestone | Description |\n|-----------|-------------|')).toBe(true);
     });
 
     it('falls back to general plan detection', () => {
-      expect(detectCondoPlan('## Plan\n| Task | Agent |\n|------|-------|')).toBe(true);
+      expect(detectStrandPlan('## Plan\n| Task | Agent |\n|------|-------|')).toBe(true);
     });
 
     it('returns false for non-plan content', () => {
-      expect(detectCondoPlan('Hello, how are you?')).toBe(false);
+      expect(detectStrandPlan('Hello, how are you?')).toBe(false);
     });
 
     it('returns false for null/empty input', () => {
-      expect(detectCondoPlan(null)).toBe(false);
-      expect(detectCondoPlan('')).toBe(false);
+      expect(detectStrandPlan(null)).toBe(false);
+      expect(detectStrandPlan('')).toBe(false);
     });
   });
 

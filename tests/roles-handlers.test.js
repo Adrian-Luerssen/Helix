@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { createGoalsStore } from '../clawcondos/condo-management/lib/goals-store.js';
-import { createRolesHandlers } from '../clawcondos/condo-management/lib/roles-handlers.js';
+import { createGoalsStore } from '../plugins/helix-goals/lib/goals-store.js';
+import { createRolesHandlers } from '../plugins/helix-goals/lib/roles-handlers.js';
 
 const TEST_DIR = join(import.meta.dirname, '__fixtures__', 'roles-handlers-test');
 
@@ -307,7 +307,7 @@ describe('Roles Handlers', () => {
     });
 
     it('returns empty suggestions when env var not set', () => {
-      delete process.env.CLAWCONDOS_AGENT_WORKSPACES;
+      delete process.env.HELIX_AGENT_WORKSPACES;
 
       let result;
       handlers['roles.autoDetect']({
@@ -317,7 +317,7 @@ describe('Roles Handlers', () => {
 
       expect(result.ok).toBe(true);
       expect(result.payload.suggestions).toEqual([]);
-      expect(result.payload.note).toContain('CLAWCONDOS_AGENT_WORKSPACES');
+      expect(result.payload.note).toContain('HELIX_AGENT_WORKSPACES');
     });
 
     it('detects frontend role from SOUL.md', () => {
@@ -329,7 +329,7 @@ describe('Roles Handlers', () => {
         '# Felix\n\nI am a frontend developer specializing in React and UI development.\nI work with CSS, HTML, and modern web technologies.'
       );
 
-      process.env.CLAWCONDOS_AGENT_WORKSPACES = `felix=${felixDir}`;
+      process.env.HELIX_AGENT_WORKSPACES = `felix=${felixDir}`;
 
       let result;
       handlers['roles.autoDetect']({
@@ -353,7 +353,7 @@ describe('Roles Handlers', () => {
         '# Blake\n\nBackend developer focused on API design and database management.\nI work with Node.js, Python, and SQL databases.'
       );
 
-      process.env.CLAWCONDOS_AGENT_WORKSPACES = `blake=${blakeDir}`;
+      process.env.HELIX_AGENT_WORKSPACES = `blake=${blakeDir}`;
 
       let result;
       handlers['roles.autoDetect']({
@@ -376,7 +376,7 @@ describe('Roles Handlers', () => {
       writeFileSync(join(felixDir, 'SOUL.md'), 'Frontend React developer');
       writeFileSync(join(blakeDir, 'SOUL.md'), 'Backend API developer');
 
-      process.env.CLAWCONDOS_AGENT_WORKSPACES = `felix=${felixDir},blake=${blakeDir}`;
+      process.env.HELIX_AGENT_WORKSPACES = `felix=${felixDir},blake=${blakeDir}`;
 
       let result;
       handlers['roles.autoDetect']({
@@ -389,7 +389,7 @@ describe('Roles Handlers', () => {
     });
 
     afterEach(() => {
-      delete process.env.CLAWCONDOS_AGENT_WORKSPACES;
+      delete process.env.HELIX_AGENT_WORKSPACES;
     });
   });
 

@@ -50,10 +50,10 @@ test.describe('Dashboard', () => {
     await expect(overviewView).toHaveClass(/active/, { timeout: 5000 });
   });
 
-  test('condos status board container exists', async ({ page }) => {
+  test('strands status board container exists', async ({ page }) => {
     await page.goto('/');
-    const condoBoard = page.locator('#condoStatusBoard');
-    const count = await condoBoard.count();
+    const strandBoard = page.locator('#strandStatusBoard');
+    const count = await strandBoard.count();
     expect(count).toBeGreaterThanOrEqual(1);
   });
 
@@ -64,14 +64,14 @@ test.describe('Dashboard', () => {
     expect(count).toBe(1);
   });
 
-  test('condo context view exists', async ({ page }) => {
+  test('strand context view exists', async ({ page }) => {
     await page.goto('/');
-    const condoView = page.locator('#condoContextView');
-    const count = await condoView.count();
+    const strandView = page.locator('#strandContextView');
+    const count = await strandView.count();
     expect(count).toBe(1);
   });
 
-  test('sidebar has condos, apps, and agents sections', async ({ page }) => {
+  test('sidebar has strands, apps, and agents sections', async ({ page }) => {
     await page.goto('/');
     // Check for sidebar section titles
     const sectionTitles = page.locator('.section-title');
