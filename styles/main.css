@@ -122,6 +122,8 @@ body {
   letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Reduce layout shift from font swap (FOUT mitigation) */
+  font-size-adjust: from-font;
 }
 
 /* ── Utility classes ── */
@@ -1777,6 +1779,8 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  /* Prevent scroll jump on view switch */
+  scroll-behavior: smooth;
 }
 
 /* Split view: overview + goal panel side by side */
@@ -1812,10 +1816,14 @@ body {
   flex: 1;
   flex-direction: column;
   position: relative; /* For drop overlay positioning */
+  /* Smooth view transitions to prevent scroll jump */
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
 }
 
 .view.active {
   display: flex;
+  opacity: 1;
 }
 
 .overview-content {
@@ -2484,6 +2492,8 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--space-lg);
+  /* Reserve space to prevent layout shift when cards load */
+  min-height: 180px;
 }
 
 .session-card, .app-card {
@@ -2498,6 +2508,8 @@ body {
   gap: var(--space-md);
   position: relative;
   overflow: hidden;
+  /* Contain layout to prevent reflow affecting siblings */
+  contain: layout style;
 }
 
 /* Neon top edge */
@@ -5680,6 +5692,8 @@ a:focus-visible {
   grid-template-columns: repeat(4, 1fr);
   gap: 10px;
   margin-bottom: 28px;
+  /* Reserve space to prevent layout shift during dynamic content load */
+  min-height: 88px;
 }
 
 @media (max-width: 768px) {
@@ -5704,6 +5718,10 @@ a:focus-visible {
   position: relative;
   overflow: hidden;
   transition: all var(--transition-smooth);
+  /* Contain layout to prevent reflow affecting siblings */
+  contain: layout style;
+  /* Reserve consistent height */
+  min-height: 88px;
 }
 
 .stat-card::before {
