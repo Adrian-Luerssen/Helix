@@ -436,14 +436,41 @@ export default function register(api) {
    * @param {string} goalId
    */
   async function autoMergeGoal(goalId) {
-    if (!wsOps) return;
     try {
       const mergeData = store.load();
       const mergeGoal = mergeData.goals.find(g => g.id === goalId);
-      if (!mergeGoal?.worktree?.branch) return;
+      if (!mergeGoal) return;
 
       const mergeStrand = mergeData.strands.find(c => c.id === mergeGoal.strandId);
-      if (!mergeStrand?.workspace?.path) return;
+
+      // If workspaces are disabled or goal has no worktree, skip git ops but still complete the goal
+      if (!wsOps || !mergeGoal.worktree?.branch || !mergeStrand?.workspace?.path) {
+        mergeGoal.status = 'done';
+        mergeGoal.completed = true;
+        mergeGoal.completedAtMs = Date.now();
+        store.save(mergeData);
+
+        broadcastPlanUpdate({
+          event: 'goal.completed',
+          goalId: mergeGoal.id,
+          strandId: mergeStrand?.id || null,
+          phase: mergeGoal.phase || null,
+          timestamp: Date.now(),
+        });
+
+        api.logger.info(`helix-goals: goal ${goalId} marked done (no workspace/worktree)`);
+
+        if (mergeStrand?.id) {
+          setTimeout(async () => {
+            try {
+              await kickoffUnblockedGoals(mergeStrand.id);
+            } catch (err) {
+              api.logger.error(`helix-goals: kickoffUnblockedGoals failed: ${err.message}`);
+            }
+          }, 2000);
+        }
+        return;
+      }
 
       // Auto-commit any uncommitted changes in the goal worktree before merging
       if (mergeGoal.worktree?.path && wsOps.commitWorktreeChanges) {
